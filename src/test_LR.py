@@ -15,7 +15,7 @@ import numpy as np
 
 #from temperature_scaling import 
 
-
+#get the scores for the trained model
 def get_score(model, X, y, X_val, y_val):
 	model.fit(X, y)
 	y_pred = model.predict_proba(X_val)[:,1]
@@ -23,12 +23,13 @@ def get_score(model, X, y, X_val, y_val):
 	brier_score = brier_score_loss(y_val, y_pred)
 	return auc_score,brier_score
 
-
+#set train file
 train_file = sys.argv[1]
 
+#set test file
 test_file = sys.argv[2]
 
-# Using only a subset of the variables.
+#read the data
 data = pd.read_csv(train_file).dropna()
 
 data_test = pd.read_csv(test_file).dropna()
@@ -36,32 +37,37 @@ data_test = pd.read_csv(test_file).dropna()
 X_orig = data.drop(['mut_type'], axis=1)
 y = data['mut_type']
 
+#extract the category columns
 cat_columns = data.columns.tolist()[0:11]
 
 #con_idx = np.append([11], list(range(13,27)))
 
 #con_columns = list( data.columns.tolist()[i] for i in con_idx)
 
+#use the OneHotEncoder to transform the data
 ohe = ce.OneHotEncoder(handle_unknown='ignore', use_cat_names=True, cols=cat_columns)
 
 X = ohe.fit_transform(X_orig)
 
 #ohe.inverse_transform(data1).shape
 
+#set train data, validation data
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=101010)
 
 X_orig_train, X_orig_val, y_train, y_val = train_test_split(X_orig, y, test_size=0.2, random_state=101010)
 
-####
+#set testing data
 X_test_orig = data_test.drop(['mut_type'], axis=1)
 
 y_test = data_test['mut_type']
 
 X_test = ohe.fit_transform(X_test_orig)
 
-#logit = LogisticRegression(solver='lbfgs')
+
+#Logistic Regression model
 logit = LogisticRegression(solver='lbfgs', max_iter=1000)
 
+#Random Forest model
 rf = RandomForestClassifier(n_estimators=100)
 
 
@@ -82,7 +88,6 @@ fit = logit_model_cv.fit(X, y)
 #fit = logit.fit(X_train, y_train)
 
 
-
 roc_auc_score(y_val, fit.predict_proba(X_val)[:,1])
 
 brier_score_loss(y_train, fit.predict_proba(X_train)[:,1])
@@ -100,11 +105,10 @@ X_out = ohe.inverse_transform(X_test).reset_index().drop(['index'], axis=1)
 y_out = y_test.reset_index().drop(['index'], axis=1)
 y_prob = pd.Series(data=fit.predict_proba(X_test)[:,1], name="prob")
 
+#save the data along with the probabilities
 data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
-
 #data_and_prob.to_csv('new_file.tsv', sep='\t', index=False, float_format='%.3f')
-#test gitpod again!
-#test anyfile notepad!
+
 
 #np.set_printoptions(threshold=sys.maxsize)
 

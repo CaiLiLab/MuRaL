@@ -20,11 +20,14 @@ from temperature_scaling import ModelWithTemperature, _ECELoss
 
 #device = torch.device("cpu")
 
+#check whether GPU is available
 print("CUDA: ", torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+#set train file
 train_file = sys.argv[1]
 
+#set test file
 test_file = sys.argv[2]
 
 # Using only a subset of the variables.
@@ -37,6 +40,7 @@ categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", 
 
 output_feature = "mut_type"
 
+#Encode categorical features
 from sklearn.preprocessing import LabelEncoder
 label_encoders = {}
 for cat_col in categorical_features:
@@ -49,7 +53,7 @@ dataset = TabularDataset(data=data, cat_cols=categorical_features,
 #split data into train, validation and test data
 #train_set, val_set, test_set = data.random_split(dataset, (800, 100, 100))
 
-#####
+#Encode categorical features for testing data
 label_encoders = {}
 for cat_col in categorical_features:
 	label_encoders[cat_col] = LabelEncoder()
@@ -61,6 +65,7 @@ for cat_col in categorical_features:
 dataset_test = TabularDataset(data=data_test, cat_cols=categorical_features,
 									 output_col=output_feature)
 
+#DataLoader for testing data
 dataloader1 = DataLoader(dataset_test, batch_size=999, shuffle=False, num_workers=1)
 
 test_y, test_cont_x, test_cat_x = next(iter(dataloader1))
@@ -71,7 +76,7 @@ test_y = test_y.to(device)
 
 #####
 
-
+#DataLoader for the train data
 batchsize = 10000
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
@@ -94,20 +99,25 @@ criterion = torch.nn.BCELoss()
 #criterion = torch.nn.NLLLoss()
 #criterion = torch.nn.BCEWithLogitsLoss()
 
+#set Optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+
 for epoch in range(no_of_epochs):
 	for y, cont_x, cat_x in dataloader:
 		cat_x = cat_x.to(device)
 		cont_x = cont_x.to(device)
 		y  = y.to(device)
+		
 		# Forward Pass
 		#preds = model(cont_x, cat_x) #original
 		preds = model.forward(cont_x, cat_x)
 		loss = criterion(preds, y)
+		
 		# Backward Pass and Optimization
 		optimizer.zero_grad()
 		loss.backward()
 		optimizer.step()
+	
 	#print([preds[0:20], y[0:20]])
 	#fpr, tpr, thresholds = metrics.roc_curve(y, preds, pos_label=1)
 	#scaled_model = ModelWithTemperature(model)
