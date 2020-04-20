@@ -68,7 +68,7 @@ rf = RandomForestClassifier(n_estimators=100)
 baseline_logit_score = get_score(logit, X_train, y_train, X_val, y_val)
 baseline_rf_score = get_score(rf, X_train, y_train, X_val, y_val)
 
-#The default scoring option used by LogisticRegressionCV is ‘accuracy’!
+#The default scoring option used by LogisticRegressionCV is 'accuracy'
 logit_model_cv = LogisticRegressionCV(cv=10, penalty='l2', tol=1e-8, scoring="brier_score_loss", solver="lbfgs", max_iter=5000)
 #logit_model_cv = LogisticRegressionCV(cv=10, penalty='l2', tol=1e-8, scoring="neg_log_loss", solver="lbfgs", max_iter=5000)
 
