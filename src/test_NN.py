@@ -129,6 +129,7 @@ for epoch in range(no_of_epochs):
 	ece_model = _ECELoss(10)
 	ece_model.zero_grad()
 
+    #get the scores
 	if torch.cuda.is_available():
 		auc_score = metrics.roc_auc_score(test_y.cpu().detach().numpy(), pred_y.cpu().detach().numpy())
 		brier_score = metrics.brier_score_loss(test_y.cpu().detach().numpy(), pred_y.cpu().detach().numpy())

@@ -98,7 +98,6 @@ brier_score_loss(y_test, fit.predict_proba(X_test)[:,1])
 
 brier_score_loss(y_val, fit.predict_proba(X_val)[:,1])
 
-#
 #pd.concat([y_val.reset_index()['mut_type'], pd.Series(data=fit.predict_proba(X_val)[:,1])], axis=1)
 
 X_out = ohe.inverse_transform(X_test).reset_index().drop(['index'], axis=1)
