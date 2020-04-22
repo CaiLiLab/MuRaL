@@ -113,6 +113,8 @@ data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
 
 #print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
 
-print (data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean())
+obs_pred_freq = data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean()
+obs_pred_freq.to_csv('obs_pred_freq.tsv', sep='\t', index=False, float_format='%.3f')
+
 #print (data_and_prob[['us2','us1','ds1','mut_type','prob']].groupby(['us2', 'us1','ds1']).agg(['mean', 'sum', 'count']).to_string())
 
