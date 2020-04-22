@@ -13,6 +13,8 @@ import category_encoders as ce
 import pandas as pd
 import numpy as np
 
+from evaluation import f5mer_comp, f7mer_comp
+
 #from temperature_scaling import 
 
 #get the scores for the trained model
@@ -100,12 +102,13 @@ brier_score_loss(y_val, fit.predict_proba(X_val)[:,1])
 
 #pd.concat([y_val.reset_index()['mut_type'], pd.Series(data=fit.predict_proba(X_val)[:,1])], axis=1)
 
-X_out = ohe.inverse_transform(X_test).reset_index().drop(['index'], axis=1)
-y_out = y_test.reset_index().drop(['index'], axis=1)
+#X_out = ohe.inverse_transform(X_test).reset_index().drop(['index'], axis=1)
+#y_out = y_test.reset_index().drop(['index'], axis=1)
 y_prob = pd.Series(data=fit.predict_proba(X_test)[:,1], name="prob")
 
 #save the data along with the probabilities
-data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
+#data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
+data_and_prob = pd.concat([data_test, y_prob], axis=1)
 #data_and_prob.to_csv('new_file.tsv', sep='\t', index=False, float_format='%.3f')
 
 
@@ -113,8 +116,12 @@ data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
 
 #print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
 
-obs_pred_freq = data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean()
-obs_pred_freq.to_csv('obs_pred_freq.tsv', sep='\t', index=False, float_format='%.3f')
+#obs_pred_freq = data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean()
+#obs_pred_freq.to_csv('obs_pred_freq.tsv', sep='\t', index=False, float_format='%.3f')
+#print (obs_pred_freq['mut_type'].corr(obs_pred_freq['prob']))
+
+print ('5mer correlation: ' + str(f5mer_comp(data_and_prob)))
+print ('7mer correlation: ' + str(f7mer_comp(data_and_prob)))
 
 #print (data_and_prob[['us2','us1','ds1','mut_type','prob']].groupby(['us2', 'us1','ds1']).agg(['mean', 'sum', 'count']).to_string())
 
