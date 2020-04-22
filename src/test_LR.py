@@ -111,6 +111,8 @@ data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
 
 #np.set_printoptions(threshold=sys.maxsize)
 
-print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
+#print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
+
+print (data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean())
 #print (data_and_prob[['us2','us1','ds1','mut_type','prob']].groupby(['us2', 'us1','ds1']).agg(['mean', 'sum', 'count']).to_string())
 
