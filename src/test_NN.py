@@ -18,6 +18,9 @@ from pytorch_tabular import TabularDataset, FeedForwardNN
 
 from temperature_scaling import ModelWithTemperature, _ECELoss
 
+from evaluation import f5mer_comp
+
+
 #device = torch.device("cpu")
 
 #check whether GPU is available
@@ -88,6 +91,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 #[(15, 8), (5, 3), (2, 1), (4, 2), (112, 50)]
 
+# define the model 
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 100], output_size=1, emb_dropout=0.04, lin_layer_dropouts=[0.001,0.01]).to(device)
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 200], output_size=1, emb_dropout=0.001, lin_layer_dropouts=[0.001,0.001]).to(device) #bs=8000
 model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
@@ -118,7 +122,7 @@ for epoch in range(no_of_epochs):
 		loss.backward()
 		optimizer.step()
 	
-	#print([preds[0:20], y[0:20]])
+	print([preds[0:20], y[0:20]])
 	#fpr, tpr, thresholds = metrics.roc_curve(y, preds, pos_label=1)
 	#scaled_model = ModelWithTemperature(model)
 	#scaled_model.set_temperature(dataloader1)
