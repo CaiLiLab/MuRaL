@@ -18,8 +18,13 @@ from pytorch_tabular import TabularDataset, FeedForwardNN
 
 from temperature_scaling import ModelWithTemperature, _ECELoss
 
-from evaluation import f5mer_comp
+from evaluation import f5mer_comp, f7mer_comp
 
+def to_np(tensor):
+	if torch.cuda.is_available():
+		return tensor.cpu().detach().numpy()
+	else:
+		return tensor.detach().numpy()
 
 #device = torch.device("cpu")
 
@@ -50,8 +55,7 @@ for cat_col in categorical_features:
 	label_encoders[cat_col] = LabelEncoder()
 	data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
 
-dataset = TabularDataset(data=data, cat_cols=categorical_features,
-									 output_col=output_feature)
+dataset = TabularDataset(data=data, cat_cols=categorical_features, output_col=output_feature)
 
 #split data into train, validation and test data
 #train_set, val_set, test_set = data.random_split(dataset, (800, 100, 100))
@@ -69,7 +73,7 @@ dataset_test = TabularDataset(data=data_test, cat_cols=categorical_features,
 									 output_col=output_feature)
 
 #DataLoader for testing data
-dataloader1 = DataLoader(dataset_test, batch_size=999, shuffle=False, num_workers=1)
+dataloader1 = DataLoader(dataset_test, batch_size=len(dataset_test), shuffle=False, num_workers=1)
 
 test_y, test_cont_x, test_cat_x = next(iter(dataloader1))
 
@@ -82,6 +86,9 @@ test_y = test_y.to(device)
 #DataLoader for the train data
 batchsize = 10000
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
+
+dataloader2 = DataLoader(dataset, len(dataset), shuffle=False, num_workers=1)
+all_y, all_cont_x, all_cat_x = next(iter(dataloader2))
 
 cat_dims = [int(data[col].nunique()) for col in categorical_features]
 #cat_dims
@@ -133,23 +140,32 @@ for epoch in range(no_of_epochs):
 	ece_model = _ECELoss(10)
 	ece_model.zero_grad()
 
-    #get the scores
-	if torch.cuda.is_available():
-		auc_score = metrics.roc_auc_score(test_y.cpu().detach().numpy(), pred_y.cpu().detach().numpy())
-		brier_score = metrics.brier_score_loss(test_y.cpu().detach().numpy(), pred_y.cpu().detach().numpy())
-		test_pred = torch.cat((test_y,pred_y),1).cpu().detach().numpy()
-		logits = torch.cat((1-pred_y,pred_y),1)
-		logits = torch.log(logits/(1-logits))
-		ECE = ece_model.forward(logits, test_y.long()).cpu().detach().numpy()
-		prob_true, prob_pred = calibration.calibration_curve(test_y.cpu().detach().numpy(), pred_y.cpu().detach().numpy(),n_bins=50)
-		print("calibration: ", np.column_stack((prob_pred,prob_true)))
-	else:
-		auc_score = metrics.roc_auc_score(test_y.detach().numpy(), pred_y.detach().numpy())
-		brier_score = metrics.brier_score_loss(test_y.detach().numpy(), pred_y.detach().numpy())
-		test_pred = torch.cat((test_y,pred_y),1).detach().numpy()
-		logits = torch.cat((1-pred_y,pred_y),1)
-		logits = torch.log(logits/(1-logits))
-		ECE = ece_model.forward(logits, test_y.long()).detach().numpy()
+	#check flanking k-mers
+	#pd.Series
+	#tmp = pred_y.cpu().detach().numpy()
+	#print(tmp)
+	y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")	
+	data_and_prob = pd.concat([data_test, y_prob], axis=1)
+
+	all_pred_y = model.forward(all_cont_x, all_cat_x)
+	all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
+	all_data_and_prob = pd.concat([data, all_y_prob], axis=1)
+
+	print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+	print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
+	print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+	
+	#get the scores
+	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+	brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
+	test_pred = to_np(torch.cat((test_y,pred_y),1))
+	logits = torch.cat((1-pred_y,pred_y),1)
+	logits = torch.log(logits/(1-logits))
+	ECE = to_np(ece_model.forward(logits, test_y.long()))
+	prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
+	
+	print("calibration: ", np.column_stack((prob_pred,prob_true)))
+	
 	print ("AUC score: ", auc_score)
 	print ("Brier score: ", brier_score)
 	print ("ECE score: ", ECE.item())

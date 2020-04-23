@@ -107,21 +107,21 @@ brier_score_loss(y_val, fit.predict_proba(X_val)[:,1])
 y_prob = pd.Series(data=fit.predict_proba(X_test)[:,1], name="prob")
 
 #save the data along with the probabilities
-#data_and_prob = pd.concat([X_out, y_out, y_prob], axis=1)
 data_and_prob = pd.concat([data_test, y_prob], axis=1)
 #data_and_prob.to_csv('new_file.tsv', sep='\t', index=False, float_format='%.3f')
 
+X_data = X_orig.reset_index().drop(['index'], axis=1)
+y_data = y.reset_index().drop(['index'], axis=1)
+y_prob_train = pd.Series(data=fit.predict_proba(X)[:,1], name="prob")
+data_and_prob_train = pd.concat([X_data, y_data, y_prob_train], axis=1)
 
 #np.set_printoptions(threshold=sys.maxsize)
 
 #print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
 
-#obs_pred_freq = data_and_prob[['us2','us1','ds1','ds2','mut_type','prob']].groupby(['us2','us1','ds1','ds2']).mean()
-#obs_pred_freq.to_csv('obs_pred_freq.tsv', sep='\t', index=False, float_format='%.3f')
-#print (obs_pred_freq['mut_type'].corr(obs_pred_freq['prob']))
-
-print ('5mer correlation: ' + str(f5mer_comp(data_and_prob)))
-print ('7mer correlation: ' + str(f7mer_comp(data_and_prob)))
+print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+print ('5mer correlation - train: ' + str(f5mer_comp(data_and_prob_train)))
+print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
 
 #print (data_and_prob[['us2','us1','ds1','mut_type','prob']].groupby(['us2', 'us1','ds1']).agg(['mean', 'sum', 'count']).to_string())
 
