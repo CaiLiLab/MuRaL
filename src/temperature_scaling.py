@@ -115,7 +115,7 @@ class _ECELoss(nn.Module):
             in_bin = confidences.gt(bin_lower.item()) * confidences.le(bin_upper.item())
             prop_in_bin = in_bin.float().mean()
             if prop_in_bin.item() > 0:
-                accuracy_in_bin = accuracies[in_bin].float().mean()
+                accuracy_in_bin = accuracies[in_bin].float().mean() # out of memory when large data
                 avg_confidence_in_bin = confidences[in_bin].mean()
                 ece += torch.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
             print ("prop_in_bin: ", prop_in_bin, bin_lower, bin_upper)

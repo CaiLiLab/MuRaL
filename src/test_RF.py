@@ -79,24 +79,31 @@ X_test = ohe.fit_transform(X_test_orig)
 
 
 #Logistic Regression model; NOTE: 'lbfgs' is not suitable for large datasets!
-#logit = LogisticRegression(C=1, class_weight='balanced', penalty='l2', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=2)
+logit = LogisticRegression(C=1, class_weight='balanced', penalty='l2', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=2)
 
 #Random Forest model
-#rf = RandomForestClassifier(n_estimators=100)
+rf = RandomForestClassifier(n_estimators=800, max_features=20, max_depth=10, criterion='entropy')
 
+#logit_cv_score = cross_val_score(logit, X, y, scoring="neg_log_loss", cv=5).mean()
+#print (logit_cv_score)
+
+rf_cv_score = cross_val_score(rf, X, y, scoring="neg_log_loss", cv=5).mean()
+print (rf_cv_score)
 
 #baseline_logit_score = get_score(logit, X_train, y_train, X_val, y_val)
 #baseline_rf_score = get_score(rf, X_train, y_train, X_val, y_val)
 
 #The default scoring option used by LogisticRegressionCV is 'accuracy'
 #NOTE: increase the max_iter if there is Covergence warning
-logit_model_cv = LogisticRegressionCV(cv=10, class_weight='balanced', penalty='l1', multi_class='auto', tol=1e-4, scoring="brier_score_loss", solver="saga", max_iter=n_iter,random_state=666, n_jobs=2)
+#logit_model_cv = LogisticRegressionCV(cv=10, class_weight='balanced', penalty='l1', multi_class='auto', tol=1e-4, scoring="brier_score_loss", solver="saga", max_iter=n_iter,random_state=666, n_jobs=2)
 #logit_model_cv = LogisticRegressionCV(cv=10, penalty='l2', tol=1e-8, scoring="neg_log_loss", solver="lbfgs", max_iter=5000)
 
 #add interactions
 #x_t = PolynomialFeatures(2, interaction_only=True, include_bias=False).fit_transform(x)
 
-fit = logit_model_cv.fit(X, y)
+
+
+fit = rf.fit(X, y)
 #fit = logit.fit(X, y)
 
 print(fit)
@@ -107,7 +114,8 @@ print(fit)
 
 roc_auc_score(y_val, fit.predict_proba(X_val)[:,1])
 
-brier_score_loss(y_train, fit.predict_proba(X_train)[:,1])
+train_brier_loss = brier_score_loss(y_train, fit.predict_proba(X_train)[:,1])
+print('train_brier_loss: ' + str(train_brier_loss))
 
 log_loss(y_train, fit.predict_proba(X_train))
 
@@ -122,7 +130,7 @@ X_out = X_test_orig.reset_index().drop(['index'], axis=1)
 y_out = y_test.reset_index().drop(['index'], axis=1)
 y_prob = pd.Series(data=fit.predict_proba(X_test)[:,1], name="prob")
 #y_prob1 = pd.Series(data=cross_val_predict(logit_model_cv, X_test, method='predict_proba')[:,1], name="prob1")
-#print (fit.predict_proba(X_test))
+print (fit.predict_proba(X_test))
 
 #save the data along with the probabilities
 #data_and_prob = pd.concat([data_test, y_prob], axis=1)
@@ -143,7 +151,7 @@ data_and_prob_all = pd.concat([X_data, y_data, y_prob_all], axis=1)
 #	return 1 / (1 + np.exp(-x))
 
 #model(x_test * clf.coef_ + clf.intercept_).ravel()
-print(fit.coef_)
+#print(fit.coef_)
 
 print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
 print ('3mer correlation - all: ' + str(f3mer_comp(data_and_prob_all)))

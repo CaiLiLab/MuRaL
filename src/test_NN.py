@@ -18,7 +18,7 @@ from pytorch_tabular import TabularDataset, FeedForwardNN
 
 from temperature_scaling import ModelWithTemperature, _ECELoss
 
-from evaluation import f5mer_comp, f7mer_comp
+from evaluation import f3mer_comp, f5mer_comp, f7mer_comp
 
 def to_np(tensor):
 	if torch.cuda.is_available():
@@ -69,8 +69,7 @@ for cat_col in categorical_features:
 #decoder
 #label_encoders['us5'].inverse_transform([int(i) for i in data.iloc[0, 0:10]]).tolist()
 
-dataset_test = TabularDataset(data=data_test, cat_cols=categorical_features,
-									 output_col=output_feature)
+dataset_test = TabularDataset(data=data_test, cat_cols=categorical_features, output_col=output_feature)
 
 #DataLoader for testing data
 dataloader1 = DataLoader(dataset_test, batch_size=len(dataset_test), shuffle=False, num_workers=1)
@@ -89,6 +88,9 @@ dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
 dataloader2 = DataLoader(dataset, len(dataset), shuffle=False, num_workers=1)
 all_y, all_cont_x, all_cat_x = next(iter(dataloader2))
+all_cat_x = all_cat_x.to(device)
+all_cont_x = all_cont_x.to(device)
+all_y  = all_y.to(device)
 
 cat_dims = [int(data[col].nunique()) for col in categorical_features]
 #cat_dims
@@ -103,7 +105,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 200], output_size=1, emb_dropout=0.001, lin_layer_dropouts=[0.001,0.001]).to(device) #bs=8000
 model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
 
-no_of_epochs = 20
+no_of_epochs = 30
 
 #criterion = nn.MSELoss()
 criterion = torch.nn.BCELoss()
@@ -129,7 +131,7 @@ for epoch in range(no_of_epochs):
 		loss.backward()
 		optimizer.step()
 	
-	print([preds[0:20], y[0:20]])
+	#print([preds[0:20], y[0:20]])
 	#fpr, tpr, thresholds = metrics.roc_curve(y, preds, pos_label=1)
 	#scaled_model = ModelWithTemperature(model)
 	#scaled_model.set_temperature(dataloader1)
@@ -151,9 +153,12 @@ for epoch in range(no_of_epochs):
 	all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
 	all_data_and_prob = pd.concat([data, all_y_prob], axis=1)
 
+	print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+	print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
 	print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
 	print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
 	print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+	print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
 	
 	#get the scores
 	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
@@ -161,13 +166,13 @@ for epoch in range(no_of_epochs):
 	test_pred = to_np(torch.cat((test_y,pred_y),1))
 	logits = torch.cat((1-pred_y,pred_y),1)
 	logits = torch.log(logits/(1-logits))
-	ECE = to_np(ece_model.forward(logits, test_y.long()))
+	#ECE = to_np(ece_model.forward(logits, test_y.long()))
 	prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
 	
 	print("calibration: ", np.column_stack((prob_pred,prob_true)))
 	
 	print ("AUC score: ", auc_score)
 	print ("Brier score: ", brier_score)
-	print ("ECE score: ", ECE.item())
+	#print ("ECE score: ", ECE.item())
 	print (loss.item())
 	#np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
