@@ -118,6 +118,6 @@ class _ECELoss(nn.Module):
                 accuracy_in_bin = accuracies[in_bin].float().mean() # out of memory when large data
                 avg_confidence_in_bin = confidences[in_bin].mean()
                 ece += torch.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
-            print ("prop_in_bin: ", prop_in_bin, bin_lower, bin_upper)
+            #print ("prop_in_bin: ", prop_in_bin, bin_lower, bin_upper)
 
         return ece

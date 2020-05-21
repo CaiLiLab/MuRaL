@@ -38,13 +38,17 @@ train_file = sys.argv[1]
 #set test file
 test_file = sys.argv[2]
 
+# set n_cont
+n_cont = int(sys.argv[3])
+
 # Using only a subset of the variables.
 data = pd.read_csv(train_file).dropna()
 
 data_test = pd.read_csv(test_file).dropna()
 
 #categorical_features = ["MSSubClass", "MSZoning", "Street", "LotShape", "YearBuilt"]
-categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5", "tdist"]
+#categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5", "tdist"]
+categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5"]
 
 output_feature = "mut_type"
 
@@ -103,7 +107,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 # define the model 
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 100], output_size=1, emb_dropout=0.04, lin_layer_dropouts=[0.001,0.01]).to(device)
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 200], output_size=1, emb_dropout=0.001, lin_layer_dropouts=[0.001,0.001]).to(device) #bs=8000
-model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
+model = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
 
 no_of_epochs = 30
 
@@ -169,7 +173,7 @@ for epoch in range(no_of_epochs):
 	#ECE = to_np(ece_model.forward(logits, test_y.long()))
 	prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
 	
-	print("calibration: ", np.column_stack((prob_pred,prob_true)))
+	#print("calibration: ", np.column_stack((prob_pred,prob_true)))
 	
 	print ("AUC score: ", auc_score)
 	print ("Brier score: ", brier_score)
