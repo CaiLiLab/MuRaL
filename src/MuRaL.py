@@ -533,11 +533,11 @@ def Load_Data(train_file,test_file):
 
 def Train_model():
 	# hyper-parameters
-	best_learning_steps=20000 #learning_steps_list=[5000,10000,15000,20000,25000,30000,35000,40000]
+	best_learning_steps=30000 #learning_steps_list=[5000,10000,15000,20000,25000,30000,35000,40000]
 	best_LearningRate=0.0098 #learning_rate=logsampler(0.005,0.5)
 	best_LearningMomentum=0.98 #momentum_rate=sqrtsampler(0.95,0.99)
 	best_sigmaConv=1e-06 #sigmaConv=logsampler(10**-6,10**-2)
-	best_dropprob=0.15 #dropoutList=[0,0.15,0.3,0.45,0.6]
+	best_dropprob=0.3 #dropoutList=[0,0.15,0.3,0.45,0.6]
 	best_sigmaNeu=0.004  #sigmaNeu=logsampler(10**-3,10**-1)
 	best_RNN_hidden_size=64 #hidden_size_list=[32,64]
 	best_weightDecay=3e-06 # weightDecay=logsampler(10**-10,10**-1)
@@ -652,7 +652,8 @@ RNN_type='BiLSTM'
 
 bases='ACGT' #DNA bases
 basesRNA='ACGU'#RNA bases
-batch_size=128
+#batch_size=128
+batch_size=500
 evaluate_performance=False
 train=True
 model_dir='models/'
@@ -664,7 +665,7 @@ stride=1
 word2vect_train=True
 word2vec_model='models/word2vec_model'
 # CNN hyper-parameters
-nummotif=16 #number of motifs to discover
+nummotif=32 #number of motifs to discover
 motiflen=24
 
 ################################

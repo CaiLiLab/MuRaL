@@ -79,10 +79,10 @@ X_test = ohe.fit_transform(X_test_orig)
 
 
 #Logistic Regression model; NOTE: 'lbfgs' is not suitable for large datasets!
-logit = LogisticRegression(C=1, class_weight='balanced', penalty='l2', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=2)
+#logit = LogisticRegression(C=1, class_weight='balanced', penalty='l2', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=2)
 
 #Random Forest model
-rf = RandomForestClassifier(n_estimators=800, max_features=20, max_depth=10, criterion='entropy')
+rf = RandomForestClassifier(n_estimators=800, max_features=20, max_depth=10, criterion='entropy', n_jobs = 3)
 
 #logit_cv_score = cross_val_score(logit, X, y, scoring="neg_log_loss", cv=5).mean()
 #print (logit_cv_score)

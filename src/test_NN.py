@@ -47,8 +47,8 @@ data = pd.read_csv(train_file).dropna()
 data_test = pd.read_csv(test_file).dropna()
 
 #categorical_features = ["MSSubClass", "MSZoning", "Street", "LotShape", "YearBuilt"]
-#categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5", "tdist"]
-categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5"]
+categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5", "tdist"]
+#categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5"]
 
 output_feature = "mut_type"
 
@@ -87,7 +87,7 @@ test_y = test_y.to(device)
 #####
 
 #DataLoader for the train data
-batchsize = 10000
+batchsize = 300
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
 dataloader2 = DataLoader(dataset, len(dataset), shuffle=False, num_workers=1)
@@ -109,7 +109,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 200], output_size=1, emb_dropout=0.001, lin_layer_dropouts=[0.001,0.001]).to(device) #bs=8000
 model = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
 
-no_of_epochs = 30
+no_of_epochs = 50
 
 #criterion = nn.MSELoss()
 criterion = torch.nn.BCELoss()

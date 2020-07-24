@@ -79,7 +79,8 @@ X_test = ohe.fit_transform(X_test_orig)
 
 
 #Logistic Regression model; NOTE: 'lbfgs' is not suitable for large datasets!
-#logit = LogisticRegression(C=1, class_weight='balanced', penalty='l2', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=2)
+#logit = LogisticRegression(C=0.1, class_weight='balanced', penalty='l1', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=3)
+logit = LogisticRegression(C=10, penalty='l1', solver='saga', max_iter=n_iter, random_state=666, tol=1e-4, verbose=0, n_jobs=3)
 
 #Random Forest model
 #rf = RandomForestClassifier(n_estimators=100)
@@ -90,14 +91,15 @@ X_test = ohe.fit_transform(X_test_orig)
 
 #The default scoring option used by LogisticRegressionCV is 'accuracy'
 #NOTE: increase the max_iter if there is Covergence warning
-logit_model_cv = LogisticRegressionCV(cv=10, class_weight='balanced', penalty='l1', multi_class='auto', tol=1e-4, scoring="brier_score_loss", solver="saga", max_iter=n_iter,random_state=666, n_jobs=2)
+
+#logit_model_cv = LogisticRegressionCV(cv=10, class_weight='balanced', penalty='l1', multi_class='auto', tol=1e-4, scoring="brier_score_loss", solver="saga", max_iter=n_iter,random_state=666, n_jobs=2)
 #logit_model_cv = LogisticRegressionCV(cv=10, penalty='l2', tol=1e-8, scoring="neg_log_loss", solver="lbfgs", max_iter=5000)
 
 #add interactions
 #x_t = PolynomialFeatures(2, interaction_only=True, include_bias=False).fit_transform(x)
 
-fit = logit_model_cv.fit(X, y)
-#fit = logit.fit(X, y)
+#fit = logit_model_cv.fit(X, y)
+fit = logit.fit(X, y)
 
 print(fit)
 #print(fit.C_)
