@@ -142,7 +142,11 @@ class FeedForwardNN(nn.Module):
     if self.no_of_embs != 0:
       x = [emb_layer(cat_data[:, i])
            for i,emb_layer in enumerate(self.emb_layers)]
-      x = torch.cat(x, 1)
+      ###
+	  print(len(x)) #x is a list, x[i].shape: batch_size * emb_size  
+	  #print(x)
+      ###
+	  x = torch.cat(x, 1) #x.shape: batch_size * sum(emb_size)
       x = self.emb_dropout_layer(x)
 
     if self.no_of_cont != 0:
