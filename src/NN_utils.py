@@ -186,9 +186,9 @@ def main():
 	test_x, test_y = dataset_test.x_data, dataset_test.y_data,
 	#test_x, test_y = torch.tensor(dataset_test[0].values), torch.tensor(dataset_test[1].values)
 
-	dataloader = DataLoader(dataset, batch_size=300, shuffle=True)
+	dataloader = DataLoader(dataset, batch_size=1000, shuffle=True)
 	
-	model = ConvNN(4, 60, 10, 100).to(device)
+	model = ConvNN(4, 120, 10, 100).to(device)
 	model.apply(weights_init)
 	
 	no_of_epochs = 10
@@ -197,6 +197,8 @@ def main():
 	model = train_network(model, no_of_epochs, dataloader)
 
 	#######
+	model.to('cpu')
+	device = 'cpu'
 	print("for the tain data:")
 	eval_model(model, train_x, train_y, device)
 	
