@@ -13,6 +13,8 @@ from sklearn import metrics, calibration
 
 from evaluation import f3mer_comp, f5mer_comp, f7mer_comp
 
+from torchsummary import summary
+
 def to_np(tensor):
 	if torch.cuda.is_available():
 		return tensor.cpu().detach().numpy()
@@ -81,20 +83,23 @@ class ConvNN(nn.Module):
 		#self.maxpool =  nn.MaxPool1d(kernel_size, stride)
 		
 		self.conv = nn.Sequential(
-            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
-            nn.ReLU(),
-            nn.MaxPool1d(2, 2), # kernel_size, stride
-            nn.Conv1d(out_channels, out_channels*2, kernel_size),
-            nn.ReLU()
+			nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
+			nn.ReLU(),
+			nn.MaxPool1d(3, 1), # kernel_size, stride
+			nn.Conv1d(out_channels, out_channels*2, kernel_size),
+			nn.ReLU(),
+			nn.MaxPool1d(3, 1)
         )
 		
 		self.fc = nn.Sequential(
-            #nn.BatchNorm1d(out_channels*2)
-			nn.Linear(out_channels*2, lin_layer_size), ####TO DO
+            nn.BatchNorm1d(out_channels*2),
+			nn.Linear(out_channels*2, lin_layer_size), 
             nn.ReLU(),
 			nn.Dropout(0.1), #dropout prob
-            nn.Linear(lin_layer_size, 1),
-			nn.Sigmoid()
+            #nn.Linear(out_channels*2, 1),
+			nn.Linear(lin_layer_size, 1),
+			#nn.ReLU(), #NOTE: addting this makes two early convergence
+			nn.Dropout(0.1)
         )
 		
 		#nn.init.kaiming_normal_(self.fc.weight.data) #
@@ -103,28 +108,43 @@ class ConvNN(nn.Module):
 		#input data shape: batch_size, in_channels, L_in (lenth of sequence)
 		out = self.conv(input_data) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
 		out, _ = torch.max(out, dim=2)
+		#out = torch.mean(out, dim=2)
+		#print("out.shape")
+		#print(out.shape)
+		#print(out[0:5])
 		
 		out = self.fc(out)
 		
-		return out
+		return torch.sigmoid(out)
 
 def weights_init(m):
 	classname = m.__class__.__name__
 	if classname.find('Conv1d') != -1:
-		nn.init.normal_(m.weight, 0.0, 0.1)
+		#nn.init.normal_(m.weight, 0.0, 1e-06)
+		nn.init.normal_(m.bias)
+		nn.init.xavier_uniform(m.weight)
+		
 		print(m.weight.shape)
 	elif classname.find('Linear') != -1:
-		nn.init.normal_(m.weight, 0, 0.1)
-		nn.init.zeros_(m.bias)
+		#nn.init.normal_(m.weight, 0, 0.004)
+		nn.init.xavier_uniform(m.weight)
+
+		nn.init.normal_(m.bias)
 		print(m.weight.shape)
 
 def train_network(model, no_of_epochs, dataloader):
+	
+	#weight = torch.tensor([1,10])
 	criterion = nn.BCELoss()
-	#criterion = torch.nn.NLLLoss()
-	#criterion = torch.nn.BCEWithLogitsLoss()
+	#criterion = nn.NLLLoss()
+	#criterion = nn.BCEWithLogitsLoss()
 
 	#set Optimizer
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+	#print("model.parameters:")
+	#print(model.parameters())
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+	#optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9859, nesterov=True,
+	#							weight_decay=3e-06)
 
 	for epoch in range(no_of_epochs):
 		for x_data, y in dataloader:
@@ -133,12 +153,14 @@ def train_network(model, no_of_epochs, dataloader):
 		
 			# Forward Pass
 			#preds = model(cont_x, cat_x) #original
-			preds = model.forward(x_data)
-			#print("preds")
-			#print(preds)
+			preds = model(x_data)
+			print("preds:")
+			#print(preds[1:20])
 			#print(y)
 			
 			loss = criterion(preds, y)
+			#loss = F.binary_cross_entropy(preds,y)
+			print("Loss is %.3f" %(loss))
 		
 			# Backward Pass and Optimization
 			optimizer.zero_grad()
@@ -160,8 +182,12 @@ def eval_model(model, test_x, test_y, device):
 	print("data_and_prob:")
 	#print(to_np(test_x))
 	#data_and_prob = pd.concat([pd.DataFrame(to_np(test_x)), y_prob], axis=1)
+	print("print test_y, pred_y:")
+	print("sum(test_y) is %0.3f; sum(pred_y) is %0.3f" % (torch.sum(test_y), torch.sum(pred_y)) )
+	print(to_np(test_y))
+	print(to_np(pred_y))
 
-	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y)) #TO CHECK
 	brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
 	print ("AUC score: ", auc_score)
 	print ("Brier score: ", brier_score)
@@ -175,10 +201,11 @@ def main():
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	#set train file
 	train_file = sys.argv[1]
-	#train_file = "/public/home/licai/DNMML/analysis/test/merge.95win.A.pos.c1000.train.30k.gz"
+	#train_file = "/public/home/licai/DNMML/analysis/test/merge.95win.A.pos.c1000.train.NN.300k.gz"
 	
 	#set test file
 	test_file = sys.argv[2]
+	#test_file = "/public/home/licai/DNMML/analysis/test/merge.95win.A.pos.c1000.test.NN.300k.gz"
 	
 	dataset = load_data(train_file)
 	train_x, train_y = dataset.x_data, dataset.y_data
@@ -188,10 +215,14 @@ def main():
 
 	dataloader = DataLoader(dataset, batch_size=1000, shuffle=True)
 	
-	model = ConvNN(4, 120, 10, 100).to(device)
-	model.apply(weights_init)
+	model = ConvNN(4, 16, 24, 30).to(device)
+	#summary(model)
 	
-	no_of_epochs = 10
+	model.apply(weights_init)
+	print("model:")
+	print(model)
+	
+	no_of_epochs = 30
 	
 	model.train()
 	model = train_network(model, no_of_epochs, dataloader)

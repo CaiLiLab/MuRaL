@@ -166,6 +166,10 @@ for epoch in range(no_of_epochs):
 	
 	#get the scores
 	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+	print("print test_y, pred_y:")
+	print(to_np(test_y))
+	print(to_np(pred_y))
+	
 	brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
 	test_pred = to_np(torch.cat((test_y,pred_y),1))
 	logits = torch.cat((1-pred_y,pred_y),1)
