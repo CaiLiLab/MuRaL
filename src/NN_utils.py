@@ -40,6 +40,7 @@ def seqs2ohe(sequences,motiflen=24):
     dataset=[]
     for row in sequences:             
         dataset.append(seq2ohe(row,motiflen))
+        
   
     return dataset
 
