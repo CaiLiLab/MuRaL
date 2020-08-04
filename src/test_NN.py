@@ -21,10 +21,10 @@ from temperature_scaling import ModelWithTemperature, _ECELoss
 from evaluation import f3mer_comp, f5mer_comp, f7mer_comp
 
 def to_np(tensor):
-	if torch.cuda.is_available():
-		return tensor.cpu().detach().numpy()
-	else:
-		return tensor.detach().numpy()
+    if torch.cuda.is_available():
+        return tensor.cpu().detach().numpy()
+    else:
+        return tensor.detach().numpy()
 
 #device = torch.device("cpu")
 
@@ -56,8 +56,8 @@ output_feature = "mut_type"
 from sklearn.preprocessing import LabelEncoder
 label_encoders = {}
 for cat_col in categorical_features:
-	label_encoders[cat_col] = LabelEncoder()
-	data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+    label_encoders[cat_col] = LabelEncoder()
+    data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
 
 dataset = TabularDataset(data=data, cat_cols=categorical_features, output_col=output_feature)
 
@@ -67,8 +67,8 @@ dataset = TabularDataset(data=data, cat_cols=categorical_features, output_col=ou
 #Encode categorical features for testing data
 label_encoders = {}
 for cat_col in categorical_features:
-	label_encoders[cat_col] = LabelEncoder()
-	data_test[cat_col] = label_encoders[cat_col].fit_transform(data_test[cat_col])
+    label_encoders[cat_col] = LabelEncoder()
+    data_test[cat_col] = label_encoders[cat_col].fit_transform(data_test[cat_col])
 
 #decoder
 #label_encoders['us5'].inverse_transform([int(i) for i in data.iloc[0, 0:10]]).tolist()
@@ -120,67 +120,67 @@ criterion = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
 
 for epoch in range(no_of_epochs):
-	for y, cont_x, cat_x in dataloader:
-		cat_x = cat_x.to(device)
-		cont_x = cont_x.to(device)
-		y  = y.to(device)
-		
-		# Forward Pass
-		#preds = model(cont_x, cat_x) #original
-		preds = model.forward(cont_x, cat_x)
-		loss = criterion(preds, y)
-		
-		# Backward Pass and Optimization
-		optimizer.zero_grad()
-		loss.backward()
-		optimizer.step()
-	
-	#print([preds[0:20], y[0:20]])
-	#fpr, tpr, thresholds = metrics.roc_curve(y, preds, pos_label=1)
-	#scaled_model = ModelWithTemperature(model)
-	#scaled_model.set_temperature(dataloader1)
+    for y, cont_x, cat_x in dataloader:
+        cat_x = cat_x.to(device)
+        cont_x = cont_x.to(device)
+        y  = y.to(device)
+        
+        # Forward Pass
+        #preds = model(cont_x, cat_x) #original
+        preds = model.forward(cont_x, cat_x)
+        loss = criterion(preds, y)
+        
+        # Backward Pass and Optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    
+    #print([preds[0:20], y[0:20]])
+    #fpr, tpr, thresholds = metrics.roc_curve(y, preds, pos_label=1)
+    #scaled_model = ModelWithTemperature(model)
+    #scaled_model.set_temperature(dataloader1)
 
-	#pred_y = scaled_model.forward(test_cont_x, test_cat_x)
-	pred_y = model.forward(test_cont_x, test_cat_x)
-	
-	ece_model = _ECELoss(10)
-	ece_model.zero_grad()
+    #pred_y = scaled_model.forward(test_cont_x, test_cat_x)
+    pred_y = model.forward(test_cont_x, test_cat_x)
+    
+    ece_model = _ECELoss(10)
+    ece_model.zero_grad()
 
-	#check flanking k-mers
-	#pd.Series
-	#tmp = pred_y.cpu().detach().numpy()
-	#print(tmp)
-	y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")	
-	data_and_prob = pd.concat([data_test, y_prob], axis=1)
+    #check flanking k-mers
+    #pd.Series
+    #tmp = pred_y.cpu().detach().numpy()
+    #print(tmp)
+    y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
+    data_and_prob = pd.concat([data_test, y_prob], axis=1)
 
-	all_pred_y = model.forward(all_cont_x, all_cat_x)
-	all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
-	all_data_and_prob = pd.concat([data, all_y_prob], axis=1)
+    all_pred_y = model.forward(all_cont_x, all_cat_x)
+    all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
+    all_data_and_prob = pd.concat([data, all_y_prob], axis=1)
 
-	print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
-	print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
-	print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
-	print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
-	print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
-	print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
-	
-	#get the scores
-	auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
-	print("print test_y, pred_y:")
-	print(to_np(test_y))
-	print(to_np(pred_y))
-	
-	brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
-	test_pred = to_np(torch.cat((test_y,pred_y),1))
-	logits = torch.cat((1-pred_y,pred_y),1)
-	logits = torch.log(logits/(1-logits))
-	#ECE = to_np(ece_model.forward(logits, test_y.long()))
-	prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
-	
-	#print("calibration: ", np.column_stack((prob_pred,prob_true)))
-	
-	print ("AUC score: ", auc_score)
-	print ("Brier score: ", brier_score)
-	#print ("ECE score: ", ECE.item())
-	print (loss.item())
-	#np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
+    print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+    print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
+    print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+    print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
+    print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+    print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
+    
+    #get the scores
+    auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+    print("print test_y, pred_y:")
+    print(to_np(test_y))
+    print(to_np(pred_y))
+    
+    brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
+    test_pred = to_np(torch.cat((test_y,pred_y),1))
+    logits = torch.cat((1-pred_y,pred_y),1)
+    logits = torch.log(logits/(1-logits))
+    #ECE = to_np(ece_model.forward(logits, test_y.long()))
+    prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
+    
+    #print("calibration: ", np.column_stack((prob_pred,prob_true)))
+    
+    print ("AUC score: ", auc_score)
+    print ("Brier score: ", brier_score)
+    #print ("ECE score: ", ECE.item())
+    print (loss.item())
+    #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')

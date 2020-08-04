@@ -21,11 +21,11 @@ from evaluation import f3mer_comp, f5mer_comp, f7mer_comp
 
 #get the scores for the trained model
 def get_score(model, X, y, X_val, y_val):
-	model.fit(X, y)
-	y_pred = model.predict_proba(X_val)[:,1]
-	auc_score = roc_auc_score(y_val, y_pred)
-	brier_score = brier_score_loss(y_val, y_pred)
-	return auc_score,brier_score
+    model.fit(X, y)
+    y_pred = model.predict_proba(X_val)[:,1]
+    auc_score = roc_auc_score(y_val, y_pred)
+    brier_score = brier_score_loss(y_val, y_pred)
+    return auc_score,brier_score
 
 #set train file
 train_file = sys.argv[1]
@@ -142,7 +142,7 @@ data_and_prob_all = pd.concat([X_data, y_data, y_prob_all], axis=1)
 #print (data_and_prob[['us1','ds1','mut_type','prob']].groupby(['us1','ds1']).mean())
 
 #def model_coef(x):
-#	return 1 / (1 + np.exp(-x))
+#   return 1 / (1 + np.exp(-x))
 
 #model(x_test * clf.coef_ + clf.intercept_).ravel()
 print(fit.coef_)
