@@ -125,41 +125,16 @@ for epoch in range(no_of_epochs):
         optimizer.step()
     
     model.eval()
-    pred_y = torch.empty(0, 1).to(device)
-    test_y = torch.empty(0, 1).to(device)
-    
-    with torch.no_grad():
-        for y, cont_x, cat_x, distal_x in dataloader1:
-            cat_x = cat_x.to(device)
-            cont_x = cont_x.to(device)
-            distal_x = distal_x.to(device)
-            y  = y.to(device)
-        
-            # Forward Pass
-            #preds = model(cont_x, cat_x) #original
-            preds = model.forward((cont_x, cat_x), distal_x)
-            pred_y = torch.cat((pred_y, preds), dim=0)
-            test_y = torch.cat((test_y, y), dim=0)
-        
+
+    pred_y = model.batch_predict(dataloader1, device)
 
     #pred_y = model.forward((test_cont_x, test_cat_x), test_distal_x)
 
     y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
 
-    torch.cuda.empty_cache()
     #all_pred_y = model.forward((all_cont_x, all_cat_x), all_distal_x)
-    all_pred_y = torch.empty(0, 1).to(device)
-    with torch.no_grad():
-        for y, cont_x, cat_x, distal_x in dataloader2:
-            cat_x = cat_x.to(device)
-            cont_x = cont_x.to(device)
-            distal_x = distal_x.to(device)
-            y  = y.to(device)
-        
-            preds = model.forward((cont_x, cat_x), distal_x)
-            all_pred_y = torch.cat((all_pred_y, preds), dim=0)
-
+    all_pred_y = model.batch_predict(dataloader2, device)
         
     all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
     all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
@@ -172,19 +147,21 @@ for epoch in range(no_of_epochs):
     print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
     
     #get the scores
-    auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+    #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+    test_y = data_local_test['mut_type']
+    auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
     print("print test_y, pred_y:")
-    print(to_np(test_y))
+    print(test_y)
     print(to_np(pred_y))
     
-    brier_score = metrics.brier_score_loss(to_np(test_y), to_np(pred_y))
-    test_pred = to_np(torch.cat((test_y,pred_y),1))
+    brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
+    #test_pred = to_np(torch.cat((test_y,pred_y),1))
     
     #logits = torch.cat((1-pred_y,pred_y),1)
     #logits = torch.log(logits/(1-logits))
     #ECE = to_np(ece_model.forward(logits, test_y.long()))
     
-    prob_true, prob_pred = calibration.calibration_curve(to_np(test_y), to_np(pred_y),n_bins=50)
+    prob_true, prob_pred = calibration.calibration_curve(test_y, to_np(pred_y),n_bins=50)
     
     #print("calibration: ", np.column_stack((prob_pred,prob_true)))
     

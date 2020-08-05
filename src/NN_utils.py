@@ -296,7 +296,7 @@ class Network(nn.Module):
         #self.cnn = nn.Conv1d(in_channels, out_channels, kernel_size)
         #self.maxpool =  nn.MaxPool1d(kernel_size, stride)
         
-        #############################
+        # FeedForward layers for local input
         # Embedding layers
         self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
 
@@ -312,10 +312,6 @@ class Network(nn.Module):
         for lin_layer in self.lin_layers:
             nn.init.kaiming_normal_(lin_layer.weight.data)
 
-        # Output Layer
-        # self.output_layer = nn.Linear(lin_layer_sizes[-1], output_size)
-        # nn.init.kaiming_normal_(self.output_layer.weight.data)
-
         # Batch Norm Layers
         self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
         self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
@@ -324,12 +320,12 @@ class Network(nn.Module):
         self.emb_dropout_layer = nn.Dropout(emb_dropout)
         self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
 
-        ######################################
+        
         self.kernel_size = kernel_size
         self.RNN_hidden_size = RNN_hidden_size
         self.RNN_layers = RNN_layers
         
-        # CNN layers
+        # CNN layers for distal input
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             nn.ReLU(),
@@ -360,15 +356,15 @@ class Network(nn.Module):
     
     def forward(self, local_input, distal_input):
         
-        ################################
+        #FeedForward layers for local input
         cont_data, cat_data = local_input
         if self.no_of_embs != 0:
             local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
-            ###
+            
         #print(len(x)) #x is a list, x[i].shape: batch_size * emb_size  
-        print('cont_data.shape:')
-        print(cont_data.shape)
-            ###
+        #print('cont_data.shape:')
+        #print(cont_data.shape)
+        
         local_out = torch.cat(local_out, dim = 1) #x.shape: batch_size * sum(emb_size)
         local_out = self.emb_dropout_layer(local_out)
 
@@ -384,30 +380,48 @@ class Network(nn.Module):
             local_out = F.relu(lin_layer(local_out))
             local_out = bn_layer(local_out)
             local_out = dropout_layer(local_out)
-        ################################
         
         
+        # CNN layers for distal_input
         #input data shape: batch_size, in_channels, L_in (lenth of sequence)
         distal_out = self.conv(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
         #out, _ = torch.max(out, dim=2)
         #print("out.shape")
         #print(out.shape)
 
-        #RNN
+        #RNN after CNN
         distal_out = distal_out.permute(2,0,1)
-        distal_out, _ = self.rnn(distal_out) #output of shape (seq_len, batch, num_directions * hidden_size)
-        Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] #output of last position
-        Rev_RNN=distal_out[0, :, self.RNN_hidden_size:]
+        distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+        Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+        Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
         distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
-        print("RNN out.shape")
-        print(distal_out.shape)        
+        #print("RNN out.shape")
+        #print(distal_out.shape)        
 
         out = torch.cat([local_out, distal_out], dim=1)
         
         out = self.fc(out)
         
         return torch.sigmoid(out)
+    
+    # do prediction using batches in DataLoader to save memory 
+    def batch_predict(self, dataloader, device):
+ 
+        self.eval()
+        pred_y = torch.empty(0, 1).to(device)
 
+        with torch.no_grad():
+            for y, cont_x, cat_x, distal_x in dataloader:
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+                distal_x = distal_x.to(device)
+                #y  = y.to(device)
+        
+                preds = self.forward((cont_x, cat_x), distal_x)
+                pred_y = torch.cat((pred_y, preds), dim=0)
+
+        return pred_y
+    
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv1d') != -1:
@@ -427,7 +441,7 @@ def weights_init(m):
         for layer_p in m._all_weights:
             for p in layer_p:
                 if 'weight' in p:
-                    torch.nn.init.xavier_uniform(m.__getattr__(p))
+                    torch.nn.init.xavier_uniform_(m.__getattr__(p))
 
 def train_network(model, no_of_epochs, dataloader):
     
