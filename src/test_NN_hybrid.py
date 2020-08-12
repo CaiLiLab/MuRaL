@@ -189,23 +189,3 @@ for epoch in range(no_of_epochs):
     print ("Loss: ", loss.item())
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
-class seqDataset(Dataset):
-    """ Diabetes dataset."""
-
-    def __init__(self,xy=None):
-        #self.x_data = np.asarray([el for el in xy[0]],dtype=np.float32)
-        self.x_data = np.asarray(xy[0], dtype=np.float32)
-        #self.y_data = np.asarray([el for el in xy[1]],dtype=np.float32)
-        self.y_data = np.asarray(xy[1], dtype=np.float32)
-        
-        self.x_data = torch.from_numpy(self.x_data)
-        self.y_data = torch.from_numpy(self.y_data)
-        
-        self.len=len(self.x_data)
-
-
-    def __getitem__(self, index):
-        return self.x_data[index], self.y_data[index]
-
-    def __len__(self):
-        return self.len
