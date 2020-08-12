@@ -207,6 +207,13 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
     distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius, order=distal_order)
 
     distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
+    
+    #####some distal bw data here##########
+    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
+    bw_distal = np.array(bw_distal).squeeze().transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+    
+    distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)
+    #####################################
     dataset_distal = seqDataset([distal_seq, y])
 
     dataset = CombinedDataset(dataset_local, dataset_distal)

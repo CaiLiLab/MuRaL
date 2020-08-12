@@ -168,17 +168,17 @@ class Network(nn.Module):
             nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             nn.ReLU(),
             nn.MaxPool1d(4, 2), # kernel_size, stride
-            nn.Conv1d(out_channels, out_channels*2, kernel_size),
-            nn.ReLU(),
-            nn.MaxPool1d(4, 2)
+            #nn.Conv1d(out_channels, out_channels*2, kernel_size),
+            #nn.ReLU(),
+            #nn.MaxPool1d(4, 2)
         )
         
         # RNN layers
         if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
-            self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
             fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
         else:
-            fc_in_size = out_channels*2 + lin_layer_sizes[-1]
+            fc_in_size = out_channels + lin_layer_sizes[-1]
         
         # FC layers      
         self.fc = nn.Sequential(

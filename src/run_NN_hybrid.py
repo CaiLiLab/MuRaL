@@ -41,20 +41,25 @@ n_cont = len(bw_names)
 
 #the width to be considered for local signals
 radius = 5
+print('radius:', radius)
 
 #the width to be considered for more distal signals
-distal_radius = 500
+distal_radius = 200
+print('distal_radius:', distal_radius)
 #############
 
 distal_order = 2
+print('distal_order:', distal_order)
+
 dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
 
 #############
-batchsize = 500
+batchsize = 200
+print('batchsize:', batchsize)
 
-dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
+dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=2)
 
-dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=2)
 
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
 
@@ -64,14 +69,24 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 ######test data #####
 dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
 
-dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=2)
 
 ###################
-model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order, out_channels=45, kernel_size=8, RNN_hidden_size=20, RNN_layers=1, last_lin_size=25).to(device)
+model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=25, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
 
-model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
+#this doesn't seem to improve
+#weights_init(model)
 
-no_of_epochs = 5
+print('model:')
+print(model)
+
+model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
+print('model2:')
+print(model2)
+
+no_of_epochs = 10
+
+learning_step = 0
 
 # Loss function
 criterion = torch.nn.BCELoss()
@@ -79,8 +94,8 @@ criterion = torch.nn.BCELoss()
 #criterion = torch.nn.BCEWithLogitsLoss()
 
 #set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.05)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.01)
 
 for epoch in range(no_of_epochs):
     
@@ -148,6 +163,7 @@ for epoch in range(no_of_epochs):
     print("print test_y, pred_y:")
     print(test_y)
     print(to_np(pred_y))
+    print('min and max of pred_y:', np.min(to_np(pred_y)), np.max(to_np(pred_y)))
     
     brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
     #test_pred = to_np(torch.cat((test_y,pred_y),1))
