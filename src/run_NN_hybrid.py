@@ -1,3 +1,6 @@
+from janggu.data import Bioseq, Cover
+from pybedtools import BedTool
+
 import sys
 from sklearn.preprocessing import LabelEncoder
 import torch
@@ -8,21 +11,11 @@ import pandas as pd
 import numpy as np
 
 from sklearn import metrics, calibration
+
 from NN_utils import *
 from preprocessing import *
-
-#from temperature_scaling import ModelWithTemperature, _ECELoss
 from evaluation import f3mer_comp, f5mer_comp, f7mer_comp
 
-def to_np(tensor):
-    if torch.cuda.is_available():
-        return tensor.cpu().detach().numpy()
-    else:
-        return tensor.detach().numpy()
-
-#device = torch.device("cpu")
-
-#check whether GPU is available
 print("CUDA: ", torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -32,71 +25,47 @@ train_file = sys.argv[1]
 #set test file
 test_file = sys.argv[2]
 
-# set n_cont
-n_cont = int(sys.argv[3])
+ref_genome='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa'
 
-# Using only a subset of the variables.
-data = pd.read_csv(train_file).dropna()
+train_bed = BedTool(train_file)
 
-data_test = pd.read_csv(test_file).dropna()
-
-output_feature = "mut_type"
-
-data_local, data_distal, categorical_features = separate_local_distal(data, radius=8)
-data_local_test, data_distal_test, categorical_features = separate_local_distal(data_test, radius=8)
-
-print('categorical_features:')
-print(categorical_features)
-
-dataset_local = TabularDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-dataset_local_test = TabularDataset(data=data_local_test, cat_cols=categorical_features, output_col=output_feature)
-
-dataset_distal = gen_ohe_dataset(data_distal)
-dataset_distal_test = gen_ohe_dataset(data_distal_test)
-print('dataset_distal.shape:', dataset_distal)
-
-dataset = CombinedDataset(dataset_local, dataset_distal)
-dataset_test = CombinedDataset(dataset_local_test, dataset_distal_test)
-
-#DataLoader for testing data
-dataloader1 = DataLoader(dataset_test, batch_size=1000, shuffle=False, num_workers=1)
-#test_y, test_cont_x, test_cat_x, test_distal_x = dataset_test.y, dataset_test.local_cont_X, dataset_test.local_cat_X, dataset_test.distal_X
-#test_y, test_cont_x, test_cat_x, test_distal_x = next(iter(dataloader1))
+test_bed = BedTool(test_file)
 
 
-#####
+n_cont = 1
 
-#DataLoader for the train data
-batchsize = 1000
+bw_files= '/public/home/licai/DNMML/data/germ_cell/Guo_2016_CR/merge_replicates.PGC.RNA-seq.hg19.log2.bw'
+
+radius = 5
+distal_radius = 100
+#############
+
+distal_order = 2
+dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files, radius, distal_radius, distal_order)
+
+#############
+batchsize = 500
 
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
-dataloader2 = DataLoader(dataset, batch_size=1000, shuffle=False, num_workers=1)
-#all_y, all_cont_x, all_cat_x, all_distal_x = next(iter(dataloader2))
-#all_y, all_cont_x, all_cat_x, all_distal_x = dataset.y, dataset.local_cont_X, dataset.local_cat_X, dataset.distal_X
-#all_cont_x = all_cont_x.to(device)
-#all_cat_x = all_cat_x.to(device)
-#all_distal_x = all_distal_x.to(device)
-#all_y = all_y.to(device)
+dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
 
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
-#cat_dims
-#[15, 5, 2, 4, 112]
 
 emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
-#[(15, 8), (5, 3), (2, 1), (4, 2), (112, 50)]
 
-# define the model 
-#model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 100], output_size=1, emb_dropout=0.04, lin_layer_dropouts=[0.001,0.01]).to(device)
-#model = FeedForwardNN(emb_dims, no_of_cont=15, lin_layer_sizes=[50, 200], output_size=1, emb_dropout=0.001, lin_layer_dropouts=[0.001,0.001]).to(device) #bs=8000
-#model = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[200, 100], output_size=1, emb_dropout=0.3, lin_layer_dropouts=[0.1,0.1]).to(device)
+######test data #####
+dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, radius, distal_radius, distal_order=2)
 
-model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=25).to(device)
+dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
+
+###################
+model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order, out_channels=20, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=25).to(device)
 
 model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
 
-no_of_epochs = 20
+no_of_epochs = 5
 
 # Loss function
 criterion = torch.nn.BCELoss()
@@ -190,4 +159,5 @@ for epoch in range(no_of_epochs):
     #print ("ECE score: ", ECE.item())
     print ("Loss: ", loss.item())
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
+
 

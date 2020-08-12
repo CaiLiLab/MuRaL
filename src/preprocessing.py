@@ -1,4 +1,4 @@
-from janggu.data import Bioseq, Cover, ReduceDim
+from janggu.data import Bioseq, Cover
 from pybedtools import BedTool
 
 import sys
@@ -12,9 +12,168 @@ import numpy as np
 
 from sklearn import metrics, calibration
 
-from NN_utils import *
+#from NN_utils import *
 
-def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=50):
+def to_np(tensor):
+    if torch.cuda.is_available():
+        return tensor.cpu().detach().numpy()
+    else:
+        return tensor.detach().numpy()
+
+def seq2ohe(sequence,motlen):
+    rows = len(sequence)+2*motlen-2
+    S = np.empty([rows,4])
+    base = 'ACGT'
+    for i in range(rows):
+        for j in range(4):
+            if i-motlen+1<len(sequence) and sequence[i-motlen+1].upper() =='N' or i<motlen-1 or i>len(sequence)+motlen-2:
+                S[i,j]=np.float32(0.25)
+            elif sequence[i-motlen+1].upper() == base[j]:
+                S[i,j]=np.float32(1)
+            else:
+                S[i,j]=np.float32(0)
+    return np.transpose(S)
+
+def seqs2ohe(sequences,motiflen=24):
+
+    dataset=[]
+    for row in sequences:             
+        dataset.append(seq2ohe(row,motiflen))
+        
+  
+    return dataset
+
+class seqDataset(Dataset):
+    """ Diabetes dataset."""
+
+    def __init__(self,xy=None):
+        #self.x_data = np.asarray([el for el in xy[0]],dtype=np.float32)
+        self.x_data = np.asarray(xy[0], dtype=np.float32)
+        #self.y_data = np.asarray([el for el in xy[1]],dtype=np.float32)
+        self.y_data = np.asarray(xy[1], dtype=np.float32)
+        
+        self.x_data = torch.from_numpy(self.x_data)
+        self.y_data = torch.from_numpy(self.y_data)
+        
+        self.len=len(self.x_data)
+
+
+    def __getitem__(self, index):
+        return self.x_data[index], self.y_data[index]
+
+    def __len__(self):
+        return self.len
+
+class CombinedDataset(Dataset):
+    """ Combined dataset."""
+
+    def __init__(self,local_dataset, distal_dataset):
+        
+        self.y = local_dataset.y
+        self.local_cont_X = local_dataset.cont_X
+        self.local_cat_X = local_dataset.cat_X
+        self.distal_X = distal_dataset.x_data
+        self.len=len(self.y)
+
+    def __getitem__(self, index):
+        return self.y[index], self.local_cont_X[index], self.local_cat_X[index], self.distal_X[index]
+
+    def __len__(self):
+        return self.len
+    
+def gen_ohe_dataset(data):
+    seq_data = data['seq']
+    y_data = data['mut_type'].astype(np.float32).values.reshape(-1, 1)
+
+    seqs_ohe = seqs2ohe(seq_data, motiflen=6)
+
+    dataset = seqDataset([seqs_ohe, y_data])
+    #print(dataset[0:2][0][0][0:4,4:10])
+    
+    return dataset
+    
+def separate_local_distal(data, radius = 5): 
+    seq_len = len(data['seq'][0])
+    mid_pos = int((seq_len+1)/2)
+
+    adj_seq = pd.DataFrame([list(el[mid_pos-(radius+1):mid_pos+radius]) for el in data['seq']])
+    adj_seq.columns = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
+
+    #local sequences and functional genomic data
+    data_local = pd.concat([adj_seq, data.drop(['pos','seq'], axis=1)], axis=1)
+
+    #consider more distal sequences
+    data_distal = data[['seq', 'mut_type']]
+    
+    categorical_features = list(adj_seq.columns)
+    #categorical_features = ["us5", "us4", "us3", "us2", "us1", "ds1", "ds2", "ds3", "ds4", "ds5"]
+    
+    return data_local, data_distal, categorical_features
+
+    
+class TabularDataset(Dataset):
+    def __init__(self, data, cat_cols, output_col):
+        """
+        Characterizes a Dataset for PyTorch
+
+        Parameters
+        ----------
+
+        data: pandas data frame
+            The data frame object for the input data. It must
+            contain all the continuous, categorical and the
+            output columns to be used.
+
+        cat_cols: List of strings
+            The names of the categorical columns in the data.
+            These columns will be passed through the embedding
+            layers in the model. These columns must be
+            label encoded beforehand. 
+
+        output_col: string
+            The name of the output variable column in the data
+            provided.
+        """
+        #first, change labels to digits
+        label_encoders = {}
+        for cat_col in cat_cols:
+            label_encoders[cat_col] = LabelEncoder()
+            data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+        
+        self.n = data.shape[0]
+
+        if output_col:
+            self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
+        else:
+            self.y =    np.zeros((self.n, 1))
+
+        self.cat_cols = cat_cols
+        self.cont_cols = [col for col in data.columns if col not in self.cat_cols + [output_col]]
+
+        if self.cont_cols:
+            self.cont_X = data[self.cont_cols].astype(np.float32).values
+        else:
+            self.cont_X = np.zeros((self.n, 1))
+
+        if len(self.cat_cols) >0:
+            self.cat_X = data[cat_cols].astype(np.int64).values
+        else:
+            self.cat_X =    np.zeros((self.n, 1))
+
+    def __len__(self):
+        """
+        Denotes the total number of samples.
+        """
+        return self.n
+
+    def __getitem__(self, idx):
+        """
+        Generates one sample of data.
+        """
+        return [self.y[idx], self.cont_X[idx], self.cat_X[idx]]
+
+
+def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=50, distal_order=1):
 
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
 
@@ -24,7 +183,7 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=
 
     categorical_features = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
 
-    local_seq_cat = pd.DataFrame(local_seq_cat, columns = seq_cat_features)
+    local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
 
     #adj_seq.columns = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
 
@@ -43,186 +202,29 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=
 
     #######
 
-    distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius)
+    distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius, order=distal_order)
 
     distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
     dataset_distal = seqDataset([distal_seq, y])
 
     dataset = CombinedDataset(dataset_local, dataset_distal)
     
-    return data_local, dataset
+    return dataset, data_local, categorical_features
 
-
-
-print("CUDA: ", torch.cuda.is_available())
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-#set train file
-train_file = sys.argv[1]
-
-#set test file
-test_file = sys.argv[2]
-
-ref_genome='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa'
-
-train_bed = BedTool(train_file)
-
-test_bed = BedTool(test_file)
-
-train_local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=train_bed, flank=5)
-
-train_local_seq_cat = train_local_seq.iseq4idx(list(range(train_local_seq.shape[0])))
-
-radius = train_local_seq_cat.shape[1]//2
-
-categorical_features = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
-
-train_local_seq_cat = pd.DataFrame(train_local_seq_cat, columns = seq_cat_features)
-
-#adj_seq.columns = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
-
-#
-train_y = np.array([float(loc.score) for loc in train_bed], ndmin=2).reshape((-1,1))
-train_y = pd.DataFrame(train_y, columns=['mut_type'])
-output_feature = 'mut_type'
-
-#embed = nn.Embedding(4,2)
-#out = embed(torch.tensor(train_seq_local_cat, dtype=torch.long))
-n_cont = 1
-
-bw_files= '/public/home/licai/DNMML/data/germ_cell/Guo_2016_CR/merge_replicates.PGC.RNA-seq.hg19.log2.bw'
-
-train_local_RNA = np.array(Cover.create_from_bigwig(name="", bigwigfiles=bw_files, roi=train_bed, resolution=11, flank=5)).reshape(-1, 1)
-
-train_local_RNA = pd.DataFrame(train_local_RNA, columns=['local_RNA'])
-
-data_local = pd.concat([train_local_seq_cat, train_local_RNA, train_y], axis=1)
-
-dataset_local = TabularDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-
-#######
-
-train_distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=train_bed, flank=50)
-
-train_distal_seq = np.array(train_distal_seq).squeeze().transpose(0,2,1)
-dataset_distal = seqDataset([train_distal_seq, train_y])
-
-dataset = CombinedDataset(dataset_local, dataset_distal)
-
-batchsize = 1000
-
-dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
-
-dataloader2 = DataLoader(dataset, batch_size=1000, shuffle=False, num_workers=1)
-
-cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
-
-emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
-#emb_dims
-
-######test data #####
-data_local_test, dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, radius=5, distal_radius=50)
-
-dataloader1 = DataLoader(dataset_test, batch_size=1000, shuffle=False, num_workers=1)
-
-###################
-model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=25).to(device)
-
-model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
-
-no_of_epochs = 5
-
-# Loss function
-criterion = torch.nn.BCELoss()
-#criterion = torch.nn.NLLLoss()
-#criterion = torch.nn.BCEWithLogitsLoss()
-
-#set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.05)
-
-for epoch in range(no_of_epochs):
+#old function
+def load_data(data_file):
     
-    model.train()
-    
-    for y, cont_x, cat_x, distal_x in dataloader:
-        cat_x = cat_x.to(device)
-        cont_x = cont_x.to(device)
-        distal_x = distal_x.to(device)
-        y  = y.to(device)
-        
-        # Forward Pass
-        #preds = model(cont_x, cat_x) #original
-        preds = model.forward((cont_x, cat_x), distal_x)
-        #print("preds:")
-        #print(preds.shape)    
-        loss = criterion(preds, y)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        preds2 = model2.forward(cont_x, cat_x)
-        loss2 = criterion(preds2, y) 
-        optimizer2.zero_grad()
-        loss2.backward()
-        optimizer2.step()
-       
-    model.eval()
+    data = pd.read_csv(data_file, sep='\t').dropna()
+    seq_data = data['sequence']
+    y_data = data['label'].astype(np.float32).values.reshape(-1, 1)
 
-    pred_y = model.batch_predict(dataloader1, device)
-    y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
-    data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
-    
-    all_pred_y = model.batch_predict(dataloader2, device)      
-    all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
-    all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
+    seqs_ohe = seqs2ohe(seq_data, 6)
 
-    print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
-    print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
-    print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
-    print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
-    print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
-    print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
+    dataset = seqDataset([seqs_ohe, y_data])
+    #print(dataset[0:2][0][0][0:4,4:10])
     
-    #########################
-    pred_y2 = model2.batch_predict(dataloader1, device)
-    y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
-    data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
-    
-    all_pred_y2 = model2.batch_predict(dataloader2, device)      
-    all_y_prob2 = pd.Series(data=to_np(all_pred_y2).T[0], name="prob")
-    all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)
+    return dataset
 
-    print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
-    print ('3mer correlation - all (FF only): ' + str(f3mer_comp(all_data_and_prob2)))
-    print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
-    print ('5mer correlation - all (FF only): ' + str(f5mer_comp(all_data_and_prob2)))
-    print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
-    print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
-    #########################
-    #get the scores
-    #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
-    test_y = data_local_test['mut_type']
-    auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
-    print("print test_y, pred_y:")
-    print(test_y)
-    print(to_np(pred_y))
-    
-    brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
-    #test_pred = to_np(torch.cat((test_y,pred_y),1))
-    
-    #logits = torch.cat((1-pred_y,pred_y),1)
-    #logits = torch.log(logits/(1-logits))
-    #ECE = to_np(ece_model.forward(logits, test_y.long()))
-    
-    prob_true, prob_pred = calibration.calibration_curve(test_y, to_np(pred_y),n_bins=50)
-    
-    #print("calibration: ", np.column_stack((prob_pred,prob_true)))
-    
-    print ("AUC score: ", auc_score)
-    print ("Brier score: ", brier_score)
-    #print ("ECE score: ", ECE.item())
-    print ("Loss: ", loss.item())
-    #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
+
 
 
