@@ -66,7 +66,7 @@ class seqDataset(Dataset):
         return self.len
 
 class CombinedDataset(Dataset):
-    """ Diabetes dataset."""
+    """ Combined dataset."""
 
     def __init__(self,local_dataset, distal_dataset):
         
@@ -86,7 +86,7 @@ def gen_ohe_dataset(data):
     seq_data = data['seq']
     y_data = data['mut_type'].astype(np.float32).values.reshape(-1, 1)
 
-    seqs_ohe = seqs2ohe(seq_data, 6)
+    seqs_ohe = seqs2ohe(seq_data, motiflen=6)
 
     dataset = seqDataset([seqs_ohe, y_data])
     #print(dataset[0:2][0][0][0:4,4:10])
@@ -176,8 +176,7 @@ class TabularDataset(Dataset):
 
 class FeedForwardNN(nn.Module):
 
-    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes,
-                             output_size, emb_dropout, lin_layer_dropouts):
+    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts):
 
         """
         Parameters
@@ -211,16 +210,14 @@ class FeedForwardNN(nn.Module):
         super(FeedForwardNN, self).__init__()
 
         # Embedding layers
-        self.emb_layers = nn.ModuleList([nn.Embedding(x, y)
-                                                                         for x, y in emb_dims])
+        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
 
         no_of_embs = sum([y for x, y in emb_dims])
         self.no_of_embs = no_of_embs
         self.no_of_cont = no_of_cont
 
         # Linear Layers
-        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont,
-                                                                lin_layer_sizes[0])
+        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont, lin_layer_sizes[0])
 
         self.lin_layers =\
          nn.ModuleList([first_lin_layer] +\
@@ -231,25 +228,21 @@ class FeedForwardNN(nn.Module):
             nn.init.kaiming_normal_(lin_layer.weight.data)
 
         # Output Layer
-        self.output_layer = nn.Linear(lin_layer_sizes[-1],
-                                                                    output_size)
+        self.output_layer = nn.Linear(lin_layer_sizes[-1], 1)
         nn.init.kaiming_normal_(self.output_layer.weight.data)
 
         # Batch Norm Layers
         self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
-        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size)
-                                                                        for size in lin_layer_sizes])
+        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
 
         # Dropout Layers
         self.emb_dropout_layer = nn.Dropout(emb_dropout)
-        self.droput_layers = nn.ModuleList([nn.Dropout(size)
-                                                                    for size in lin_layer_dropouts])
+        self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
 
     def forward(self, cont_data, cat_data):
 
         if self.no_of_embs != 0:
-            x = [emb_layer(cat_data[:, i])
-                     for i,emb_layer in enumerate(self.emb_layers)]
+            x = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
             ###
         #print(len(x)) #x is a list, x[i].shape: batch_size * emb_size  
         #print(x)
@@ -277,8 +270,26 @@ class FeedForwardNN(nn.Module):
         x = torch.sigmoid(self.output_layer(x)) # for logistic regression
 
         return x
-    
+
+    def batch_predict(self, dataloader, device):
+        
+        self.eval()
+        
+        pred_y = torch.empty(0, 1).to(device)
+
+        with torch.no_grad():
+            for y, cont_x, cat_x, _ in dataloader:
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+        
+                preds = self.forward(cont_x, cat_x)
+                pred_y = torch.cat((pred_y, preds), dim=0)
+
+        return pred_y
+
+#
 def load_data(data_file):
+    
     data = pd.read_csv(data_file, sep='\t').dropna()
     seq_data = data['sequence']
     y_data = data['label'].astype(np.float32).values.reshape(-1, 1)
@@ -292,6 +303,7 @@ def load_data(data_file):
 
 class Network(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size):
+        
         super(Network, self).__init__()
         #self.cnn = nn.Conv1d(in_channels, out_channels, kernel_size)
         #self.maxpool =  nn.MaxPool1d(kernel_size, stride)
@@ -336,11 +348,13 @@ class Network(nn.Module):
         )
         
         # RNN layers
-        self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+        else:
+            fc_in_size = out_channels*2 + lin_layer_sizes[-1]
         
-        
-        # FC layers
-        fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+        # FC layers      
         self.fc = nn.Sequential(
             nn.BatchNorm1d(fc_in_size),
             nn.Linear(fc_in_size, last_lin_size), 
@@ -390,11 +404,14 @@ class Network(nn.Module):
         #print(out.shape)
 
         #RNN after CNN
-        distal_out = distal_out.permute(2,0,1)
-        distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
-        Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
-        Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
-        distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            distal_out = distal_out.permute(2,0,1)
+            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
+            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        else:
+            distal_out, _ = torch.max(distal_out, dim=2)
         #print("RNN out.shape")
         #print(distal_out.shape)        
 
