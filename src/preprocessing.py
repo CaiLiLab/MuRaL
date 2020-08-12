@@ -145,7 +145,7 @@ class TabularDataset(Dataset):
         if output_col:
             self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
         else:
-            self.y =    np.zeros((self.n, 1))
+            self.y = np.zeros((self.n, 1))
 
         self.cat_cols = cat_cols
         self.cont_cols = [col for col in data.columns if col not in self.cat_cols + [output_col]]
@@ -173,13 +173,14 @@ class TabularDataset(Dataset):
         return [self.y[idx], self.cont_X[idx], self.cat_X[idx]]
 
 
-def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=50, distal_order=1):
+def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1):
 
-    local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
+    local_seq = Bioseq.create_from_refgenome(name='', refgenome=ref_genome, roi=bed_regions, flank=radius)
 
+    #get the numberized seq data
     local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0])))
 
-    #radius = local_seq_cat.shape[1]//2
+    #TO DO: some other categorical data can be added here
 
     categorical_features = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
 
@@ -192,11 +193,12 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, radius=5, distal_radius=
     y = pd.DataFrame(y, columns=['mut_type'])
     output_feature = 'mut_type'
 
-    local_RNA = np.array(Cover.create_from_bigwig(name="", bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(-1, 1)
+    bw_data = np.array(Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
 
-    local_RNA = pd.DataFrame(local_RNA, columns=['local_RNA'])
+    bw_data = pd.DataFrame(bw_data, columns=bw_names)
+    #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
 
-    data_local = pd.concat([local_seq_cat, local_RNA, y], axis=1)
+    data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
 
     dataset_local = TabularDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
 

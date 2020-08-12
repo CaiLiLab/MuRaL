@@ -32,16 +32,22 @@ train_bed = BedTool(train_file)
 test_bed = BedTool(test_file)
 
 
-n_cont = 1
 
-bw_files= '/public/home/licai/DNMML/data/germ_cell/Guo_2016_CR/merge_replicates.PGC.RNA-seq.hg19.log2.bw'
+bw_list = pd.read_table('/public/home/licai/DNMML/analysis/test/bw_files.txt', sep='\s+', header=None, comment='#')
 
+bw_files = list(bw_list[0])
+bw_names = list(bw_list[1])
+n_cont = len(bw_names)
+
+#the width to be considered for local signals
 radius = 5
-distal_radius = 100
+
+#the width to be considered for more distal signals
+distal_radius = 500
 #############
 
 distal_order = 2
-dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files, radius, distal_radius, distal_order)
+dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
 
 #############
 batchsize = 500
@@ -56,12 +62,12 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 
 ######test data #####
-dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, radius, distal_radius, distal_order=2)
+dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
 
 dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
 
 ###################
-model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order, out_channels=20, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=25).to(device)
+model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order, out_channels=45, kernel_size=8, RNN_hidden_size=20, RNN_layers=1, last_lin_size=25).to(device)
 
 model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[100, 50], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
 
