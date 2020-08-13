@@ -85,9 +85,9 @@ dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_
 
 ###################
 if len(sys.argv)>7 and int(sys.argv[7]) > 0:
-    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=25, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
+    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
 else:
-    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=25, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
+    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
 
 #this doesn't seem to improve
 weights_init(model)
@@ -99,7 +99,7 @@ model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], e
 print('model2:')
 print(model2)
 
-no_of_epochs = 15
+no_of_epochs = 20
 
 learning_step = 0
 
@@ -109,8 +109,8 @@ criterion = torch.nn.BCELoss()
 #criterion = torch.nn.BCEWithLogitsLoss()
 
 #set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.002)
 
 for epoch in range(no_of_epochs):
     
@@ -139,7 +139,8 @@ for epoch in range(no_of_epochs):
         optimizer2.step()
        
     model.eval()
-
+    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
+    
     pred_y = model.batch_predict(dataloader1, device)
     y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
@@ -175,6 +176,7 @@ for epoch in range(no_of_epochs):
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
     test_y = data_local_test['mut_type']
     auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
+    auc_score2 = metrics.roc_auc_score(test_y, to_np(pred_y2))
     print("print test_y, pred_y:")
     print(test_y)
     print(to_np(pred_y))
@@ -182,6 +184,7 @@ for epoch in range(no_of_epochs):
     print('min and max of pred_y2:', np.min(to_np(pred_y2)), np.max(to_np(pred_y2)))
    
     brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
+    brier_score2 = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y2))
     #test_pred = to_np(torch.cat((test_y,pred_y),1))
     
     #logits = torch.cat((1-pred_y,pred_y),1)
@@ -192,10 +195,10 @@ for epoch in range(no_of_epochs):
     
     #print("calibration: ", np.column_stack((prob_pred,prob_true)))
     
-    print ("AUC score: ", auc_score)
-    print ("Brier score: ", brier_score)
+    print ("AUC score: ", auc_score, auc_score2)
+    print ("Brier score: ", brier_score, brier_score2)
     #print ("ECE score: ", ECE.item())
-    print ("Loss: ", loss.item())
+    print ("Loss: ", loss.item(), loss2.item())
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
 

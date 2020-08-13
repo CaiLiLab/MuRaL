@@ -305,10 +305,12 @@ class Network2(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             nn.ReLU(),
-            nn.MaxPool1d(4, 2), # kernel_size, stride
-            #nn.Conv1d(out_channels, out_channels*2, kernel_size),
+            #nn.Sigmoid(),
+            nn.MaxPool1d(3, 1), # kernel_size, stride
+            #nn.Conv1d(out_channels, out_channels, kernel_size),
             #nn.ReLU(),
-            #nn.MaxPool1d(4, 2)
+            #nn.Sigmoid(),
+            #nn.MaxPool1d(3, 1)
         )
         
         
@@ -324,10 +326,12 @@ class Network2(nn.Module):
         #=== separate FC layers for distal and local ====
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(crnn_fc_in_size),
+            nn.Dropout(0.1),
             #nn.Linear(crnn_fc_in_size, 30), 
-            #nn.ReLU(),
+            nn.ReLU(),
+            #nn.Dropout(0.1), #dropout prob
             nn.Linear(crnn_fc_in_size, 1),
-            nn.Dropout(0.1), #dropout prob
+            
             #nn.Linear(out_channels*2, 1),
             #nn.Linear(30, 1),
             #nn.Dropout(0.1)
@@ -338,6 +342,9 @@ class Network2(nn.Module):
             nn.Linear(lin_layer_sizes[-1], 1), 
         )       
         
+        self.fc2to1 = nn.Linear(2, 1)
+        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+
         #====================================
         
         
@@ -404,6 +411,10 @@ class Network2(nn.Module):
         #=========separate FC layers ===========
         local_out = self.local_fc(local_out)
         distal_out = self.distal_fc(distal_out)
+        if np.random.uniform(0,1) < np.random.uniform(0,1) < 1e-1:
+            print('local_out:', local_out[:5])
+            print('distal_out:', distal_out[:5])
+        
         #out = local_out * torch.sigmoid(distal_out)
         #out = local_out * distal_out # NO
         #out = local_out * torch.exp(distal_out)
@@ -414,8 +425,11 @@ class Network2(nn.Module):
         #out = torch.cat([local_out, distal_out], dim=1)
         #out = self.fc(out)
         
+        #out = torch.sigmoid(local_out + distal_out)
+        #out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
+        #out = torch.sigmoid(local_out) * torch.sigmoid(distal_out) # OK for large data?
         #out = torch.sigmoid(out)
-        out = torch.sigmoid(local_out) * torch.sigmoid(distal_out) # OK for large data?
+        out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) #set the weight as a Parameter when adding local and distal
         
         return out
     
@@ -441,7 +455,7 @@ def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv1d') != -1:
         #nn.init.normal_(m.weight, 0.0, 1e-06)
-        #nn.init.xavier_uniform_(m.weight)
+        nn.init.xavier_uniform_(m.weight)
         nn.init.normal_(m.bias)
 
         
