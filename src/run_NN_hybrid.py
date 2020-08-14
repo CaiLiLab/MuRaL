@@ -116,6 +116,9 @@ for epoch in range(no_of_epochs):
     
     model.train()
     
+    total_loss = 0
+    total_loss2 = 0
+    
     for y, cont_x, cat_x, distal_x in dataloader:
         cat_x = cat_x.to(device)
         cont_x = cont_x.to(device)
@@ -137,15 +140,19 @@ for epoch in range(no_of_epochs):
         optimizer2.zero_grad()
         loss2.backward()
         optimizer2.step()
+        
+        total_loss += loss.item()
+        total_loss2 += loss2.item()
        
     model.eval()
-    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
+    if len(sys.argv)>7 and int(sys.argv[7]) > 0:
+        print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
-    pred_y = model.batch_predict(dataloader1, device)
+    pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
     y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
     
-    all_pred_y = model.batch_predict(dataloader2, device)      
+    all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
     all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
     all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
 
@@ -157,11 +164,11 @@ for epoch in range(no_of_epochs):
     print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
     
     #########################
-    pred_y2 = model2.batch_predict(dataloader1, device)
+    pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
     y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
     data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
     
-    all_pred_y2 = model2.batch_predict(dataloader2, device)      
+    all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)      
     all_y_prob2 = pd.Series(data=to_np(all_pred_y2).T[0], name="prob")
     all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)
 
@@ -198,7 +205,7 @@ for epoch in range(no_of_epochs):
     print ("AUC score: ", auc_score, auc_score2)
     print ("Brier score: ", brier_score, brier_score2)
     #print ("ECE score: ", ECE.item())
-    print ("Loss: ", loss.item(), loss2.item())
+    print ("Total Loss: ", train_total_loss, train_total_loss2, test_total_loss, test_total_loss2)
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
 

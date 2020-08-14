@@ -111,21 +111,26 @@ class FeedForwardNN(nn.Module):
 
         return x
 
-    def batch_predict(self, dataloader, device):
+    def batch_predict(self, dataloader, criterion, device):
         
         self.eval()
         
         pred_y = torch.empty(0, 1).to(device)
+        total_loss = 0
 
         with torch.no_grad():
             for y, cont_x, cat_x, _ in dataloader:
                 cat_x = cat_x.to(device)
                 cont_x = cont_x.to(device)
+                y = y.to(device)
         
                 preds = self.forward(cont_x, cat_x)
                 pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y)
+                total_loss += loss.item()
 
-        return pred_y
+        return pred_y, total_loss
 
 class Network(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size):
@@ -183,6 +188,7 @@ class Network(nn.Module):
         # FC layers      
         self.fc = nn.Sequential(
             nn.BatchNorm1d(fc_in_size),
+            nn.Dropout(0.1),
             nn.Linear(fc_in_size, last_lin_size), 
             nn.ReLU(),
             nn.Dropout(0.1), #dropout prob
@@ -248,22 +254,27 @@ class Network(nn.Module):
         return torch.sigmoid(out)
     
     # do prediction using batches in DataLoader to save memory 
-    def batch_predict(self, dataloader, device):
+    def batch_predict(self, dataloader, criterion, device):
  
         self.eval()
         pred_y = torch.empty(0, 1).to(device)
+        
+        total_loss = 0
 
         with torch.no_grad():
             for y, cont_x, cat_x, distal_x in dataloader:
                 cat_x = cat_x.to(device)
                 cont_x = cont_x.to(device)
                 distal_x = distal_x.to(device)
-                #y  = y.to(device)
+                y  = y.to(device)
         
                 preds = self.forward((cont_x, cat_x), distal_x)
                 pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y)
+                total_loss += loss.item()
 
-        return pred_y
+        return pred_y, total_loss
 
 class Network2(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size):
@@ -343,7 +354,7 @@ class Network2(nn.Module):
         )       
         
         self.fc2to1 = nn.Linear(2, 1)
-        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        self.w_ld = torch.nn.Parameter(torch.Tensor([1]))
 
         #====================================
         
@@ -411,9 +422,9 @@ class Network2(nn.Module):
         #=========separate FC layers ===========
         local_out = self.local_fc(local_out)
         distal_out = self.distal_fc(distal_out)
-        if np.random.uniform(0,1) < np.random.uniform(0,1) < 1e-1:
-            print('local_out:', local_out[:5])
-            print('distal_out:', distal_out[:5])
+        if np.random.uniform(0,1) < 0.01 and self.training == False:
+            print('local_out:', torch.min(local_out).item(), torch.max(local_out).item(), torch.var(local_out).item(), torch.var(torch.sigmoid(local_out)).item())
+            print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
         
         #out = local_out * torch.sigmoid(distal_out)
         #out = local_out * distal_out # NO
@@ -434,22 +445,27 @@ class Network2(nn.Module):
         return out
     
     # do prediction using batches in DataLoader to save memory 
-    def batch_predict(self, dataloader, device):
+    def batch_predict(self, dataloader, criterion, device):
  
         self.eval()
         pred_y = torch.empty(0, 1).to(device)
+        
+        total_loss = 0
 
         with torch.no_grad():
             for y, cont_x, cat_x, distal_x in dataloader:
                 cat_x = cat_x.to(device)
                 cont_x = cont_x.to(device)
                 distal_x = distal_x.to(device)
-                #y  = y.to(device)
+                y  = y.to(device)
         
                 preds = self.forward((cont_x, cat_x), distal_x)
                 pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y)
+                total_loss += loss.item()
 
-        return pred_y
+        return pred_y, total_loss
     
 def weights_init(m):
     classname = m.__class__.__name__
