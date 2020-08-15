@@ -69,9 +69,9 @@ else:
     batchsize = 200
 print('batchsize:', batchsize)
 
-dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=2)
+dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
-dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=2)
+dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
 
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
 
@@ -81,16 +81,13 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 ######test data #####
 dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
 
-dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=2)
+dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
 
 ###################
 if len(sys.argv)>7 and int(sys.argv[7]) > 0:
-    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
+    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 else:
-    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=18, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35).to(device)
-
-#this doesn't seem to improve
-weights_init(model)
+    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
 print('model:')
 print(model)
@@ -98,6 +95,10 @@ print(model)
 model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
 print('model2:')
 print(model2)
+
+#this doesn't seem to improve
+weights_init(model)
+weights_init(model2)
 
 no_of_epochs = 20
 
@@ -109,8 +110,8 @@ criterion = torch.nn.BCELoss()
 #criterion = torch.nn.BCEWithLogitsLoss()
 
 #set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.002)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.001)
 
 for epoch in range(no_of_epochs):
     
