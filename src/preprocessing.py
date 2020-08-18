@@ -193,12 +193,15 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
     y = pd.DataFrame(y, columns=['mut_type'])
     output_feature = 'mut_type'
 
-    bw_data = np.array(Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
+    if len(bw_files) > 0:
+        bw_data = np.array(Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
 
-    bw_data = pd.DataFrame(bw_data, columns=bw_names)
+        bw_data = pd.DataFrame(bw_data, columns=bw_names)
     #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
 
-    data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
+        data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
+    else:
+        data_local = pd.concat([local_seq_cat, y], axis=1)
 
     dataset_local = TabularDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
 
@@ -209,10 +212,11 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
     distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
     
     #####some distal bw data here##########
-    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
-    bw_distal = np.array(bw_distal).squeeze().transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+    if len(bw_files) > 0:
+        bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
+        bw_distal = np.array(bw_distal).squeeze().transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
     
-    distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)
+        distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)
     #####################################
     dataset_distal = seqDataset([distal_seq, y])
 

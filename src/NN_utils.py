@@ -318,14 +318,16 @@ class Network2(nn.Module):
         # CNN layers for distal input
         maxpool_kernel_size = 10
         maxpool_stride = 10
+        second_kernel_size = kernel_size//2
         self.conv = nn.Sequential(
-            nn.BatchNorm1d(in_channels),
-            nn.Conv1d(in_channels, out_channels*2, kernel_size), # in_channels, out_channels, kernel_size
+            nn.BatchNorm1d(in_channels), #this is important!
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             nn.ReLU(),
             #nn.Sigmoid(),
             nn.MaxPool1d(maxpool_kernel_size, maxpool_stride), # kernel_size, stride
             
-            nn.Conv1d(out_channels*2, out_channels, kernel_size//3),
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels*2, second_kernel_size),
             nn.ReLU(),
             #nn.Sigmoid(),
             nn.MaxPool1d(2, 2)
@@ -334,30 +336,31 @@ class Network2(nn.Module):
         
         # RNN layers
         if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
-            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
             fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
             crnn_fc_in_size = RNN_hidden_size*2
         else:
             fc_in_size = out_channels + lin_layer_sizes[-1]
-            crnn_fc_in_size = out_channels
+            crnn_fc_in_size = out_channels*2
             
             ##### use the flattened output of CNN instead of torch.max
             last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
-            last_seq_len = (last_seq_len - (kernel_size//2 -1) )//2 #for the 2nd conv1d
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 #for the 2nd conv1d
             
             #crnn_fc_in_size = out_channels*last_seq_len
         
         #=== separate FC layers for distal and local ====
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(crnn_fc_in_size),
-            nn.Dropout(0.3),
-            nn.Linear(crnn_fc_in_size, 50), 
-            nn.ReLU(),
-            nn.Dropout(0.2), #dropout prob
+            nn.Dropout(0.25), #control overfitting
+            nn.Linear(crnn_fc_in_size, 1), 
+            #nn.ReLU(),
             
             #nn.Linear(crnn_fc_in_size, 1),
             #nn.Linear(out_channels*2, 1),
-            nn.Linear(50, 1),
+            #nn.BatchNorm1d(30),
+            #nn.Dropout(0.25), #dropout prob
+            #nn.Linear(30, 1),
             #nn.Dropout(0.1)
         )
         
@@ -454,11 +457,12 @@ class Network2(nn.Module):
         #out = self.fc(out)
         
         #out = torch.sigmoid(local_out + distal_out)
-        #out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
+        out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
         #out = torch.sigmoid(local_out) * torch.sigmoid(distal_out) # OK for large data?
         #out = torch.sigmoid(out)
         #out = torch.sigmoid(local_out)
-        out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) #set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(distal_out)
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) #set the weight as a Parameter when adding local and distal
         
         return out
     

@@ -32,13 +32,16 @@ train_bed = BedTool(train_file)
 
 test_bed = BedTool(test_file)
 
+if 1:
+    bw_files = []
+    bw_names = []
+    n_cont = 0
+else:
+    bw_list = pd.read_table('/public/home/licai/DNMML/analysis/test/bw_files.txt', sep='\s+', header=None, comment='#')
 
-
-bw_list = pd.read_table('/public/home/licai/DNMML/analysis/test/bw_files.txt', sep='\s+', header=None, comment='#')
-
-bw_files = list(bw_list[0])
-bw_names = list(bw_list[1])
-n_cont = len(bw_names)
+    bw_files = list(bw_list[0])
+    bw_names = list(bw_list[1])
+    n_cont = len(bw_names)
 
 #the width to be considered for local signals
 if len(sys.argv)>3:
@@ -69,6 +72,27 @@ else:
     batchsize = 200
 print('batchsize:', batchsize)
 
+if len(sys.argv)>7:
+    cnn_kernel_size = int(sys.argv[7])
+else:
+    cnn_kernel_size = 12
+print('cnn_kernel_size:', cnn_kernel_size)
+
+    
+if len(sys.argv)>8:
+    cnn_out_channels = int(sys.argv[8])
+else:
+    cnn_out_channels = 50
+    
+print('cnn_out_channels:', cnn_out_channels)
+
+if len(sys.argv)>9:
+    RNN_hidden_size = int(sys.argv[9])
+else:
+    RNN_hidden_size = 0
+    
+print('RNN_hidden_size:', RNN_hidden_size)
+
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1)
 
 dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
@@ -84,10 +108,10 @@ dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_file
 dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
 
 ###################
-if len(sys.argv)>7 and int(sys.argv[7]) > 0:
-    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+if len(sys.argv)>10 and int(sys.argv[10]) > 0:
+    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 else:
-    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=50, kernel_size=12, RNN_hidden_size=0, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
 print('model:')
 print(model)
@@ -110,8 +134,22 @@ criterion = torch.nn.BCELoss()
 #criterion = torch.nn.BCEWithLogitsLoss()
 
 #set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.002)
+
+best_loss = 0
+pred_df = None
+
+best_loss2 = 0
+
+pred_df2 = None
+
+
+if len(sys.argv)>11:
+    pred_outfile = sys.argv[11]
+else:
+    pred_outfile = test_file + '.csv'
+
 
 for epoch in range(no_of_epochs):
     
@@ -119,6 +157,7 @@ for epoch in range(no_of_epochs):
     
     total_loss = 0
     total_loss2 = 0
+    
     
     for y, cont_x, cat_x, distal_x in dataloader:
         cat_x = cat_x.to(device)
@@ -146,8 +185,8 @@ for epoch in range(no_of_epochs):
         total_loss2 += loss2.item()
        
     model.eval()
-    if len(sys.argv)>7 and int(sys.argv[7]) > 0:
-        print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
+    #if len(sys.argv)>7 and int(sys.argv[7]) > 0:
+    #    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
     pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
     y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
@@ -180,6 +219,21 @@ for epoch in range(no_of_epochs):
     print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
     print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
     #########################
+    
+    if epoch == 0:
+        best_loss = test_total_loss
+        best_loss2 = test_total_loss2
+        pred_df = data_and_prob[['mut_type','prob']]
+        pred_df2 = data_and_prob2[['mut_type','prob']]
+    
+    if test_total_loss < best_loss:
+        best_loss = test_total_loss
+        pref_df = data_and_prob[['mut_type','prob']]
+    
+    if test_total_loss2 < best_loss2:
+        best_loss2 = test_total_loss2
+        pref_df2 = data_and_prob2[['mut_type','prob']]
+        
     #get the scores
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
     test_y = data_local_test['mut_type']
@@ -209,4 +263,7 @@ for epoch in range(no_of_epochs):
     print ("Total Loss: ", train_total_loss, train_total_loss2, test_total_loss, test_total_loss2)
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
+#write the prediction
+pref_df = pd.concat([pref_df, pred_df2['prob']], axis=1, names=['mut_type','prob1', 'prob2'])
+pref_df.to_csv(pred_outfile, sep='\t', index=False)
 
