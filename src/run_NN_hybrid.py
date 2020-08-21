@@ -60,7 +60,7 @@ print('distal_radius:', distal_radius)
 if len(sys.argv)>5:
     distal_order = int(sys.argv[5])
 else:
-    distal_order = 2
+    distal_order = 1
 print('distal_order:', distal_order)
 
 dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
@@ -109,7 +109,10 @@ dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_
 
 ###################
 if len(sys.argv)>10 and int(sys.argv[10]) > 0:
-    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    if int(sys.argv[10]) ==1:
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    else:
+        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 else:
     model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
@@ -228,11 +231,11 @@ for epoch in range(no_of_epochs):
     
     if test_total_loss < best_loss:
         best_loss = test_total_loss
-        pref_df = data_and_prob[['mut_type','prob']]
+        pred_df = data_and_prob[['mut_type','prob']]
     
     if test_total_loss2 < best_loss2:
         best_loss2 = test_total_loss2
-        pref_df2 = data_and_prob2[['mut_type','prob']]
+        pred_df2 = data_and_prob2[['mut_type','prob']]
         
     #get the scores
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
@@ -264,6 +267,6 @@ for epoch in range(no_of_epochs):
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
 #write the prediction
-pref_df = pd.concat([pref_df, pred_df2['prob']], axis=1, names=['mut_type','prob1', 'prob2'])
-pref_df.to_csv(pred_outfile, sep='\t', index=False)
+pred_df = pd.concat([pred_df, pred_df2['prob']], axis=1, names=['mut_type','prob1', 'prob2'])
+pred_df.to_csv(pred_outfile, sep='\t', index=False)
 
