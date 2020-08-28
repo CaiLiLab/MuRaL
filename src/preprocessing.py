@@ -12,14 +12,14 @@ import numpy as np
 
 from sklearn import metrics, calibration
 
-#convert numpy arrays to Tensor
+# Convert numpy arrays to Tensor
 def to_np(tensor):
     if torch.cuda.is_available():
         return tensor.cpu().detach().numpy()
     else:
         return tensor.detach().numpy()
 
-#Deprecated.One-hot encoding for the sequence. 
+# Deprecated.One-hot encoding for the sequence. 
 def seq2ohe(sequence,motlen):
     rows = len(sequence)+2*motlen-2
     S = np.empty([rows,4])
@@ -35,7 +35,7 @@ def seq2ohe(sequence,motlen):
                 S[i,j]=np.float32(0)
     return np.transpose(S)
 
-#Deprecated. One-hot encoding for multple sequences.
+# Deprecated. One-hot encoding for multple sequences.
 def seqs2ohe(sequences,motiflen=24):
 
     dataset=[]
@@ -45,7 +45,7 @@ def seqs2ohe(sequences,motiflen=24):
   
     return dataset
 
-#Define a Dataset for handling distal data
+# Define a Dataset for handling distal data
 class DistalDataset(Dataset):
 
     def __init__(self,xy=None):
@@ -66,7 +66,7 @@ class DistalDataset(Dataset):
     def __len__(self):
         return self.len
 
-#Define a Dataset with both local data and distal data
+# Define a Dataset with both local data and distal data
 class CombinedDataset(Dataset):
     """ Combined dataset."""
 
@@ -84,7 +84,7 @@ class CombinedDataset(Dataset):
     def __len__(self):
         return self.len
 
-#Deprecated.
+# Deprecated.
 def gen_ohe_dataset(data):
     seq_data = data['seq']
     y_data = data['mut_type'].astype(np.float32).values.reshape(-1, 1)
@@ -96,7 +96,7 @@ def gen_ohe_dataset(data):
     
     return dataset
 
-#Deprecated.
+# Deprecated.
 def separate_local_distal(data, radius = 5): 
     seq_len = len(data['seq'][0])
     mid_pos = int((seq_len+1)/2)
@@ -104,10 +104,10 @@ def separate_local_distal(data, radius = 5):
     adj_seq = pd.DataFrame([list(el[mid_pos-(radius+1):mid_pos+radius]) for el in data['seq']])
     adj_seq.columns = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
 
-    #local sequences and functional genomic data
+    # Local sequences and functional genomic data
     data_local = pd.concat([adj_seq, data.drop(['pos','seq'], axis=1)], axis=1)
 
-    #consider more distal sequences
+    # Consider more distal sequences
     data_distal = data[['seq', 'mut_type']]
     
     categorical_features = list(adj_seq.columns)
@@ -115,7 +115,7 @@ def separate_local_distal(data, radius = 5):
     
     return data_local, data_distal, categorical_features
 
-#Define a Dataset for handling local data with categorical and continuous data  
+# Define a Dataset class for handling local signals with categorical and continuous data  
 class LocalDataset(Dataset):
     def __init__(self, data, cat_cols, output_col):
         """
@@ -139,7 +139,7 @@ class LocalDataset(Dataset):
             The name of the output variable column in the data
             provided.
         """
-        #first, change labels to digits
+        # First, change labels to digits
         label_encoders = {}
         for cat_col in cat_cols:
             label_encoders[cat_col] = LabelEncoder()
@@ -177,27 +177,28 @@ class LocalDataset(Dataset):
         """
         return [self.y[idx], self.cont_X[idx], self.cat_X[idx]]
 
-#Prepare the datasets for given regions
+# Prepare the datasets for given regions
 def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1):
-
+    
+    # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='', refgenome=ref_genome, roi=bed_regions, flank=radius)
 
-    #Get the numberized seq data
+    # Get the digitalized seq data
     local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0])))
 
-    #TO DO: some other categorical data can be added here
-    #Names of the categorical variables
+    # TO DO: some other categorical data can be added here
+    # Names of the categorical variables
     categorical_features = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
 
     local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
 
-    #The 'score' field in the BED file is used for storing the label/class information
+    # The 'score' field in the BED file stores the label/class information
     y = np.array([float(loc.score) for loc in bed_regions], ndmin=2).reshape((-1,1))
     y = pd.DataFrame(y, columns=['mut_type'])
     output_feature = 'mut_type'
 
     if len(bw_files) > 0:
-        #Use the mean value of the region of 2*radius+1 bp around the focal site
+        # Use the mean value of the region of 2*radius+1 bp around the focal site
         bw_data = np.array(Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
 
         bw_data = pd.DataFrame(bw_data, columns=bw_names)
@@ -209,12 +210,12 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
 
     dataset_local = LocalDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
 
-    #For the distal data, first extract the sequences and convert them to one-hot-encoding data 
+    # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
     distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius, order=distal_order)
-    #Note the shape of data
+    # Note the shape of data
     distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
     
-    #Handle distal bigWig data
+    # Handle distal bigWig data
     if len(bw_files) > 0:
         bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
         bw_distal = np.array(bw_distal).squeeze().transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
@@ -223,12 +224,13 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
         distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)
     
     dataset_distal = DistalDataset([distal_seq, y])
-
+    
+    # Combine local Dataset and distal Dataset
     dataset = CombinedDataset(dataset_local, dataset_distal)
     
     return dataset, data_local, categorical_features
 
-#Deprecated. Old function
+# Deprecated. Old function
 def load_data(data_file):
     
     data = pd.read_csv(data_file, sep='\t').dropna()

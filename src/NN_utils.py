@@ -80,13 +80,11 @@ class FeedForwardNN(nn.Module):
         self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
 
     def forward(self, cont_data, cat_data):
-
+        
+        # Do the embedding for the categrical features
         if self.no_of_embs != 0:
             x = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
-            ###
-        #print(len(x)) #x is a list, x[i].shape: batch_size * emb_size  
-        #print(x)
-            ###
+
         x = torch.cat(x, 1) #x.shape: batch_size * sum(emb_size)
         x = self.emb_dropout_layer(x)
 
@@ -107,10 +105,11 @@ class FeedForwardNN(nn.Module):
 
         #x = self.output_layer(x) #oringial output
         
-        x = torch.sigmoid(self.output_layer(x)) # for logistic regression
+        out = torch.sigmoid(self.output_layer(x))
 
-        return x
-
+        return out
+    
+    # Do prediction using batches in DataLoader to save memory
     def batch_predict(self, dataloader, criterion, device):
         
         self.eval()
@@ -132,7 +131,7 @@ class FeedForwardNN(nn.Module):
 
         return pred_y, total_loss
 
-#Hybrid network with feedforward and CNN/RNN layers
+# Hybrid network with feedforward (local) and CNN/RNN (distal) layers, followed by a FC layer for combined output 
 class Network(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
         
@@ -195,13 +194,13 @@ class Network(nn.Module):
             nn.Dropout(0.2), #dropout prob
             #nn.Linear(out_channels*2, 1),
             nn.Linear(last_lin_size, 1),
-            #nn.ReLU(), #NOTE: adding this makes too early convergence
+            #nn.ReLU(), # NOTE: adding this makes too early convergence
             #nn.Dropout(0.1)
         )
     
     def forward(self, local_input, distal_input):
         
-        #FeedForward layers for local input
+        # FeedForward layers for local input
         cont_data, cat_data = local_input
         if self.no_of_embs != 0:
             local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
@@ -227,14 +226,14 @@ class Network(nn.Module):
             local_out = dropout_layer(local_out)
         
         
-        #CNN layers for distal_input
-        #Input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
         distal_out = self.conv(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
         #out, _ = torch.max(out, dim=2)
         #print("out.shape")
         #print(out.shape)
 
-        #Add RNN after CNN
+        # Add RNN after CNN
         if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
             distal_out = distal_out.permute(2,0,1)
             distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
@@ -242,7 +241,7 @@ class Network(nn.Module):
             Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
             distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
         else:
-            #Flatten the sequence dimension
+            # Flatten the sequence dimension
             distal_out, _ = torch.max(distal_out, dim=2)
         #print("RNN out.shape")
         #print(distal_out.shape)        
@@ -253,7 +252,7 @@ class Network(nn.Module):
         
         return torch.sigmoid(out)
     
-    #Do prediction using batches in DataLoader to save memory 
+    # Do prediction using batches in DataLoader to save memory 
     def batch_predict(self, dataloader, criterion, device):
  
         self.eval()
@@ -276,7 +275,7 @@ class Network(nn.Module):
 
         return pred_y, total_loss
 
-#Hybrid network with feedforward and CNN/RNN layers; the FC layers of local and distal data are separated.
+# Hybrid network with feedforward and CNN/RNN layers; the FC layers of local and distal data are separated.
 class Network2(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
         
@@ -317,7 +316,7 @@ class Network2(nn.Module):
         maxpool_stride = 10
         second_kernel_size = kernel_size//2
         self.conv = nn.Sequential(
-            nn.BatchNorm1d(in_channels), #this is important!
+            nn.BatchNorm1d(in_channels), # This is important!
             nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             nn.ReLU(),
             #nn.Sigmoid(),
@@ -340,13 +339,13 @@ class Network2(nn.Module):
             #fc_in_size = out_channels + lin_layer_sizes[-1]
             crnn_fc_in_size = out_channels*2
             
-            ##### use the flattened output of CNN instead of torch.max
+            # Use the flattened output of CNN instead of torch.max
             last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
-            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 #for the 2nd conv1d
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
             
             #crnn_fc_in_size = out_channels*last_seq_len
         
-        #Separate FC layers for distal and local data
+        # Separate FC layers for distal and local data
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(crnn_fc_in_size),
             nn.Dropout(0.25), #control overfitting
@@ -361,20 +360,20 @@ class Network2(nn.Module):
             #nn.Dropout(0.1)
         )
         
-        #local FC layers
+        # Local FC layers
         self.local_fc = nn.Sequential(
             #nn.BatchNorm1d(lin_layer_sizes[-1]),
             nn.Linear(lin_layer_sizes[-1], 1), 
         )       
         
 
-        #Learn the weight parameter 
+        # Learn the weight parameter 
         self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
         
     
     def forward(self, local_input, distal_input):
         
-        #FeedForward layers for local input
+        # FeedForward layers for local input
         cont_data, cat_data = local_input
         if self.no_of_embs != 0:
             local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
@@ -397,13 +396,13 @@ class Network2(nn.Module):
             local_out = dropout_layer(local_out)
         
         # CNN layers for distal_input
-        #input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
         distal_out = self.conv(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
         #out, _ = torch.max(out, dim=2)
         #print("out.shape")
         #print(out.shape)
 
-        #RNN after CNN
+        # RNN after CNN
         if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
             distal_out = distal_out.permute(2,0,1)
             distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
@@ -414,12 +413,12 @@ class Network2(nn.Module):
             
             distal_out, _ = torch.max(distal_out, dim=2)
             
-            #use flattened layer instead of torchmax
+            # Use flattened layer instead of torchmax
             #distal_out = distal_out.view(distal_out.shape[0], -1)
         #print("RNN out.shape")
         #print(distal_out.shape)        
         
-        #Separate FC layers 
+        # Separate FC layers 
         local_out = self.local_fc(local_out)
         distal_out = self.distal_fc(distal_out)
         if np.random.uniform(0,1) < 0.01 and self.training == False:
@@ -434,11 +433,12 @@ class Network2(nn.Module):
         
         #out = torch.sigmoid(local_out + distal_out)
         out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
-        #out = torch.sigmoid(local_out) * torch.sigmoid(distal_out) # OK for large data?
         #out = torch.sigmoid(out)
         #out = torch.sigmoid(local_out)
         #out = torch.sigmoid(distal_out)
-        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) #set the weight as a Parameter when adding local and distal
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
         
         return out
     
@@ -465,7 +465,7 @@ class Network2(nn.Module):
 
         return pred_y, total_loss
     
-#Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
+# Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
 class Network3(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
         
@@ -495,14 +495,14 @@ class Network3(nn.Module):
         self.emb_dropout_layer = nn.Dropout(emb_dropout)
         self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
 
-        
+        # These variables are not used currently
         self.kernel_size = kernel_size
         self.RNN_hidden_size = RNN_hidden_size
         self.RNN_layers = RNN_layers
         self.seq_len = distal_radius*2+1 - (distal_order-1)
         
-        #CNN ResNet layers for distal input
-        #Set prelayer before the ResNet Blocks
+        # CNN ResNet layers for distal input
+        # Set prelayer before the ResNet Blocks
         self.conv1 = nn.Conv2d(4**distal_order + self.no_of_cont, 48, (3, 1), stride=(1, 1), padding=(1, 0))
         self.bn1 = nn.BatchNorm2d(48)
         self.conv2 = nn.Conv2d(48, 64, (3, 1), stride=(1, 1), padding=(1, 0))
@@ -510,7 +510,7 @@ class Network3(nn.Module):
         self.prelayer = nn.Sequential(self.conv1, self.bn1, nn.ReLU(inplace=True),
                                       self.conv2, self.bn2, nn.ReLU(inplace=True))
 
-        #ResNet Blocks
+        # ResNet Blocks
         self.layer1 = nn.Sequential(*[L1Block() for x in range(1)]) # 2 convolutional layers, 64 channels, filter size (3,1)
         self.layer2 = nn.Sequential(*[L2Block() for x in range(1)]) # 2 convolutional layers, 128 channels, filter size (7,1)
         self.layer3 = nn.Sequential(*[L3Block() for x in range(1)]) # 3 convolutional layers, 200 channels, filter size (7,1), (3,1),(3,1)
@@ -537,10 +537,10 @@ class Network3(nn.Module):
         #self.conv_out_len = (((distal_radius*2+1)//3)//4 + 2)//4; reasoning: maxpooling layers reduce seq len
         self.resnet_fc_in_size = (((distal_radius*2+1)//3 + 6)//4 + 2)//4 * 200
         
-        #remove maxpool3
+        # Remove maxpool3
         #self.resnet_fc_in_size = (((distal_radius*2+1)//3 + 6)//4 + 2)* 200
         
-        #FC layers after ResNet
+        # FC layers after ResNet
         self.resnet_distal_fc = nn.Sequential(nn.BatchNorm1d(self.resnet_fc_in_size),
                                               nn.Dropout(0.1), 
                                               nn.Linear(self.resnet_fc_in_size, 1), 
@@ -559,13 +559,13 @@ class Network3(nn.Module):
             #fc_in_size = out_channels + lin_layer_sizes[-1]
             crnn_fc_in_size = out_channels*2
             
-            ##### use the flattened output of CNN instead of torch.max
+            # Use the flattened output of CNN instead of torch.max
             #last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
             #last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 #for the 2nd conv1d
             
             #crnn_fc_in_size = out_channels*last_seq_len
         
-        #Separate FC layers for distal and local 
+        # Separate FC layers for distal and local 
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(crnn_fc_in_size),
             nn.Dropout(0.25), #control overfitting
@@ -585,13 +585,13 @@ class Network3(nn.Module):
             nn.Linear(lin_layer_sizes[-1], 1), 
         )       
         
-        #Learn the weight parameter
+        # Learn the weight parameter
         self.w_ld = torch.nn.Parameter(torch.Tensor([0]))        
         
             
     def forward(self, local_input, distal_input):
         
-        #FeedForward layers for local input
+        # FeedForward layers for local input
         cont_data, cat_data = local_input
         if self.no_of_embs != 0:
             local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
@@ -613,8 +613,8 @@ class Network3(nn.Module):
             local_out = bn_layer(local_out)
             local_out = dropout_layer(local_out)
         
-        #CNN layers for distal_input
-        #input data shape: batch_size, in_channels, L_in(lenth of sequence)
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in(lenth of sequence)
         distal_input = distal_input.view(distal_input.shape[0], distal_input.shape[1], distal_input.shape[2], 1) 
         #distal_input = distal_input.unsqueeze(3) #add one dimension
         
@@ -642,16 +642,14 @@ class Network3(nn.Module):
         else:
             
             #distal_out, _ = torch.max(distal_out, dim=2)
+            
             #print('distal_out.shape:', distal_out.shape)
             distal_out = distal_out.view(-1, self.resnet_fc_in_size)
-            
-            #use flattened layer instead of torchmax
-            #distal_out = distal_out.view(distal_out.shape[0], -1)
-        #print("RNN out.shape")
-        #print(distal_out.shape)        
+                  
         
         #Separate FC layers 
         local_out = self.local_fc(local_out)
+        
         #distal_out = self.distal_fc(distal_out)
         distal_out = self.resnet_distal_fc(distal_out)
         
@@ -660,7 +658,6 @@ class Network3(nn.Module):
             print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
         
         #out = local_out * torch.sigmoid(distal_out)
-        #out = local_out * distal_out # NO
         #out = local_out * torch.exp(distal_out)
         #out = local_out + distal_out
         
@@ -670,13 +667,12 @@ class Network3(nn.Module):
         #out = torch.sigmoid(distal_out)
         #out = torch.sigmoid(local_out + distal_out)
         out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
-        #out = torch.sigmoid(local_out) * torch.sigmoid(distal_out) # OK for large data?
         #out = torch.sigmoid(out)
 
         
         return out
     
-    # do prediction using batches in DataLoader to save memory 
+    # Do prediction using batches in DataLoader to save memory 
     def batch_predict(self, dataloader, criterion, device):
  
         self.eval()
@@ -702,13 +698,13 @@ class Network3(nn.Module):
     
 def weights_init(m):
     classname = m.__class__.__name__
-    if classname.find('Conv1d') != -1:
+    if classname.find('Conv1d') != -1 or classname.find('Conv2d') != -1:
         #nn.init.normal_(m.weight, 0.0, 1e-06)
         nn.init.xavier_uniform_(m.weight)
         nn.init.normal_(m.bias)
-
         
         print(m.weight.shape)
+        
     elif classname.find('Linear') != -1:
         #nn.init.normal_(m.weight, 0, 0.004)
         #nn.init.xavier_uniform_(m.weight)
@@ -716,13 +712,14 @@ def weights_init(m):
             
         nn.init.normal_(m.bias)
         print(m.weight.shape)
+        
     elif classname.find('LSTM') != -1 or classname.find('GRU') != -1:
         for layer_p in m._all_weights:
             for p in layer_p:
                 if 'weight' in p:
                     torch.nn.init.xavier_uniform_(m.__getattr__(p))
 
-#Residual block
+# Residual block
 class L1Block(nn.Module):
 
     def __init__(self):
@@ -739,7 +736,7 @@ class L1Block(nn.Module):
         out = F.relu(out)
         return out
 
-#Residual block
+# Residual block
 class L2Block(nn.Module):
 
     def __init__(self):
@@ -756,7 +753,7 @@ class L2Block(nn.Module):
         out = F.relu(out)
         return out
 
-#Residual block
+# Residual block
 class L3Block(nn.Module):
 
     def __init__(self):
@@ -779,7 +776,7 @@ class L3Block(nn.Module):
         out = F.relu(out)
         return out
 
-#Residual block
+# Residual block
 class L4Block(nn.Module):
 
     def __init__(self):
@@ -797,13 +794,13 @@ class L4Block(nn.Module):
         out = F.relu(out)
         return out
 
-#Hybrid loss function: BCELoss + the difference between observed and predicted mutation probabilities in bins
+# Hybrid loss function: BCELoss + the difference between observed and predicted mutation probabilities in bins
 class HybridLoss(nn.Module):
     
     def __init__(self, n_bin):
         super(HybridLoss,self).__init__()
         
-        #Set the bin number for splitting the input samples
+        # Set the bin number for splitting the input samples
         self.n_bin = n_bin
         
     def forward(self, y_hat, y):
@@ -836,7 +833,7 @@ class HybridLoss(nn.Module):
         
         return loss1 + loss2
     
-#Caculate pearsonr correlation coefficient between two pytorch Tensors
+# Caculate pearsonr correlation coefficient between two pytorch Tensors
 def pearsonr(x, y):
     """
     Mimics `scipy.stats.pearsonr`
@@ -851,23 +848,14 @@ def pearsonr(x, y):
     r_val : float
         pearsonr correlation coefficient between x and y
     
-    Scipy docs ref:
-        https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
-    
-    Scipy code ref:
-        https://github.com/scipy/scipy/blob/v0.19.0/scipy/stats/stats.py#L2975-L3033
-    Example:
-        >>> x = np.random.randn(100)
-        >>> y = np.random.randn(100)
-        >>> sp_corr = scipy.stats.pearsonr(x, y)[0]
-        >>> th_corr = pearsonr(torch.from_numpy(x), torch.from_numpy(y))
-        >>> np.allclose(sp_corr, th_corr)
     """
     mean_x = torch.mean(x)
     mean_y = torch.mean(y)
     xm = x.sub(mean_x)
     ym = y.sub(mean_y)
+    
     r_num = xm.dot(ym)
     r_den = torch.norm(xm, 2) * torch.norm(ym, 2)
     r_val = r_num / r_den
+    
     return r_val

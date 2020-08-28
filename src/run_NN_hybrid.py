@@ -1,4 +1,3 @@
-from janggu.data import Bioseq, Cover
 from pybedtools import BedTool
 
 import sys
@@ -21,69 +20,73 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 print(' '.join(sys.argv))
 
-#set train file
+# Set train file
 train_file = sys.argv[1]
 
-#set test file
+# Set test file
 test_file = sys.argv[2]
 
 ref_genome='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa'
 
+# Read BED files
 train_bed = BedTool(train_file)
 
 test_bed = BedTool(test_file)
 
-#Read bw file names; code to be improved
-if 0:
-    bw_files = []
-    bw_names = []
-    n_cont = 0
-else:
+# Read bigWig file names
+bw_files = []
+bw_names = []
+n_cont = 0
+try:
     bw_list = pd.read_table('/public/home/licai/DNMML/analysis/test/bw_files.txt', sep='\s+', header=None, comment='#')
 
     bw_files = list(bw_list[0])
     bw_names = list(bw_list[1])
     n_cont = len(bw_names)
-
-#The width to be considered for local signals
+except pd.errors.EmptyDataError:
+    print('Warnings: no bigWig files provided')
+except FileNotFoundError:
+    print('Error: bw_list file does not exist')
+    
+# The width to be considered for local signals
 if len(sys.argv)>3:
     radius = int(sys.argv[3])
 else:
     radius = 5
 print('radius:', radius)
 
-#The width to be considered for more distal signals
+# The width to be considered for more distal signals
 if len(sys.argv)>4:
     distal_radius = int(sys.argv[4])
 else:
     distal_radius = 200
 print('distal_radius:', distal_radius)
 
-#The order of sequence when converting sequence to digital data
+# The order of sequence when converting sequence to digital data
 if len(sys.argv)>5:
     distal_order = int(sys.argv[5])
 else:
     distal_order = 1
 print('distal_order:', distal_order)
 
-#Prepare the datasets for trainging
+# Prepare the datasets for trainging
 dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
 
-#Batch size for training
+# Batch size for training
 if len(sys.argv)>6:
     batchsize = int(sys.argv[6])
 else:
     batchsize = 200
 print('batchsize:', batchsize)
 
-#CNN kernel size
+# CNN kernel size
 if len(sys.argv)>7:
     cnn_kernel_size = int(sys.argv[7])
 else:
     cnn_kernel_size = 12
 print('cnn_kernel_size:', cnn_kernel_size)
 
-#CNN output channels
+# CNN output channels
 if len(sys.argv)>8:
     cnn_out_channels = int(sys.argv[8])
 else:
@@ -91,7 +94,7 @@ else:
     
 print('cnn_out_channels:', cnn_out_channels)
 
-#RNN hidden neurons
+# RNN hidden neurons
 if len(sys.argv)>9:
     RNN_hidden_size = int(sys.argv[9])
 else:
@@ -99,53 +102,58 @@ else:
     
 print('RNN_hidden_size:', RNN_hidden_size)
 
-#Dataloader for training
+# Dataloader for training
 dataloader = DataLoader(dataset, batchsize, shuffle=False, num_workers=1) #shuffle=False for HybridLoss
 
-#Dataloader for prediting
+# Dataloader for prediting
 dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
 
-#number of categorical features
+# Number of categorical features
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
 
 #Embedding dimensions for categorical features
 emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 
-#Prepare testing data 
+# Prepare testing data 
 dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
 
-#Dataloader for testing data
+# Dataloader for testing data
 dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
 
-#choose the network model
-if len(sys.argv)>10 and int(sys.argv[10]) > 0:
-    if int(sys.argv[10]) ==1:
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
-    else:
-        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
-else:
+# Choose the network model
+if len(sys.argv) < 10:
     model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    
+elif int(sys.argv[10]) == 1:
+    model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    
+elif int(sys.argv[10]) == 2:
+    model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+    
+else:
+    print('Error: no model selected!')
+    sys.exit() 
 
 print('model:')
 print(model)
 
-#FeedForward only model for comparison
+# FeedForward-only model for comparison
 model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
 print('model2:')
 print(model2)
 
-#Initiating the weights of models; this doesn't seem to improve
+# Initiating weights of the models;
 weights_init(model)
 weights_init(model2)
 
-no_of_epochs = 12
+no_of_epochs = 15
 
 # Loss function
 criterion = torch.nn.BCELoss()
 #criterion = HybridLoss(10)
 
-#set Optimizer
+# Set Optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.001)
 
@@ -155,13 +163,13 @@ pred_df = None
 best_loss2 = 0
 pred_df2 = None
 
-#output file name for saving predictions 
+# Output file name for saving predictions 
 if len(sys.argv)>11:
     pred_outfile = sys.argv[11]
 else:
     pred_outfile = test_file + '.csv'
 
-#Trainging
+# Training
 for epoch in range(no_of_epochs):
     
     model.train()
@@ -199,17 +207,17 @@ for epoch in range(no_of_epochs):
     #if len(sys.argv)>7 and int(sys.argv[7]) > 0:
     #    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
-    #Do predictions for testing data
+    # Do predictions for testing data
     pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
     y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
     
-    #Do predictions for training data
+    # Do predictions for training data
     all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
     all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
     all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
     
-    #Compare observed/predicted 3/5/7mer mutation frequencies
+    # Compare observed/predicted 3/5/7mer mutation frequencies
     print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
     print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
     print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
@@ -217,7 +225,7 @@ for epoch in range(no_of_epochs):
     print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
     print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
     
-    #For FeedForward only model
+    # For FeedForward-only model
     pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
     y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
     data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
@@ -233,7 +241,7 @@ for epoch in range(no_of_epochs):
     print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
     print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
     
-    #Save the predictions of the best model
+    # Save the predictions of the best model
     if epoch == 0:
         best_loss = test_total_loss
         best_loss2 = test_total_loss2
@@ -248,13 +256,13 @@ for epoch in range(no_of_epochs):
         best_loss2 = test_total_loss2
         pred_df2 = data_and_prob2[['mut_type','prob']]
         
-    #Get the scores
+    # Get the scores
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
     test_y = data_local_test['mut_type']
     auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
     auc_score2 = metrics.roc_auc_score(test_y, to_np(pred_y2))
     
-    #Print some data for debugging
+    # Print some data for debugging
     print("print test_y, pred_y:")
     print(test_y)
     print(to_np(pred_y))
@@ -275,7 +283,7 @@ for epoch in range(no_of_epochs):
     print ("Total Loss: ", train_total_loss, train_total_loss2, test_total_loss, test_total_loss2)
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
-#Write the prediction
+# Write the prediction
 pred_df = pd.concat([pred_df, pred_df2['prob']], axis=1, names=['mut_type','prob1', 'prob2'])
 pred_df.to_csv(pred_outfile, sep='\t', index=False)
 
