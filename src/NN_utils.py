@@ -437,10 +437,10 @@ class Network2(nn.Module):
         #out = torch.cat([local_out, distal_out], dim=1)
         
         #out = torch.sigmoid(local_out + distal_out)
-        #out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
+        out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
         #out = torch.sigmoid(out)
         #out = torch.sigmoid(local_out)
-        out = torch.sigmoid(distal_out)
+        #out = torch.sigmoid(distal_out)
         
         # Set the weight as a Parameter when adding local and distal
         #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
@@ -747,9 +747,9 @@ class Network4(nn.Module):
         
         #pre_chan_sizes = [48, 64]
         #res_chan_sizes = [64, 128, 200, 200]
-        pre_chan_sizes = [120, 32]
-        res_chan_sizes = [32, 32]
-        res_kernel_sizes = [15, 15]
+        pre_chan_sizes = [64, 64]
+        res_chan_sizes = [64, 64]
+        res_kernel_sizes = [3, 3]
         
         assert(pre_chan_sizes[-1] == res_chan_sizes[0])
         in_chan_size = 4**distal_order + self.no_of_cont
@@ -761,7 +761,8 @@ class Network4(nn.Module):
         #self.bn2 = nn.BatchNorm1d(pre_chan_sizes[1])
         self.relu = nn.ReLU()
         
-        self.prelayer = nn.Sequential(self.bn1, self.conv1, self.relu, self.bn2, self.conv2)
+        #self.prelayer = nn.Sequential(self.bn1, self.conv1, self.relu, self.bn2, self.conv2)
+        self.prelayer = nn.Sequential(self.bn1, self.conv1)
 
         # ResNet Blocks
         self.RBs1 = nn.Sequential(*[ResBlock(res_chan_sizes[0], kernel_size=res_kernel_sizes[0], stride=1, padding=(res_kernel_sizes[0]-1)//2, dilation=1) for x in range(4)])
