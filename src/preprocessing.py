@@ -218,7 +218,10 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
     # Handle distal bigWig data
     if len(bw_files) > 0:
         bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
-        bw_distal = np.array(bw_distal).squeeze().transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+        
+        #print('bw_distal.shape:', np.array(bw_distal).shape)
+        #bw_distal should have the same seq len as that for distal_seq
+        bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
         
         # Concatenate the sequence data and the bigWig data
         distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)

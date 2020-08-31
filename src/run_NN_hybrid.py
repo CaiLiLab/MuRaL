@@ -103,7 +103,7 @@ else:
 print('RNN_hidden_size:', RNN_hidden_size)
 
 # Dataloader for training
-dataloader = DataLoader(dataset, batchsize, shuffle=False, num_workers=1) #shuffle=False for HybridLoss
+dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1) #shuffle=False for HybridLoss
 
 # Dataloader for prediting
 dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
@@ -130,6 +130,9 @@ elif int(sys.argv[10]) == 1:
     
 elif int(sys.argv[10]) == 2:
     model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+
+elif int(sys.argv[10]) == 3:
+    model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=cnn_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
     
 else:
     print('Error: no model selected!')
@@ -154,14 +157,21 @@ criterion = torch.nn.BCELoss()
 #criterion = HybridLoss(10)
 
 # Set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
+
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.005)
+scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=0.7)
+print('optimizer, optimizer2:', optimizer, optimizer2)
+
 
 best_loss = 0
 pred_df = None
+last_pred_df = None
 
 best_loss2 = 0
 pred_df2 = None
+last_pred_df2 = None
 
 # Output file name for saving predictions 
 if len(sys.argv)>11:
@@ -204,6 +214,11 @@ for epoch in range(no_of_epochs):
         total_loss2 += loss2.item()
        
     model.eval()
+    
+    print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
+    scheduler.step()
+    scheduler2.step()
+    
     #if len(sys.argv)>7 and int(sys.argv[7]) > 0:
     #    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
@@ -255,7 +270,10 @@ for epoch in range(no_of_epochs):
     if test_total_loss2 < best_loss2:
         best_loss2 = test_total_loss2
         pred_df2 = data_and_prob2[['mut_type','prob']]
-        
+    
+    if epoch == no_of_epochs-1:
+        last_pred_df = data_and_prob[['mut_type','prob']]
+        last_pred_df2 = data_and_prob2[['mut_type','prob']]
     # Get the scores
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
     test_y = data_local_test['mut_type']
@@ -284,6 +302,9 @@ for epoch in range(no_of_epochs):
     #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
 # Write the prediction
-pred_df = pd.concat([pred_df, pred_df2['prob']], axis=1, names=['mut_type','prob1', 'prob2'])
+print('best loss, best loss2:', best_loss, best_loss2)
+
+pred_df = pd.concat((pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
+pred_df.columns = ['mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
 pred_df.to_csv(pred_outfile, sep='\t', index=False)
 
