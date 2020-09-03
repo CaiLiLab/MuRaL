@@ -157,13 +157,13 @@ criterion = torch.nn.BCELoss()
 #criterion = HybridLoss(10)
 
 # Set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.005, weight_decay=1e-7)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
 
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.005)
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.005, weight_decay=1e-7)
 scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=0.7)
 print('optimizer, optimizer2:', optimizer, optimizer2)
-
+print('scheduler, scheduler2:', scheduler, scheduler2)
 
 best_loss = 0
 pred_df = None
