@@ -526,7 +526,7 @@ class Network3(nn.Module):
             
             ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
             ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
-            #ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
+            ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
             #ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
             nn.MaxPool1d(maxpool_kernel_size, maxpool_stride), # kernel_size, stride
             nn.BatchNorm1d(out_channels),
@@ -535,7 +535,7 @@ class Network3(nn.Module):
             
             ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
             ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
-            #ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
+            ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
             #ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
             nn.MaxPool1d(4, 4),
             nn.BatchNorm1d(out_channels*2),

@@ -150,20 +150,45 @@ print(model2)
 weights_init(model)
 weights_init(model2)
 
-no_of_epochs = 15
-
 # Loss function
 criterion = torch.nn.BCELoss()
 #criterion = HybridLoss(10)
 
-# Set Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=0.005, weight_decay=1e-5)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+# Output file name for saving predictions 
+if len(sys.argv)>11:
+    pred_outfile = sys.argv[11]
+else:
+    pred_outfile = test_file + '.csv'
+    
+if len(sys.argv)>12:
+    learning_rate = float(sys.argv[12])
+else:
+    learning_rate = 0.005
 
-optimizer2 = torch.optim.Adam(model2.parameters(), lr=0.005, weight_decay=1e-5)
-scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=0.5)
+if len(sys.argv)>13:
+    weight_decay = float(sys.argv[13])
+else:
+    weight_decay = 1e-5
+
+if len(sys.argv)>14:
+    gamma = float(sys.argv[14])
+else:
+    gamma = 0.5
+
+if len(sys.argv)>15:
+    no_of_epochs = int(sys.argv[15])
+else:
+    no_of_epochs = 15
+    
+# Set Optimizer
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=gamma)
+
+optimizer2 = torch.optim.Adam(model2.parameters(), lr=learning_rate, weight_decay=weight_decay)
+scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=gamma)
 print('optimizer, optimizer2:', optimizer, optimizer2)
 print('scheduler, scheduler2:', scheduler, scheduler2)
+
 
 best_loss = 0
 pred_df = None
@@ -173,11 +198,6 @@ best_loss2 = 0
 pred_df2 = None
 last_pred_df2 = None
 
-# Output file name for saving predictions 
-if len(sys.argv)>11:
-    pred_outfile = sys.argv[11]
-else:
-    pred_outfile = test_file + '.csv'
 
 # Training
 for epoch in range(no_of_epochs):
