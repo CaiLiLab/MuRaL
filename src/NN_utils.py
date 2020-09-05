@@ -517,31 +517,33 @@ class Network3(nn.Module):
         # CNN layers for distal input
         maxpool_kernel_size = 10
         maxpool_stride = 10
-        second_kernel_size = kernel_size//2
-        third_kernel_size = kernel_size//3
-        self.conv = nn.Sequential(
+        second_kernel_size = kernel_size
+        third_kernel_size = kernel_size
+        self.conv1 = nn.Sequential(
             nn.BatchNorm1d(in_channels), # This is important!
-            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
-            nn.ReLU(),
+            nn.Conv1d(in_channels, out_channels*3, kernel_size), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels*3, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1) for x in range(4)])
             
-            ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
-            ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
-            ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
-            ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1),
-            nn.MaxPool1d(maxpool_kernel_size, maxpool_stride), # kernel_size, stride
-            nn.BatchNorm1d(out_channels),
-            nn.Conv1d(out_channels, out_channels*2, second_kernel_size),
+
+        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
+        
+        self.conv2 = nn.Sequential(    
+            nn.BatchNorm1d(out_channels*3),
+            nn.Conv1d(out_channels*3, out_channels*3, second_kernel_size),
+            #nn.ReLU(),
+        )
+        
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels*3, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
+    
+        self.conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels*3),
+            nn.Conv1d(out_channels*3, out_channels*3, third_kernel_size),
             nn.ReLU(),
-            
-            ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
-            ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
-            ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
-            ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1),
-            nn.MaxPool1d(4, 4),
-            nn.BatchNorm1d(out_channels*2),
-            nn.Conv1d(out_channels*2, out_channels*3, third_kernel_size),
-            nn.ReLU(),
-            #nn.MaxPool1d(2, 2),
         )
         
         
@@ -614,7 +616,24 @@ class Network3(nn.Module):
         
         # CNN layers for distal_input
         # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
-        distal_out = self.conv(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        
+        jump_input = distal_out = self.conv1(distal_input)
+        distal_out = self.RBs1(distal_out)    
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool1(distal_out)
+        
+        jump_input = distal_out = self.conv2(distal_out)
+        distal_out = self.RBs2(distal_out)
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool2(distal_out)
+        
+        distal_out = self.conv3(distal_out)
+        #d = x.shape[2] - out.shape[2]
+        #out = x[:,:,0:x.shape[2]-d] + out
+        
         #out, _ = torch.max(out, dim=2)
         #print("out.shape")
         #print(out.shape)
@@ -681,6 +700,7 @@ class Network3(nn.Module):
                 total_loss += loss.item()
 
         return pred_y, total_loss
+    
     
 # Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
 class Network4(nn.Module):

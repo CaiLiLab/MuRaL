@@ -105,7 +105,7 @@ print('RNN_hidden_size:', RNN_hidden_size)
 # Dataloader for training
 dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1) #shuffle=False for HybridLoss
 
-# Dataloader for prediting
+# Dataloader for predicting
 dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
 
 # Number of categorical features
@@ -187,7 +187,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=gamma)
 optimizer2 = torch.optim.Adam(model2.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=gamma)
 print('optimizer, optimizer2:', optimizer, optimizer2)
-print('scheduler, scheduler2:', scheduler, scheduler2)
+#print('scheduler, scheduler2:', scheduler, scheduler2)
 
 
 best_loss = 0
