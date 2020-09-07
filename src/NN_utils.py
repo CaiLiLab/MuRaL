@@ -519,30 +519,32 @@ class Network3(nn.Module):
         maxpool_stride = 10
         second_kernel_size = kernel_size
         third_kernel_size = kernel_size
+        rb1_kernel_size = 3
+        rb2_kernel_size = 5
         self.conv1 = nn.Sequential(
             nn.BatchNorm1d(in_channels), # This is important!
-            nn.Conv1d(in_channels, out_channels*3, kernel_size), # in_channels, out_channels, kernel_size
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
             #nn.ReLU(),
         )
         
-        self.RBs1 = nn.Sequential(*[ResBlock(out_channels*3, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1) for x in range(4)])
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb1_kernel_size, stride=1, padding=(rb1_kernel_size-1)//2, dilation=1) for x in range(4)])
             
 
         self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
         
         self.conv2 = nn.Sequential(    
-            nn.BatchNorm1d(out_channels*3),
-            nn.Conv1d(out_channels*3, out_channels*3, second_kernel_size),
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, second_kernel_size),
             #nn.ReLU(),
         )
         
-        self.RBs2 = nn.Sequential(*[ResBlock(out_channels*3, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1) for x in range(4)])
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
 
         self.maxpool2 = nn.MaxPool1d(4, 4)
     
         self.conv3 = nn.Sequential(
-            nn.BatchNorm1d(out_channels*3),
-            nn.Conv1d(out_channels*3, out_channels*3, third_kernel_size),
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
             nn.ReLU(),
         )
         
@@ -550,13 +552,13 @@ class Network3(nn.Module):
         # RNN layers
         if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
             #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
-            self.rnn = nn.LSTM(out_channels*3, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
             #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
             crnn_fc_in_size = RNN_hidden_size*2
         else:
             #fc_in_size = out_channels + lin_layer_sizes[-1]
             #crnn_fc_in_size = out_channels*2
-            crnn_fc_in_size = out_channels*3
+            crnn_fc_in_size = out_channels
             
             # Use the flattened output of CNN instead of torch.max
             last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
