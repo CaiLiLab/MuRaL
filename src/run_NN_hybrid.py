@@ -203,6 +203,7 @@ last_pred_df2 = None
 for epoch in range(no_of_epochs):
     
     model.train()
+    model2.train()
     
     total_loss = 0
     total_loss2 = 0
@@ -234,6 +235,7 @@ for epoch in range(no_of_epochs):
         total_loss2 += loss2.item()
        
     model.eval()
+    model2.eval()
     with torch.no_grad():
     
         print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
@@ -295,6 +297,10 @@ for epoch in range(no_of_epochs):
         if epoch == no_of_epochs-1:
             last_pred_df = data_and_prob[['mut_type','prob']]
             last_pred_df2 = data_and_prob2[['mut_type','prob']]
+            
+            torch.save(model.state_dict(), pred_outfile+'.model1')
+            torch.save(model2.state_dict(), pred_outfile+'.model2')
+
         # Get the scores
         #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
         test_y = data_local_test['mut_type']
@@ -325,7 +331,7 @@ for epoch in range(no_of_epochs):
 # Write the prediction
 print('best loss, best loss2:', best_loss, best_loss2)
 
-pred_df = pd.concat((pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
-pred_df.columns = ['mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
+pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
+pred_df.columns = ['chrom', 'start', 'end','mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
 pred_df.to_csv(pred_outfile, sep='\t', index=False)
 

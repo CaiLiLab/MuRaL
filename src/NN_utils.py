@@ -479,6 +479,297 @@ class Network2(nn.Module):
         return pred_y, total_loss
     
 # Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
+class Network4(nn.Module):
+    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
+        
+        super(Network4, self).__init__()
+
+        # FeedForward layers for local input
+        # Embedding layers
+        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
+
+        no_of_embs = sum([y for x, y in emb_dims])
+        self.no_of_embs = no_of_embs
+        self.no_of_cont = no_of_cont
+        self.distal_radius = distal_radius
+
+        # Linear Layers
+        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont, lin_layer_sizes[0])
+
+        self.lin_layers = nn.ModuleList([first_lin_layer] + [nn.Linear(lin_layer_sizes[i], lin_layer_sizes[i + 1]) for i in range(len(lin_layer_sizes) - 1)])
+        
+        for lin_layer in self.lin_layers:
+            nn.init.kaiming_normal_(lin_layer.weight.data)
+
+        # Batch Norm Layers
+        self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
+        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
+
+        # Dropout Layers
+        self.emb_dropout_layer = nn.Dropout(emb_dropout)
+        self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
+        #===============
+        local_radius = no_of_embs // 2
+        local_kernel_size = 3
+        local_maxpool_kernel_size = 2
+        local_maxpool_stride = 2
+        local_out_channels = 50 #lin_layer_sizes[0]
+        local_out_channels2 = lin_layer_sizes[1]
+        
+        
+        self.local_conv1 = nn.Sequential(
+            nn.BatchNorm1d(in_channels), # This is important!
+            nn.Conv1d(in_channels, local_out_channels, kernel_size=local_kernel_size, padding=(local_kernel_size-1)//2), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.local_RBs1 = nn.Sequential(*[ResBlock(local_out_channels, kernel_size=local_kernel_size, stride=1, padding=(local_kernel_size-1)//2, dilation=1) for x in range(4)])
+            
+
+        self.local_maxpool1 = nn.MaxPool1d(local_maxpool_kernel_size, local_maxpool_stride) # kernel_size, stride
+        
+        self.local_conv2 = nn.Sequential(    
+            nn.BatchNorm1d(local_out_channels),
+            nn.Conv1d(local_out_channels, local_out_channels2, kernel_size=3, padding=(3-1)//2),
+            nn.ReLU(),
+        )
+        
+        self.last_local_seq_len = (local_radius*2+1)//local_maxpool_stride
+        #last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
+        #last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
+        
+        """
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
+    
+        self.local_conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
+            nn.ReLU(),
+        )        
+        """
+        #===============
+
+        
+        self.kernel_size = kernel_size
+        self.RNN_hidden_size = RNN_hidden_size
+        self.RNN_layers = RNN_layers
+        self.seq_len = distal_radius*2+1 - (distal_order-1)
+        
+        # CNN layers for distal input
+        maxpool_kernel_size = 10
+        maxpool_stride = 10
+        second_kernel_size = kernel_size
+        third_kernel_size = kernel_size
+        rb1_kernel_size = 3
+        rb2_kernel_size = 5
+        self.conv1 = nn.Sequential(
+            nn.BatchNorm1d(in_channels), # This is important!
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb1_kernel_size, stride=1, padding=(rb1_kernel_size-1)//2, dilation=1) for x in range(4)])
+            
+
+        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
+        
+        self.conv2 = nn.Sequential(    
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, second_kernel_size),
+            #nn.ReLU(),
+        )
+        
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
+    
+        self.conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
+            nn.ReLU(),
+        )
+        
+        
+        # RNN layers
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+            crnn_fc_in_size = RNN_hidden_size*2
+        else:
+            #fc_in_size = out_channels + lin_layer_sizes[-1]
+            #crnn_fc_in_size = out_channels*2
+            crnn_fc_in_size = out_channels
+            
+            # Use the flattened output of CNN instead of torch.max
+            last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
+            
+            #crnn_fc_in_size = out_channels*last_seq_len
+        
+        # Separate FC layers for distal and local data
+        self.distal_fc = nn.Sequential(
+            nn.BatchNorm1d(crnn_fc_in_size),
+            nn.Dropout(0.25), #control overfitting
+            nn.Linear(crnn_fc_in_size, 1), 
+            #nn.ReLU(),
+            
+            #nn.Linear(crnn_fc_in_size, 1),
+            #nn.Linear(out_channels*2, 1),
+            #nn.BatchNorm1d(30),
+            #nn.Dropout(0.25), #dropout prob
+            #nn.Linear(30, 1),
+            #nn.Dropout(0.1)
+        )
+        
+        # Local FC layers
+        self.local_fc = nn.Sequential(
+            nn.BatchNorm1d(lin_layer_sizes[-1]),
+            nn.Dropout(0.15),
+            nn.Linear(lin_layer_sizes[-1], 1), 
+        )       
+        
+
+        # Learn the weight parameter 
+        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        
+    
+    def forward(self, local_input, distal_input):
+        
+        """
+        # FeedForward layers for local input
+        cont_data, cat_data = local_input
+        if self.no_of_embs != 0:
+            local_out = [torch.tensor(emb_layer(cat_data[:, i])).unsqueeze(2) for i,emb_layer in enumerate(self.emb_layers)]
+            
+        print('local_out.shape:', local_out[1].shape, local_out[1][1,:,:], local_out[5][1,:,:])
+        #local_out = local_out.unsqueenze(2)
+        local_out=torch.cat(local_out, dim=2)
+        print('local_out.shape:', local_out.shape)
+        #sys.exit()
+        
+        local_out = torch.cat(local_out, dim = 1) #local_out.shape: batch_size * sum(emb_size)
+        local_out = self.emb_dropout_layer(local_out)
+
+        if self.no_of_cont != 0:
+            normalized_cont_data = self.first_bn_layer(cont_data)
+
+            if self.no_of_embs != 0:
+                local_out = torch.cat([local_out, normalized_cont_data], dim = 1) 
+            else:
+                local_out = normalized_cont_data
+        
+        for lin_layer, dropout_layer, bn_layer in zip(self.lin_layers, self.droput_layers, self.bn_layers):
+            local_out = F.relu(lin_layer(local_out))
+            local_out = bn_layer(local_out)
+            local_out = dropout_layer(local_out)
+        """
+        local_radius = self.no_of_embs // 2
+        local_input = distal_input[:,:, self.distal_radius-local_radius:self.distal_radius+local_radius]
+        
+        jump_input = local_out = self.local_conv1(local_input)
+        local__out = self.local_RBs1(local_out)
+        assert(jump_input.shape[2] >= local_out.shape[2])
+        local_out = local_out + jump_input[:,:,0:local_out.shape[2]]
+        local_out = self.local_maxpool1(local_out)
+        local_out = self.local_conv2(local_out)
+        local_out, _ = torch.max(local_out, dim=2)
+        local_out = self.local_fc(local_out)
+        
+        
+        
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        
+        jump_input = distal_out = self.conv1(distal_input)
+        distal_out = self.RBs1(distal_out)    
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool1(distal_out)
+        
+        jump_input = distal_out = self.conv2(distal_out)
+        distal_out = self.RBs2(distal_out)
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool2(distal_out)
+        
+        distal_out = self.conv3(distal_out)
+        #d = x.shape[2] - out.shape[2]
+        #out = x[:,:,0:x.shape[2]-d] + out
+        
+        #out, _ = torch.max(out, dim=2)
+        #print("out.shape")
+        #print(out.shape)
+
+        # RNN after CNN
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            distal_out = distal_out.permute(2,0,1)
+            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
+            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        else:
+            
+            distal_out, _ = torch.max(distal_out, dim=2)
+            
+            # Use flattened layer instead of torchmax
+            #distal_out = distal_out.view(distal_out.shape[0], -1)
+        #print("RNN out.shape")
+        #print(distal_out.shape)        
+        
+        # Separate FC layers 
+        #local_out = self.local_fc(local_out)
+        
+        distal_out = self.distal_fc(distal_out)
+        if np.random.uniform(0,1) < 0.01 and self.training == False:
+            print('local_out:', torch.min(local_out).item(), torch.max(local_out).item(), torch.var(local_out).item(), torch.var(torch.sigmoid(local_out)).item())
+            print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
+        
+        #out = local_out * torch.sigmoid(distal_out)
+        #out = local_out * torch.exp(distal_out)
+        #out = local_out + distal_out
+        
+        #out = torch.cat([local_out, distal_out], dim=1)
+        
+        #out = torch.sigmoid(local_out + distal_out)
+        out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
+        #out = torch.sigmoid(out)
+        #out = torch.sigmoid(local_out)
+        #out = torch.sigmoid(distal_out)
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
+        
+        return out
+    
+    # Do prediction using batches in DataLoader to save memory 
+    def batch_predict(self, dataloader, criterion, device):
+ 
+        self.eval()
+        pred_y = torch.empty(0, 1).to(device)
+        
+        total_loss = 0
+
+        with torch.no_grad():
+            for y, cont_x, cat_x, distal_x in dataloader:
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+                distal_x = distal_x.to(device)
+                y  = y.to(device)
+        
+                preds = self.forward((cont_x, cat_x), distal_x)
+                pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y)
+                total_loss += loss.item()
+
+        return pred_y, total_loss
+    
+    
+# Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
 class Network3(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
         
@@ -584,6 +875,7 @@ class Network3(nn.Module):
         # Local FC layers
         self.local_fc = nn.Sequential(
             #nn.BatchNorm1d(lin_layer_sizes[-1]),
+            #nn.Dropout(0.15),
             nn.Linear(lin_layer_sizes[-1], 1), 
         )       
         
@@ -703,229 +995,6 @@ class Network3(nn.Module):
 
         return pred_y, total_loss
     
-    
-# Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
-class Network4(nn.Module):
-    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
-        
-        super(Network4, self).__init__()
-
-        # FeedForward layers for local input
-        # Embedding layers
-        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
-
-        no_of_embs = sum([y for x, y in emb_dims])
-        self.no_of_embs = no_of_embs
-        self.no_of_cont = no_of_cont
-
-        # Linear Layers
-        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont, lin_layer_sizes[0])
-
-        self.lin_layers = nn.ModuleList([first_lin_layer] + [nn.Linear(lin_layer_sizes[i], lin_layer_sizes[i + 1]) for i in range(len(lin_layer_sizes) - 1)])
-        
-        for lin_layer in self.lin_layers:
-            nn.init.kaiming_normal_(lin_layer.weight.data)
-
-        # Batch Norm Layers
-        self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
-        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
-
-        # Dropout Layers
-        self.emb_dropout_layer = nn.Dropout(emb_dropout)
-        self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
-
-        
-        self.kernel_size = kernel_size
-        self.RNN_hidden_size = RNN_hidden_size
-        self.RNN_layers = RNN_layers
-        self.seq_len = distal_radius*2+1 - (distal_order-1)
-        
-        # CNN layers for distal input
-        maxpool_kernel_size = 10
-        maxpool_stride = 10
-        second_kernel_size = kernel_size//2
-        third_kernel_size = kernel_size//3
-        self.conv1 = nn.Sequential(
-            nn.BatchNorm1d(in_channels), # This is important!
-            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
-            #nn.ReLU(),
-        )
-        
-        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=11, stride=1, padding=(11-1)//2, dilation=1) for x in range(4)])
-            
-
-        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
-        
-        self.conv2 = nn.Sequential(    
-            nn.BatchNorm1d(out_channels),
-            nn.Conv1d(out_channels, out_channels*2, second_kernel_size),
-            #nn.ReLU(),
-        )
-        
-        self.RBs2 = nn.Sequential(*[ResBlock(out_channels*2, kernel_size=7, stride=1, padding=(7-1)//2, dilation=1) for x in range(4)])
-
-        self.maxpool2 = nn.MaxPool1d(4, 4)
-    
-        self.conv3 = nn.Sequential(
-            nn.BatchNorm1d(out_channels*2),
-            nn.Conv1d(out_channels*2, out_channels*3, third_kernel_size),
-            nn.ReLU(),
-        )
-        
-        
-        # RNN layers
-        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
-            #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
-            self.rnn = nn.LSTM(out_channels*3, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
-            #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
-            crnn_fc_in_size = RNN_hidden_size*2
-        else:
-            #fc_in_size = out_channels + lin_layer_sizes[-1]
-            #crnn_fc_in_size = out_channels*2
-            crnn_fc_in_size = out_channels*3
-            
-            # Use the flattened output of CNN instead of torch.max
-            last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
-            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
-            
-            #crnn_fc_in_size = out_channels*last_seq_len
-        
-        # Separate FC layers for distal and local data
-        self.distal_fc = nn.Sequential(
-            nn.BatchNorm1d(crnn_fc_in_size),
-            nn.Dropout(0.25), #control overfitting
-            nn.Linear(crnn_fc_in_size, 1), 
-            #nn.ReLU(),
-            
-            #nn.Linear(crnn_fc_in_size, 1),
-            #nn.Linear(out_channels*2, 1),
-            #nn.BatchNorm1d(30),
-            #nn.Dropout(0.25), #dropout prob
-            #nn.Linear(30, 1),
-            #nn.Dropout(0.1)
-        )
-        
-        # Local FC layers
-        self.local_fc = nn.Sequential(
-            #nn.BatchNorm1d(lin_layer_sizes[-1]),
-            nn.Linear(lin_layer_sizes[-1], 1), 
-        )       
-        
-
-        # Learn the weight parameter 
-        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
-        
-    
-    def forward(self, local_input, distal_input):
-        
-        # FeedForward layers for local input
-        cont_data, cat_data = local_input
-        if self.no_of_embs != 0:
-            local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
-            
-        
-        local_out = torch.cat(local_out, dim = 1) #x.shape: batch_size * sum(emb_size)
-        local_out = self.emb_dropout_layer(local_out)
-
-        if self.no_of_cont != 0:
-            normalized_cont_data = self.first_bn_layer(cont_data)
-
-            if self.no_of_embs != 0:
-                local_out = torch.cat([local_out, normalized_cont_data], dim = 1) 
-            else:
-                local_out = normalized_cont_data
-        
-        for lin_layer, dropout_layer, bn_layer in zip(self.lin_layers, self.droput_layers, self.bn_layers):
-            local_out = F.relu(lin_layer(local_out))
-            local_out = bn_layer(local_out)
-            local_out = dropout_layer(local_out)
-        
-        # CNN layers for distal_input
-        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
-        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
-        
-        jump_input = distal_out = self.conv1(distal_input)
-        distal_out = self.RBs1(distal_out)    
-        assert(jump_input.shape[2] >= distal_out.shape[2])
-        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
-        distal_out = self.maxpool1(distal_out)
-        
-        jump_input = distal_out = self.conv2(distal_out)
-        distal_out = self.RBs2(distal_out)
-        assert(jump_input.shape[2] >= distal_out.shape[2])
-        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
-        distal_out = self.maxpool2(distal_out)
-        
-        distal_out = self.conv3(distal_out)
-        #d = x.shape[2] - out.shape[2]
-        #out = x[:,:,0:x.shape[2]-d] + out
-        
-        #out, _ = torch.max(out, dim=2)
-        #print("out.shape")
-        #print(out.shape)
-
-        # RNN after CNN
-        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
-            distal_out = distal_out.permute(2,0,1)
-            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
-            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
-            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
-            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
-        else:
-            
-            distal_out, _ = torch.max(distal_out, dim=2)
-            
-            # Use flattened layer instead of torchmax
-            #distal_out = distal_out.view(distal_out.shape[0], -1)
-        #print("RNN out.shape")
-        #print(distal_out.shape)        
-        
-        # Separate FC layers 
-        local_out = self.local_fc(local_out)
-        distal_out = self.distal_fc(distal_out)
-        if np.random.uniform(0,1) < 0.01 and self.training == False:
-            print('local_out:', torch.min(local_out).item(), torch.max(local_out).item(), torch.var(local_out).item(), torch.var(torch.sigmoid(local_out)).item())
-            print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
-        
-        #out = local_out * torch.sigmoid(distal_out)
-        #out = local_out * torch.exp(distal_out)
-        #out = local_out + distal_out
-        
-        #out = torch.cat([local_out, distal_out], dim=1)
-        
-        #out = torch.sigmoid(local_out + distal_out)
-        out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
-        #out = torch.sigmoid(out)
-        #out = torch.sigmoid(local_out)
-        #out = torch.sigmoid(distal_out)
-        
-        # Set the weight as a Parameter when adding local and distal
-        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
-        
-        return out
-    
-    # Do prediction using batches in DataLoader to save memory 
-    def batch_predict(self, dataloader, criterion, device):
- 
-        self.eval()
-        pred_y = torch.empty(0, 1).to(device)
-        
-        total_loss = 0
-
-        with torch.no_grad():
-            for y, cont_x, cat_x, distal_x in dataloader:
-                cat_x = cat_x.to(device)
-                cont_x = cont_x.to(device)
-                distal_x = distal_x.to(device)
-                y  = y.to(device)
-        
-                preds = self.forward((cont_x, cat_x), distal_x)
-                pred_y = torch.cat((pred_y, preds), dim=0)
-                
-                loss = criterion(preds, y)
-                total_loss += loss.item()
-
-        return pred_y, total_loss
     
 # Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
 class Network5(nn.Module):
