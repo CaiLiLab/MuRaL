@@ -103,10 +103,10 @@ else:
 print('RNN_hidden_size:', RNN_hidden_size)
 
 # Dataloader for training
-dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1) #shuffle=False for HybridLoss
+dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=0) #shuffle=False for HybridLoss
 
 # Dataloader for predicting
-dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=0)
 
 # Number of categorical features
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
@@ -119,7 +119,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
 
 # Dataloader for testing data
-dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=0)
 
 # Choose the network model
 if len(sys.argv) < 10:
@@ -208,6 +208,7 @@ for epoch in range(no_of_epochs):
     total_loss = 0
     total_loss2 = 0
     
+    torch.cuda.empty_cache() 
     
     for y, cont_x, cat_x, distal_x in dataloader:
         cat_x = cat_x.to(device)
