@@ -9,6 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 
+import os
+
 from sklearn import metrics, calibration
 
 from NN_utils import *
@@ -69,8 +71,13 @@ else:
     distal_order = 1
 print('distal_order:', distal_order)
 
+train_h5f_path = sys.argv[11] + '.train_distal.h5'
+test_h5f_path = sys.argv[11] + '.test_distal.h5'
+
 # Prepare the datasets for trainging
-dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
+dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order, train_h5f_path)
+
+#sys.exit()
 
 # Batch size for training
 if len(sys.argv)>6:
@@ -116,7 +123,7 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 
 # Prepare testing data 
-dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
+dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order, test_h5f_path)
 
 # Dataloader for testing data
 dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
@@ -234,6 +241,7 @@ for epoch in range(no_of_epochs):
         
         total_loss += loss.item()
         total_loss2 += loss2.item()
+        #print('in the training loop...')
        
     model.eval()
     model2.eval()
@@ -242,7 +250,7 @@ for epoch in range(no_of_epochs):
         print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
         scheduler.step()
         scheduler2.step()
-    
+        
         #if len(sys.argv)>7 and int(sys.argv[7]) > 0:
         #    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
@@ -335,4 +343,7 @@ print('best loss, best loss2:', best_loss, best_loss2)
 pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
 pred_df.columns = ['chrom', 'start', 'end','mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
 pred_df.to_csv(pred_outfile, sep='\t', index=False)
+
+os.remove(train_h5f_path)
+os.remove(test_h5f_path)
 
