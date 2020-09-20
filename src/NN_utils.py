@@ -1433,6 +1433,39 @@ def weights_init(m):
                 if 'weight' in p:
                     torch.nn.init.xavier_uniform_(m.__getattr__(p))
 
+def two_model_predict(model, model2, dataloader, criterion, device):
+ 
+    model = model.to(device)
+    model2 = model2.to(device)
+    model.eval()
+    model2.eval()
+    
+    pred_y = torch.empty(0, 1).to(device)
+    pred_y2 = torch.empty(0, 1).to(device)
+        
+    total_loss = 0
+    total_loss2 = 0
+
+    with torch.no_grad():
+        for y, cont_x, cat_x, distal_x in dataloader:
+            cat_x = cat_x.to(device)
+            cont_x = cont_x.to(device)
+            distal_x = distal_x.to(device)
+            y  = y.to(device)
+        
+            preds = model.forward((cont_x, cat_x), distal_x)
+            pred_y = torch.cat((pred_y, preds), dim=0)
+                
+            loss = criterion(preds, y)
+            total_loss += loss.item()
+            
+            preds = model2.forward(cont_x, cat_x)
+            pred_y2 = torch.cat((pred_y2, preds), dim=0)
+            loss2 = criterion(preds, y)
+            total_loss2 += loss2.item()
+
+    return pred_y, total_loss, pred_y2, total_loss2 
+
 class ModelWithTemperature(nn.Module):
     """
     A thin decorator, which wraps a model with temperature scaling

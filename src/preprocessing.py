@@ -133,7 +133,10 @@ class HDF5Dataset(Dataset):
         Generate one sample of data.
         """
         if self.distal_X is None:
+            #self.distal_X = h5py.File(self.h5f_path, 'r', rdcc_nbytes=50*1024**2)["distal_X"]
             self.distal_X = h5py.File(self.h5f_path, 'r')["distal_X"]
+            #print('open h5f file:', self.h5f_path)
+            #print('idx is:', idx)
         
         
         return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.distal_X[idx])
@@ -306,10 +309,10 @@ def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dist
     return dataset, data_local, categorical_features
 
 # Prepare the datasets for given regions
-def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1, h5f_path='distal_data.h5'):
+def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1):
     
     # Use janggu Bioseq to read the data
-    local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius, storage='hdf5', cache=True)
+    local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
 
     # Get the digitalized seq data
     local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0])))
@@ -327,7 +330,7 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
 
     if len(bw_files) > 0:
         # Use the mean value of the region of 2*radius+1 bp around the focal site
-        bw_data = np.array(Cover.create_from_bigwig(name='local', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius, storage='hdf5', cache=True)).reshape(len(bed_regions), -1)
+        bw_data = np.array(Cover.create_from_bigwig(name='local', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
 
         bw_data = pd.DataFrame(bw_data, columns=bw_names)
         #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
@@ -347,7 +350,7 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     with h5py.File(h5f_path, 'w') as hf:
         #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
         #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", chunks=True, maxshape=(None,n_channels, distal_radius*2+1)) 
+        hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, distal_radius*2+1), maxshape=(None,n_channels, distal_radius*2+1)) 
     
         chunk_size = 50000
         for start in range(0, len(bed_regions), chunk_size):
