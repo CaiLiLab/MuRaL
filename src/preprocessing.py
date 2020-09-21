@@ -1,7 +1,13 @@
+
+import os, os.path
+import sys
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 from janggu.data import Bioseq, Cover
+sys.stderr = stderr
+
 from pybedtools import BedTool
 
-import sys
 from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
@@ -347,40 +353,44 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     
     n_channels = 4 + len(bw_files)
     
-    with h5py.File(h5f_path, 'w') as hf:
-        #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
-        #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, distal_radius*2+1), maxshape=(None,n_channels, distal_radius*2+1)) 
-    
-        chunk_size = 50000
-        for start in range(0, len(bed_regions), chunk_size):
-            end = min(start+chunk_size, len(bed_regions))
-            seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-            #print('seqs:', seqs)
-            seqs = np.array(seqs).squeeze().transpose(0,2,1)
-            #print('np.array(seqs):', seqs)
-        
-            # Handle distal bigWig data
-            if len(bw_files) > 0:
-                bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius, verbose=True)
-        
-                #print('bw_distal.shape:', np.array(bw_distal).shape)
-                #bw_distal should have the same seq len as that for distal_seq
-                bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-        
-                # Concatenate the sequence data and the bigWig data
-                seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                #distal_seq = np.concatenate((distal_seq, seqs), axis=0)
+    write_h5f = True
+    if os.path.exists(h5f_path):
+        try:
+            with h5py.File(h5f_path, 'r') as hf:
+                if len(y) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                    write_h5f = False
+        except OSError:
+            print('Warning: the file is empty or imcomplete:', h5f_path)
             
-            hf["distal_X"].resize((hf["distal_X"].shape[0] + seqs.shape[0]), axis = 0)
-            hf["distal_X"][-seqs.shape[0]:] = seqs
     
-        #import os
-        #os.remove('data.h5')  
-    
-        #distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius, order=distal_order, storage='hdf5', cache=True)
-        # Note the shape of data
-        #distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
+    if write_h5f:            
+        with h5py.File(h5f_path, 'w') as hf:
+            #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
+            #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
+            hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, distal_radius*2+1), maxshape=(None,n_channels, distal_radius*2+1)) 
+
+            chunk_size = 50000
+            for start in range(0, len(bed_regions), chunk_size):
+                end = min(start+chunk_size, len(bed_regions))
+                seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
+                #print('seqs:', seqs)
+                seqs = np.array(seqs).squeeze().transpose(0,2,1)
+                #print('np.array(seqs):', seqs)
+
+                # Handle distal bigWig data
+                if len(bw_files) > 0:
+                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius, verbose=True)
+
+                    #print('bw_distal.shape:', np.array(bw_distal).shape)
+                    #bw_distal should have the same seq len as that for distal_seq
+                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+
+                    # Concatenate the sequence data and the bigWig data
+                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
+                    #distal_seq = np.concatenate((distal_seq, seqs), axis=0)
+
+                hf["distal_X"].resize((hf["distal_X"].shape[0] + seqs.shape[0]), axis = 0)
+                hf["distal_X"][-seqs.shape[0]:] = seqs
     
 
     

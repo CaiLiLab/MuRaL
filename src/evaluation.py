@@ -78,3 +78,41 @@ def f7mer_comp_rand(df, n_rows):
         mean_corr += corr
     
     print('mean corr:', mean_corr/sampling_times)
+
+def corr_calc(data, window, model):
+    start = obs = pred = avg_obs = avg_pred = 0
+    
+    count = 0
+    
+    site_length = len(data) ### confirm cycle time
+    
+    last_start = data.loc[0, 'start']//window*window ### confirm start region
+    result = pd.DataFrame(columns=('avg_obs', 'avg_pred'))
+    for i in range(site_length):
+        start = data.loc[i, 'start']//window*window
+        chromosome = data.loc[i, 'chr']
+        if start != last_start:
+            ### calculate avg of the last region
+            avg_obs = obs/count
+            avg_pred = pred/count
+            result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
+            print('chr20', start, count, avg_obs, avg_pred, sep='\t')
+            obs = pred = 0
+            count = 0
+            last_start = start
+            obs += data.loc[i, 'mut_type']
+            pred += data.loc[i, model]
+            count = count + 1
+        else:
+            obs += data.loc[i, 'mut_type']
+            pred += data.loc[i, model]
+            count = count + 1
+
+    avg_obs = obs/count
+    avg_pred = pred/count
+    result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
+    print('chr20', start, count, avg_obs, avg_pred, sep='\t')
+    ### calculate correlation
+
+    corr = result['avg_obs'].corr(result['avg_pred'])
+    return corr
