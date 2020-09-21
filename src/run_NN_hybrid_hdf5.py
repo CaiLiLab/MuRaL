@@ -131,10 +131,10 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 
 # Prepare testing data 
-dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order, test_h5f_path, 50)
+dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order, test_h5f_path, 1)
 
 # Dataloader for testing data
-dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=2)
+dataloader1 = DataLoader(dataset_test, batch_size=10, shuffle=False, num_workers=2)
 
 # Choose the network model
 if len(sys.argv) < 10:

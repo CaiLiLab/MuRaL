@@ -725,7 +725,7 @@ class Network4(nn.Module):
         #local_out = self.local_fc(local_out)
         
         distal_out = self.distal_fc(distal_out)
-        if np.random.uniform(0,1) < 0.01 and self.training == False:
+        if np.random.uniform(0,1) < 0.1 and self.training == False:
             print('local_out:', torch.min(local_out).item(), torch.max(local_out).item(), torch.var(local_out).item(), torch.var(torch.sigmoid(local_out)).item())
             print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
         
@@ -952,7 +952,7 @@ class Network3(nn.Module):
         # Separate FC layers 
         local_out = self.local_fc(local_out)
         distal_out = self.distal_fc(distal_out)
-        if np.random.uniform(0,1) < 0.01 and self.training == False:
+        if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
             print('local_out:', torch.min(local_out).item(), torch.max(local_out).item(), torch.var(local_out).item(), torch.var(torch.sigmoid(local_out)).item())
             print('distal_out:', torch.min(distal_out).item(), torch.max(distal_out).item(),torch.var(distal_out).item(), torch.var(torch.sigmoid(distal_out)).item())
         
