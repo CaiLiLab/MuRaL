@@ -311,11 +311,15 @@ def main():
     pred_df.columns = ['chrom', 'start', 'end','mut_type', 'last_prob', 'last_prob2']
 
     pred_df.to_csv(pred_file, sep='\t', index=False)
-
+    
+    for win_size in [1000, 5000, 50000]:
+        corr1 = corr_calc(pred_df, win_size, 'last_prob')
+        corr2 = corr_calc(pred_df, win_size, 'last_prob2')
+        print('regional corr:', str(win_size)+'bp', corr1, corr2)
     #os.remove(train_h5f_path)
     #os.remove(test_h5f_path)
 
-    print("Total time used: %s seconds" % (time.time() - start_time))
+    print('Total time used: %s seconds' % (time.time() - start_time))
    
     
 if __name__ == "__main__":
