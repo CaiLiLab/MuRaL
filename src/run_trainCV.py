@@ -24,6 +24,9 @@ from NN_utils import *
 from preprocessing import *
 from evaluation import *
 
+from torch.utils.data import random_split, Subset
+import random
+
 
 def parse_arguments(parser):
 ## data
@@ -134,14 +137,27 @@ def main():
     
     # Prepare the datasets for trainging
     dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
+    #data_local.to_csv('data_local.tsv', sep='\t', index=False)
     
-    train_size = len(dataset)
+    train_size = int(len(dataset)*0.7)
+    valid_size = len(dataset) - train_size
+    print('train_size, valid_size:', train_size, valid_size)
+    
+    dataset_train, dataset_valid = random_split(dataset, [train_size, valid_size])
+    dataset_valid.indices.sort()
+    #order = sorted(range(valid_size),key=dataset_valid.indices.__getitem__)
+    
+    #dataset_train = Subset(dataset, idx[0:train_size])
+    #dataset_valid = Subset(dataset, sorted(idx[train_size:train_size+valid_size]))
+    #print('before:', dataset_valid.indices) 
+    
+    #dataset_valid = Subset(dataset, dataset_valid.indices)
 
     # Dataloader for training
-    dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2) #shuffle=False for HybridLoss
+    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=2) #shuffle=False for HybridLoss
 
     # Dataloader for predicting
-    dataloader2 = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    dataloader_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=False, num_workers=1)
 
     # Number of categorical features
     cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
@@ -156,7 +172,7 @@ def main():
     test_size = len(dataset_test)
 
     # Dataloader for testing data
-    dataloader1 = DataLoader(dataset_test, batch_size=10, shuffle=False, num_workers=2)
+    dataloader_test = DataLoader(dataset_test, batch_size=10, shuffle=False, num_workers=2)
 
     # Choose the network model
     if model_no == 0:
@@ -219,9 +235,9 @@ def main():
         torch.cuda.empty_cache()
         
         #re-shuffling
-        dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
+        #dataloader = DataLoader(dataset_train, batch_size, shuffle=True, num_workers=2)
 
-        for y, cont_x, cat_x, distal_x in dataloader:
+        for y, cont_x, cat_x, distal_x in dataloader_train:
             cat_x = cat_x.to(device)
             cont_x = cont_x.to(device)
             distal_x = distal_x.to(device)
@@ -253,65 +269,76 @@ def main():
             scheduler.step()
             scheduler2.step()
 
-            if epoch <5:
-                continue
+            #if epoch <5:
+            #    continue
 
             # Do predictions for training data
-            #all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
-            all_pred_y, train_total_loss, all_pred_y2, train_total_loss2 = two_model_predict(model, model2, dataloader2, criterion, device)
+            #valid_pred_y, valid_total_loss = model.batch_predict(dataloader_valid, criterion, device)      
+            valid_pred_y, valid_total_loss, valid_pred_y2, valid_total_loss2 = two_model_predict(model, model2, dataloader_valid, criterion, device)
 
-            all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
-            all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
+            valid_y_prob = pd.Series(data=to_np(valid_pred_y).T[0], name="prob")
+            
+            valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)
+            #print('valid_data_and_prob', valid_data_and_prob.iloc[1:10,], valid_data_and_prob.shape, a.shape, data_local.shape, len(dataset_valid.indices), len(valid_y_prob))
 
-            #all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)     
-            all_y_prob2 = pd.Series(data=to_np(all_pred_y2).T[0], name="prob")
-            all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)        
+            #valid_pred_y2, valid_total_loss2 = model2.batch_predict(dataloader_valid, criterion, device)     
+            valid_y_prob2 = pd.Series(data=to_np(valid_pred_y2).T[0], name="prob")
+            valid_data_and_prob2 = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob2], axis=1)
+            #print('valid_data_and_prob2', valid_data_and_prob2.iloc[1:10,])
 
             # Compare observed/predicted 3/5/7mer mutation frequencies
-            print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
-            print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
-            print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
+            print ('3mer correlation - valid: ' + str(f3mer_comp(valid_data_and_prob)))
+            print ('5mer correlation - valid: ' + str(f5mer_comp(valid_data_and_prob)))
+            print ('7mer correlation - valid: ' + str(f7mer_comp(valid_data_and_prob)))
 
 
-            print ('3mer correlation - all (FF only): ' + str(f3mer_comp(all_data_and_prob2)))
-            print ('5mer correlation - all (FF only): ' + str(f5mer_comp(all_data_and_prob2)))
-            print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
+            print ('3mer correlation - valid (FF only): ' + str(f3mer_comp(valid_data_and_prob2)))
+            print ('5mer correlation - valid (FF only): ' + str(f5mer_comp(valid_data_and_prob2)))
+            print ('7mer correlation - valid (FF only): ' + str(f7mer_comp(valid_data_and_prob2)))
 
-            print ("Total Loss: ", train_total_loss/train_size, train_total_loss2/train_size)        
-            # Do predictions for testing data
-            if epoch == epochs-1:
-                #pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
-                pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict(model, model2, dataloader1, criterion, device)
-                y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
-                data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
+            print ("Total Loss: ", valid_total_loss/valid_size, valid_total_loss2/valid_size)        
+            
+            valid_pred_df = pd.concat((train_bed.to_dataframe().loc[dataset_valid.indices, ['chrom', 'start', 'end']].reset_index(drop=True), valid_data_and_prob[['mut_type','prob']], valid_data_and_prob2['prob']), axis=1)
+            valid_pred_df.columns = ['chrom', 'start', 'end','mut_type', 'valid_prob', 'valid_prob2']
+            
+            for win_size in [10000, 100000]:
+                corr1 = corr_calc(valid_pred_df, win_size, 'valid_prob')
+                corr2 = corr_calc(valid_pred_df, win_size, 'valid_prob2')
+                print('regional corr (validation):', str(win_size)+'bp', corr1, corr2)
+    
+    # Do predictions for testing data
+    #pred_y, test_total_loss = model.batch_predict(dataloader_test, criterion, device)
+    pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict(model, model2, dataloader_test, criterion, device)
+    y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
+    data_and_prob = pd.concat([data_local_test, y_prob], axis=1) 
+    #print('data_and_prob', data_and_prob.iloc[1:10,], data_and_prob.shape)
 
-                # For FeedForward-only model
-                #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
-                y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
-                data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
+    # For FeedForward-only model
+    #pred_y2, test_total_loss2 = model2.batch_predict(dataloader_test, criterion, device)
+    y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
+    data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
 
-                print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
-                print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
-                print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
-                print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
-                print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
-                print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
+    print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+    print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+    print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+    print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
+    print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
+    print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
 
 
-            if epoch == epochs-1:
-                last_pred_df = data_and_prob[['mut_type','prob']]
-                last_pred_df2 = data_and_prob2[['mut_type','prob']]
+    last_pred_df = data_and_prob[['mut_type','prob']]
+    last_pred_df2 = data_and_prob2[['mut_type','prob']]
 
-                torch.save(model.state_dict(), pred_file+'.model1')
-                torch.save(model2.state_dict(), pred_file+'.model2')
+    torch.save(model.state_dict(), pred_file+'.model1')
+    torch.save(model2.state_dict(), pred_file+'.model2')
 
-                # Get the scores
-                #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
-                test_y = data_local_test['mut_type']
+    # Get the scores
+    #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+    test_y = data_local_test['mut_type']
 
-                # Print some data for debugging
-                print('min and max of pred_y:', np.min(to_np(pred_y)), np.max(to_np(pred_y)))
-                print('min and max of pred_y2:', np.min(to_np(pred_y2)), np.max(to_np(pred_y2)))
+    # Print some data for debugging
+    print('min and max of pred_y:', np.min(to_np(pred_y)), np.max(to_np(pred_y)))
+    print('min and max of pred_y2:', np.min(to_np(pred_y2)), np.max(to_np(pred_y2)))
 
     # Write the prediction
     pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], last_pred_df, last_pred_df2['prob']), axis=1)
@@ -319,7 +346,7 @@ def main():
 
     pred_df.to_csv(pred_file, sep='\t', index=False)
     
-    for win_size in [1000, 5000, 50000]:
+    for win_size in [1000, 5000,20000, 50000, 100000]:
         corr1 = corr_calc(pred_df, win_size, 'last_prob')
         corr2 = corr_calc(pred_df, win_size, 'last_prob2')
         print('regional corr:', str(win_size)+'bp', corr1, corr2)
