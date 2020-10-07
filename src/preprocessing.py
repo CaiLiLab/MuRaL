@@ -96,7 +96,9 @@ class DistalDataset2(Dataset):
 # 
 class HDF5Dataset(Dataset):
     def __init__(self, data, cat_cols, output_col, h5f_path):
-
+        
+        self.data_local = data
+        
         # First, change labels to digits
         label_encoders = {}
         for cat_col in cat_cols:
@@ -319,9 +321,12 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     
     # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
-
-    # Get the digitalized seq data
-    local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0])))
+    
+    # To get One-Hot encoded data, shape is [sample_size, 4*seq_len]
+    #local_seq = np.array(local_seq).squeeze().reshape(local_seq.shape[0], -1)   
+    
+    # Get the digitalized seq data; values are one of 0,1,2,3
+    local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0]))).astype(np.int8)
 
     # TO DO: some other categorical data can be added here
     # Names of the categorical variables
@@ -402,7 +407,8 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     #dataset = CombinedDataset(dataset_local, dataset_distal)
     dataset = HDF5Dataset(data=data_local, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path)
     
-    return dataset, data_local, categorical_features
+    #return dataset, data_local, categorical_features
+    return dataset
 
 
 # Deprecated. Old function

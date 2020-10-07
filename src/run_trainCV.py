@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 import pandas as pd
 import numpy as np
 
@@ -195,8 +195,8 @@ def main2():
     print(model2)
 
     # Initiating weights of the models;
-    weights_init(model)
-    weights_init(model2)
+    model.apply(weights_init)
+    model2.apply(weights_init)
 
     # Loss function
     criterion = torch.nn.BCELoss()
@@ -412,11 +412,16 @@ def main():
             test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.'.join(list(bw_names)) + '.h5'
     
     # Prepare the datasets for trainging
-    dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
+    #dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
+    dataset = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
+    data_local = dataset.data_local
+    categorical_features = dataset.cat_cols
     #data_local.to_csv('data_local.tsv', sep='\t', index=False)
     
     # Prepare testing data 
-    dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, test_h5f_path, 1)
+    #dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, test_h5f_path, 1)
+    dataset_test = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, test_h5f_path, 1)
+    data_local_test = dataset_test.data_local
     
     # Number of categorical features
     cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
@@ -579,7 +584,7 @@ def get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid
     best_trial = 0
     best_loss = 100
 
-    weights_init(model)
+    model.apply(weights_init)
     untrained_model = model
     
     best_hyper_param = HyperParam(learning_rate=0, weight_decay=0, LR_gamma=0, epochs=0)
@@ -652,7 +657,130 @@ def get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid
     
     #return best_learning_rate, best_weight_decay, best_LR_gamma, best_epochs
     return best_hyper_param
+
+
+def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size, criterion, device):
+    
+    split_size = len(dataset)//3
+    split_sizes = [split_size, split_size, len(dataset) - 2*split_size]
+    
+    #train_size = int(len(dataset)*0.7)
+    #valid_size = len(dataset) - train_size
+    #print('train_size, valid_size:', train_size, valid_size)
+    
+    dataset_split1, dataset_split2, dataset_split3 = random_split(dataset, split_sizes)
+    
+    dataset_train1 = ConcatDataset([dataset_split1, dataset_split2])
+    dataset_valid1 = dataset_split3
+    dataset_valid1.indices.sort()
+    
+    dataset_train2 = ConcatDataset([dataset_split1, dataset_split3])
+    dataset_valid2 = dataset_split2
+    dataset_valid2.indices.sort()
+    
+    dataset_train3 = ConcatDataset([dataset_split2, dataset_split3])
+    dataset_valid3 = dataset_split1
+    dataset_valid3.indices.sort()
+
+    # Dataloader for training
+    #dataloader_train1 = DataLoader(dataset_train1, batch_size=batch_size, shuffle=True, num_workers=2) 
+    #dataloader_valid1 = DataLoader(dataset_valid1, batch_size=batch_size, shuffle=False, num_workers=1)
+    
+    #dataloader_train2 = DataLoader(dataset_train2, batch_size=batch_size, shuffle=True, num_workers=2) 
+    #dataloader_valid2 = DataLoader(dataset_valid2, batch_size=batch_size, shuffle=False, num_workers=1)
+
+    #dataloader_train3 = DataLoader(dataset_train3, batch_size=batch_size, shuffle=True, num_workers=2) 
+    #dataloader_valid3 = DataLoader(dataset_valid3, batch_size=batch_size, shuffle=False, num_workers=1)
+    
+    best_trial = 0
+    best_loss = 100
+    best_score = 100
+
+    model.apply(weights_init)
+    untrained_model = model
+    
+    best_hyper_param = HyperParam(learning_rate=0, weight_decay=0, LR_gamma=0, epochs=0)
+    
+    for number in range(10):
+        
+        learning_rate_list = [1e-2, 5e-3, 1e-3]
+        learning_rate = random.choice(learning_rate_list)
+        weight_decay_list = [1e-4, 5e-5, 1e-5]
+        weight_decay = random.choice(weight_decay_list)
+        LR_gamma_list = [0.5, 0.6, 0.7]
+        LR_gamma = random.choice(LR_gamma_list)
+        epochs_list = [8, 10, 15]
+        epochs = random.choice(epochs_list)
+
+        print('learning_rate:', learning_rate)
+        print('weight_decay:', weight_decay)
+        print('LR_gamma:', LR_gamma)
+        print('epochs:', epochs)
+        
+        score_list = []
+        valid_total_loss_list = []
+
+        for dataset_train, dataset_valid  in ((dataset_train1, dataset_valid1), (dataset_train2, dataset_valid2,), (dataset_train3, dataset_valid3)):
             
+            dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=2) 
+            dataloader_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=False, num_workers=1)
+    
+            
+            model = untrained_model      
+            
+            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=LR_gamma)
+
+
+            # Training
+            for epoch in range(epochs):
+                model.train()
+
+                for y, cont_x, cat_x, distal_x in dataloader_train:
+                    cat_x = cat_x.to(device)
+                    cont_x = cont_x.to(device)
+                    distal_x = distal_x.to(device)
+                    y  = y.to(device)
+
+                    # Forward Pass
+                    preds = model.forward((cont_x, cat_x), distal_x)  
+                    loss = criterion(preds, y)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                #print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
+                scheduler.step()
+
+            with torch.no_grad():
+
+                valid_pred_y, valid_total_loss = model.batch_predict(dataloader_valid, criterion, device)
+
+                score = calc_eval_score(valid_pred_y, data_local, dataset_valid, train_bed)
+                valid_total_loss = valid_total_loss/len(valid_pred_y)
+                
+                score_list.append(score)
+                valid_total_loss_list.append(valid_total_loss)
+            
+        print('Trial',number+1, 'valid_total_loss, score:', valid_total_loss_list, score_list)
+        #if score < best_score:
+        if np.mean(valid_total_loss_list) < best_loss:
+                best_hyper_param.set_learning_rate(learning_rate)
+                best_hyper_param.set_weight_decay(weight_decay)
+                best_hyper_param.set_LR_gamma(LR_gamma)
+                best_hyper_param.set_epochs(epochs)
+                #best_score = score
+                best_loss = np.mean(valid_total_loss_list)
+                best_trial = number + 1
+    
+    print('best_trial:', best_trial)
+    print('best_learning_rate:', best_hyper_param.learning_rate)
+    print('best_weight_decay:', best_hyper_param.weight_decay)
+    print('best_LR_gamma:', best_hyper_param.LR_gamma)
+    print('best_epochs:', best_hyper_param.epochs)
+    
+    #return best_learning_rate, best_weight_decay, best_LR_gamma, best_epochs
+    return best_hyper_param
     
         
 def train_model(model, model2, train_bed, dataset, data_local, batch_size, learning_rate, weight_decay, LR_gamma, epochs, criterion, device):
@@ -673,11 +801,12 @@ def train_model(model, model2, train_bed, dataset, data_local, batch_size, learn
     hyper_param = HyperParam(learning_rate=learning_rate, weight_decay=weight_decay, LR_gamma=LR_gamma, epochs=epochs)
     #################
     #learning_rate, weight_decay, LR_gamma, epochs = get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid, dataset_valid, data_local, criterion, device)
-    hyper_param = get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid, dataset_valid, data_local, criterion, device)
+    #hyper_param = get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid, dataset_valid, data_local, criterion, device)
+    hyper_param = get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size, criterion, device)
     ###################
     
-    weights_init(model)
-    weights_init(model2)
+    model.apply(weights_init)
+    model2.apply(weights_init)
 
     # Set Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=hyper_param.learning_rate, weight_decay=hyper_param.weight_decay)

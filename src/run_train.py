@@ -184,8 +184,9 @@ def main():
     print(model2)
 
     # Initiating weights of the models;
-    weights_init(model)
-    weights_init(model2)
+    
+    model.apply(weights_init)
+    model2.apply(weights_init)
 
     # Loss function
     criterion = torch.nn.BCELoss()
