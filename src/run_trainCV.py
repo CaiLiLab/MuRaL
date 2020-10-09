@@ -464,6 +464,7 @@ def main():
     
     test_model(model, model2, test_bed, dataset_test, data_local_test, pred_file, criterion, device)
 
+    print('Total time used: %s seconds' % (time.time() - start_time))
 
 def train_one_epoch(model, model2, dataloader_train, optimizer, optimizer2, criterion, device):
     model.train()
@@ -503,23 +504,30 @@ def train_one_epoch(model, model2, dataloader_train, optimizer, optimizer2, crit
 
 def calc_eval_score(valid_pred_y, data_local, dataset_valid, train_bed):
     
+    score = 0
+    
     valid_y_prob = pd.Series(data=to_np(valid_pred_y).T[0], name="prob")
 
     valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)
 
+    corr_3mer = f3mer_comp(valid_data_and_prob)
+    corr_5mer = f5mer_comp(valid_data_and_prob)
+    corr_7mer = f7mer_comp(valid_data_and_prob)
+    
+    score += (1 - corr_3mer)**2 + (1 - corr_5mer)**2 + (1- corr_7mer)**2
     # Compare observed/predicted 3/5/7mer mutation frequencies
-    print ('3mer correlation - valid: ' + str(f3mer_comp(valid_data_and_prob)))
-    print ('5mer correlation - valid: ' + str(f5mer_comp(valid_data_and_prob)))
-    print ('7mer correlation - valid: ' + str(f7mer_comp(valid_data_and_prob)))
+    print ('3mer correlation - valid: ' + str(corr_3mer))
+    print ('5mer correlation - valid: ' + str(corr_5mer))
+    print ('7mer correlation - valid: ' + str(corr_7mer))
 
     valid_pred_df = pd.concat((train_bed.to_dataframe().loc[dataset_valid.indices, ['chrom', 'start', 'end']].reset_index(drop=True), valid_data_and_prob[['mut_type','prob']]), axis=1)
     valid_pred_df.columns = ['chrom', 'start', 'end','mut_type', 'valid_prob']
     
-    score = 0
-    for win_size in [10000, 100000]:
+    
+    for win_size in [10000, 30000, 100000]:
         corr = corr_calc(valid_pred_df, win_size, 'valid_prob')
         print('regional corr (validation):', str(win_size)+'bp', corr)
-        score += 1 - corr**2
+        score += (1 - corr)**2
         
     return score
 
@@ -639,13 +647,13 @@ def get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid
             valid_total_loss = valid_total_loss/len(valid_pred_y)
             print('Trial',number+1, 'valid_total_loss, score:', valid_total_loss, score)
             
-            #if score < best_score:
-            if valid_total_loss < best_loss:
+            if score < best_score:
+            #if valid_total_loss < best_loss:
                     best_hyper_param.set_learning_rate(learning_rate)
                     best_hyper_param.set_weight_decay(weight_decay)
                     best_hyper_param.set_LR_gamma(LR_gamma)
                     best_hyper_param.set_epochs(epochs)
-                    #best_score = score
+                    best_score = score
                     best_loss = valid_total_loss
                     best_trial = number + 1
     
@@ -693,8 +701,8 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
     #dataloader_valid3 = DataLoader(dataset_valid3, batch_size=batch_size, shuffle=False, num_workers=1)
     
     best_trial = 0
-    best_loss = 100
-    best_score = 100
+    best_loss = 0
+    best_score = 0
 
     model.apply(weights_init)
     untrained_model = model
@@ -711,7 +719,8 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
         LR_gamma = random.choice(LR_gamma_list)
         epochs_list = [8, 10, 15]
         epochs = random.choice(epochs_list)
-
+        
+        print('\nTrial',number+1)
         print('learning_rate:', learning_rate)
         print('weight_decay:', weight_decay)
         print('LR_gamma:', LR_gamma)
@@ -723,7 +732,7 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
         for dataset_train, dataset_valid  in ((dataset_train1, dataset_valid1), (dataset_train2, dataset_valid2,), (dataset_train3, dataset_valid3)):
             
             dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True, num_workers=2) 
-            dataloader_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=False, num_workers=1)
+            dataloader_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=False, num_workers=2)
     
             
             model = untrained_model      
@@ -763,13 +772,14 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
                 valid_total_loss_list.append(valid_total_loss)
             
         print('Trial',number+1, 'valid_total_loss, score:', valid_total_loss_list, score_list)
-        #if score < best_score:
-        if np.mean(valid_total_loss_list) < best_loss:
+        
+        if np.mean(score_list) < best_score or number == 0 :
+        #if np.mean(valid_total_loss_list) < best_loss:
                 best_hyper_param.set_learning_rate(learning_rate)
                 best_hyper_param.set_weight_decay(weight_decay)
                 best_hyper_param.set_LR_gamma(LR_gamma)
                 best_hyper_param.set_epochs(epochs)
-                #best_score = score
+                best_score = np.mean(score_list)
                 best_loss = np.mean(valid_total_loss_list)
                 best_trial = number + 1
     
