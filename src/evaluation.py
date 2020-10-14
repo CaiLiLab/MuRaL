@@ -97,10 +97,12 @@ def corr_calc(data, window, model):
         chrom = data.loc[i, 'chrom']
         if chrom != last_chrom or start != last_start:
             ### calculate avg of the last region
-            avg_obs = obs/count
-            avg_pred = pred/count
-            result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
-            #print(chrom, start, count, avg_obs, avg_pred, sep='\t')
+            if obs >0 and pred>0 and obs < count:
+                avg_obs = obs/count
+                avg_pred = pred/count
+                result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
+                #if i <100:
+                #    print(chrom, start, count, avg_obs, avg_pred, sep='\t')
             obs = pred = 0
             count = 0
             last_chrom = chrom
@@ -117,6 +119,14 @@ def corr_calc(data, window, model):
     avg_pred = pred/count
     result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
     #print(chrom, start, count, avg_obs, avg_pred, sep='\t')
+    #print('no of sites:', site_length)
+    #print('result.head', result.head(5))
+    #print('result.tail', result.tail(5))
+    #print('result.shape', result.shape)
+    if sum(list(result['avg_obs'] == 0) | (result['avg_obs'] == 1))/result.shape[0] > 0.5:
+        print('Warning: too many zeros/ones in the obs windows of size', window)
+    
+    #print('obs==0 rows:', result.loc[result['avg_obs']==0].shape)
 
     corr = result['avg_obs'].corr(result['avg_pred'])
     return corr

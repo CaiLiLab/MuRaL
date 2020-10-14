@@ -524,7 +524,7 @@ def calc_eval_score(valid_pred_y, data_local, dataset_valid, train_bed):
     valid_pred_df.columns = ['chrom', 'start', 'end','mut_type', 'valid_prob']
     
     
-    for win_size in [10000, 30000, 100000]:
+    for win_size in [20000, 100000, 500000]:
         corr = corr_calc(valid_pred_df, win_size, 'valid_prob')
         print('regional corr (validation):', str(win_size)+'bp', corr)
         score += (1 - corr)**2
@@ -721,10 +721,10 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
         epochs = random.choice(epochs_list)
         
         print('\nTrial',number+1)
-        print('learning_rate:', learning_rate)
-        print('weight_decay:', weight_decay)
-        print('LR_gamma:', LR_gamma)
-        print('epochs:', epochs)
+        print('Trial',number+1, 'learning_rate:', learning_rate)
+        print('Trial',number+1, 'weight_decay:', weight_decay)
+        print('Trial',number+1, 'LR_gamma:', LR_gamma)
+        print('Trial',number+1, 'epochs:', epochs)
         
         score_list = []
         valid_total_loss_list = []
@@ -771,7 +771,7 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
                 score_list.append(score)
                 valid_total_loss_list.append(valid_total_loss)
             
-        print('Trial',number+1, 'valid_total_loss, score:', valid_total_loss_list, score_list)
+        print('Trial',number+1, 'valid_total_loss, score:', valid_total_loss_list, np.mean(valid_total_loss_list), score_list, np.mean(score_list))
         
         if np.mean(score_list) < best_score or number == 0 :
         #if np.mean(valid_total_loss_list) < best_loss:
