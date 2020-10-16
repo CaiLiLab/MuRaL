@@ -6,6 +6,24 @@ def f3mer_comp(data_and_prob):
     #print (obs_pred_freq[['mut_type', 'prob']])
     return obs_pred_freq['mut_type'].corr(obs_pred_freq['prob'])
 
+def freq_kmer_comp_multi(data_and_prob, k, n_class):
+    
+    d = k//2
+    mer_list = ['us'+str(i) for i in list(range(1, d+1))[::-1]] + ['ds'+str(i) for i in list(range(1, d+1))]
+    
+    prob_list = ['prob'+str(i) for i in range(n_class)]
+    
+    corr_list = []
+    for i in range(1, n_class):
+        obs_pred_freq = pd.concat([data_and_prob[ mer_list + [prob_list[i]]], data_and_prob['mut_type']==i ], axis=1)
+        
+        #print('obs_pred_freq:', obs_pred_freq[1:5])
+        obs_pred_freq = obs_pred_freq.groupby(mer_list).mean()
+        
+        #obs_pred_freq.columns = 
+        corr_list.append(obs_pred_freq['mut_type'].corr(obs_pred_freq[prob_list[i]]))
+        
+    return corr_list
 
 # Compare the observed and predicted frequencies of mutations in 5mers
 def f5mer_comp(data_and_prob):
@@ -130,3 +148,71 @@ def corr_calc(data, window, model):
 
     corr = result['avg_obs'].corr(result['avg_pred'])
     return corr
+
+def corr_calc_sub(data, window, prob_names):
+    
+    #print('in the corr_calc_sub, data.head()', data.head())
+    n_class = len(prob_names)
+    obs = [0]*n_class
+    pred = [0]*n_class
+    
+    count = 0
+    site_length = len(data) ### confirm cycle time
+    
+    start = 0  
+    avg_names = []
+    for i in range(n_class):
+        avg_names = avg_names +['avg_obs'+str(i), 'avg_pred'+str(i)]
+    
+    #print('avg_names.shape:', avg_names.shape)
+    last_chrom = data.loc[0, 'chrom']
+    last_start = data.loc[0, 'start']//window * window ### confirm start region
+    result = pd.DataFrame(columns=avg_names)
+    for i in range(site_length):
+        start = data.loc[i, 'start']//window * window
+        chrom = data.loc[i, 'chrom']
+        if chrom != last_chrom or start != last_start:
+            ### calculate avg of the last region
+            
+            avg_list = []
+            for j in range(n_class):
+                avg_list += [obs[j]/count, pred[j]/count]
+
+            result = result.append(pd.DataFrame([avg_list], columns=avg_names))
+                #if i <100:
+                #    print(chrom, start, count, avg_obs, avg_pred, sep='\t')
+            obs = [0]*n_class
+            pred = [0]*n_class
+            count = 0
+            last_chrom = chrom
+            last_start = start
+            
+            obs[int(data.loc[i, 'mut_type'])] += 1              
+            for j in range(n_class):
+                pred[j] += data.loc[i, prob_names[j]]
+            
+            count = count + 1
+        else:
+            obs[int(data.loc[i, 'mut_type'])] += 1           
+            for j in range(n_class):
+                pred[j] += data.loc[i, prob_names[j]]
+            
+            count = count + 1
+    
+    avg_list = []
+    for j in range(n_class):
+        avg_list += [obs[j]/count, pred[j]/count]
+
+    result = result.append(pd.DataFrame([avg_list], columns=avg_names))
+    
+    corr_list = []
+    for i in range(n_class):
+        
+        if sum(list(result['avg_obs'+str(i)] == 0) | (result['avg_obs'+str(i)] == 1))/result.shape[0] > 0.5:
+            print('Warning: too many zeros/ones in the obs windows of size', window, 'subtype', i)
+    
+        #print('obs==0 rows:', result.loc[result['avg_obs']==0].shape)
+        corr = result['avg_obs'+str(i)].corr(result['avg_pred'+str(i)])
+        print('corr:', corr)
+        corr_list.append(corr)
+    return corr_list

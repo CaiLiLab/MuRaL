@@ -42,6 +42,8 @@ def parse_arguments(parser):
     #parser.add_argument('--', type=str, default='', help='')
     parser.add_argument('--bw_paths', type=str, default='/public/home/licai/DNMML/analysis/test/bw_files.txt', help='path for the list of BigWig files for non-sequence features')
     
+    parser.add_argument('--n_class', type=int, default='2', help='number of mutation classes')
+    
     parser.add_argument('--local_radius', type=int, default='5', help='radius of local sequences to be considered')
     
     parser.add_argument('--distal_radius', type=int, default='50', help='radius of distal sequences to be considered')
@@ -103,7 +105,7 @@ def main():
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
     
-    n_class = 2
+    n_class = args.n_class
     
     # Read BED files
     train_bed = BedTool(train_file)
@@ -215,6 +217,7 @@ def main():
     best_loss2 = 0
     pred_df2 = None
     last_pred_df2 = None
+    prob_names = ['prob'+str(i) for i in range(n_class)]
     
     # Training
     for epoch in range(epochs):
@@ -270,47 +273,65 @@ def main():
             #all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
             all_pred_y, train_total_loss, all_pred_y2, train_total_loss2 = two_model_predict_m(model, model2, dataloader2, criterion, device, n_class)
 
-            all_y_prob = pd.Series(data=to_np(torch.exp(all_pred_y)).T[1], name="prob")
-            all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
-
+            #all_y_prob = pd.Series(data=to_np(torch.exp(all_pred_y)).T[1], name="prob")
+            all_y_prob = pd.DataFrame(data=to_np(torch.exp(all_pred_y)), columns=prob_names)
+            #all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
+            all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1) 
+            
             #all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)     
-            all_y_prob2 = pd.Series(data=to_np(torch.exp(all_pred_y2)).T[1], name="prob")
-            all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)        
+            all_y_prob2 = pd.DataFrame(data=to_np(torch.exp(all_pred_y2)), columns=prob_names)
+            all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1) 
+            #all_y_prob2 = pd.Series(data=to_np(torch.exp(all_pred_y2)).T[1], name="prob")
+            #all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)        
 
             # Compare observed/predicted 3/5/7mer mutation frequencies
+            print('3mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 3, n_class))
+            print('5mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 5, n_class))
+            print('7mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 7, n_class))
+            
+            print('3mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 3, n_class))
+            print('5mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 5, n_class))
+            print('7mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 7, n_class))
+            
+            '''
             print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
             print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
             print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
-
-
             print ('3mer correlation - all (FF only): ' + str(f3mer_comp(all_data_and_prob2)))
             print ('5mer correlation - all (FF only): ' + str(f5mer_comp(all_data_and_prob2)))
             print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
-
+            '''
+            
             print ("Total Loss: ", train_total_loss/train_size, train_total_loss2/train_size)        
             # Do predictions for testing data
             if epoch == epochs-1:
                 #pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
                 pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict_m(model, model2, dataloader1, criterion, device, n_class)
-                y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
+                print('pred_y:', torch.exp(pred_y[1:10]))
+                print('pred_y2:', torch.exp(pred_y2[1:10]))
+                
+                #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
+                y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
                 data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
 
                 # For FeedForward-only model
                 #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
-                y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
+                #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
+                y_prob2 = pd.DataFrame(data=to_np(torch.exp(pred_y2)), columns=prob_names)
                 data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
 
-                print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+                '''
+                print ('3mer correlation - test: ' + str(f3mer_comp_multi(data_and_prob, n_class)))
                 print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
                 print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
                 print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
                 print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
                 print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
-
+                '''
 
             if epoch == epochs-1:
-                last_pred_df = data_and_prob[['mut_type','prob']]
-                last_pred_df2 = data_and_prob2[['mut_type','prob']]
+                last_pred_df = data_and_prob[['mut_type'] + prob_names]
+                last_pred_df2 = data_and_prob2[['mut_type'] + prob_names]
 
                 torch.save(model.state_dict(), pred_file+'.model1')
                 torch.save(model2.state_dict(), pred_file+'.model2')
@@ -320,19 +341,21 @@ def main():
                 test_y = data_local_test['mut_type']
 
                 # Print some data for debugging
-                print('min and max of pred_y:', np.min(to_np(torch.exp(pred_y))[:,1]), np.max(to_np(torch.exp(pred_y))[:,1]))
-                print('min and max of pred_y2:', np.min(to_np(torch.exp(pred_y2))[:,1]), np.max(to_np(torch.exp(pred_y2))[:,1]))
+                for i in range(1, n_class):
+                    print('min and max of pred_y: type', i, np.min(to_np(torch.exp(pred_y))[:,i]), np.max(to_np(torch.exp(pred_y))[:,i]))
+                    print('min and max of pred_y2: type', i, np.min(to_np(torch.exp(pred_y2))[:,i]), np.max(to_np(torch.exp(pred_y2))[:,i]))
 
     # Write the prediction
-    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], last_pred_df, last_pred_df2['prob']), axis=1)
-    pred_df.columns = ['chrom', 'start', 'end','mut_type', 'last_prob', 'last_prob2']
+    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], last_pred_df, last_pred_df2[prob_names]), axis=1)
+    pred_df.columns = ['chrom', 'start', 'end','mut_type'] + [name+'_M1' for name in prob_names] + [name+'_M2' for name in prob_names]
 
     pred_df.to_csv(pred_file, sep='\t', index=False)
     
-    for win_size in [1000, 5000, 50000]:
-        corr1 = corr_calc(pred_df, win_size, 'last_prob')
-        corr2 = corr_calc(pred_df, win_size, 'last_prob2')
-        print('regional corr:', str(win_size)+'bp', corr1, corr2)
+    for win_size in [10000, 50000, 200000]:
+        corr1 = corr_calc_sub(pred_df, win_size, [name+'_M1' for name in prob_names])
+        corr2 = corr_calc_sub(pred_df, win_size, [name+'_M2' for name in prob_names])
+        print('regional corr:', str(win_size)+'bp', corr1)
+        print('regional corr2:', str(win_size)+'bp', corr2)
     #os.remove(train_h5f_path)
     #os.remove(test_h5f_path)
 
