@@ -70,6 +70,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--epochs', type=int, default='15', help='numbe of epochs for training')
     
+    parser.add_argument('--model1_path', type=str, default='', help='model1 path')
+    
+    parser.add_argument('--model2_path', type=str, default='', help='model2 path')
+    
     args = parser.parse_args()
 
     return args
@@ -104,6 +108,8 @@ def main():
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
+    model1_path = args.model1_path
+    model2_path = args.model2_path
     
     n_class = args.n_class
     
@@ -144,10 +150,7 @@ def main():
     train_size = len(dataset)
 
     # Dataloader for training
-    dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2) #shuffle=False for HybridLoss
-
-    # Dataloader for predicting
-    dataloader2 = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    #dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
 
     # Number of categorical features
     cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
@@ -192,166 +195,52 @@ def main():
     print('model2:')
     print(model2)
 
-    # Initiating weights of the models;
-    
-    model.apply(weights_init)
-    model2.apply(weights_init)
+    model.load_state_dict(torch.load(model1_path))
+    model2.load_state_dict(torch.load(model2_path))
 
-    # Loss function
-    #criterion = torch.nn.BCELoss()
-    #class_count = pd.DataFrame(data_local['mut_type'].value_counts(sort=False))/data_local.shape[0]
-    #class_count = np.array([np.sum(data_local['mut_type'].values.astype(np.int16) == i) for i in range(n_class)])
-    #class_weight = torch.Tensor(1/class_count).squeeze()
-    print('class_count, class_weight', class_count, class_weight)
-    #criterion = torch.nn.NLLLoss(weight=class_weight).to(device)
     criterion = torch.nn.NLLLoss()
-
-    # Set Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=LR_gamma)
-
-    optimizer2 = torch.optim.Adam(model2.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=LR_gamma)
-    print('optimizer, optimizer2:', optimizer, optimizer2)
-    #print('scheduler, scheduler2:', scheduler, scheduler2)
-
+    
     best_loss = 0
     pred_df = None
-    last_pred_df = None
+    test_pred_df = None
 
     best_loss2 = 0
     pred_df2 = None
-    last_pred_df2 = None
+    test_pred_df2 = None
     prob_names = ['prob'+str(i) for i in range(n_class)]
     
-    # Training
-    for epoch in range(epochs):
 
-        model.train()
-        model2.train()
+    pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict_m(model, model2, dataloader1, criterion, device, n_class)
+    print('pred_y:', torch.exp(pred_y[1:10]))
+    print('pred_y2:', torch.exp(pred_y2[1:10]))
 
-        total_loss = 0
-        total_loss2 = 0
+    #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
+    y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
+    data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
 
-        torch.cuda.empty_cache()
-        
-        #re-shuffling
-        dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
+    # For FeedForward-only model
+    #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
+    #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
+    y_prob2 = pd.DataFrame(data=to_np(torch.exp(pred_y2)), columns=prob_names)
+    data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
 
-        for y, cont_x, cat_x, distal_x in dataloader:
-            cat_x = cat_x.to(device)
-            cont_x = cont_x.to(device)
-            distal_x = distal_x.to(device)
-            y  = y.to(device)
+    test_pred_df = data_and_prob[['mut_type'] + prob_names]
+    test_pred_df2 = data_and_prob2[['mut_type'] + prob_names]
 
-            # Forward Pass
-            #preds = model(cont_x, cat_x) #original
-            preds = model.forward((cont_x, cat_x), distal_x)
-            
-            loss = criterion(preds, y.long().squeeze())
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+    torch.save(model.state_dict(), pred_file+'.model1')
+    torch.save(model2.state_dict(), pred_file+'.model2')
 
-            preds2 = model2.forward(cont_x, cat_x)
-            loss2 = criterion(preds2, y.long().squeeze())
-            optimizer2.zero_grad()
-            loss2.backward()
-            optimizer2.step()
+    # Get the scores
+    #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+    test_y = data_local_test['mut_type']
 
-            total_loss += loss.item()
-            total_loss2 += loss2.item()
-            #print('in the training loop...')
-
-        model.eval()
-        model2.eval()
-        with torch.no_grad():
-
-            print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
-            scheduler.step()
-            scheduler2.step()
-
-            if epoch <5:
-                continue
-
-            # Do predictions for training data
-            #all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
-            all_pred_y, train_total_loss, all_pred_y2, train_total_loss2 = two_model_predict_m(model, model2, dataloader2, criterion, device, n_class)
-
-            #all_y_prob = pd.Series(data=to_np(torch.exp(all_pred_y)).T[1], name="prob")
-            all_y_prob = pd.DataFrame(data=to_np(torch.exp(all_pred_y)), columns=prob_names)
-            #all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
-            all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1) 
-            
-            #all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)     
-            all_y_prob2 = pd.DataFrame(data=to_np(torch.exp(all_pred_y2)), columns=prob_names)
-            all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1) 
-            #all_y_prob2 = pd.Series(data=to_np(torch.exp(all_pred_y2)).T[1], name="prob")
-            #all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)        
-
-            # Compare observed/predicted 3/5/7mer mutation frequencies
-            print('3mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 3, n_class))
-            print('5mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 5, n_class))
-            print('7mer correlation - all: ', freq_kmer_comp_multi(all_data_and_prob, 7, n_class))
-            
-            print('3mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 3, n_class))
-            print('5mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 5, n_class))
-            print('7mer correlation - all (FF only): ', freq_kmer_comp_multi(all_data_and_prob2, 7, n_class))
-            
-            '''
-            print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
-            print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
-            print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
-            print ('3mer correlation - all (FF only): ' + str(f3mer_comp(all_data_and_prob2)))
-            print ('5mer correlation - all (FF only): ' + str(f5mer_comp(all_data_and_prob2)))
-            print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
-            '''
-            
-            print ("Total Loss: ", train_total_loss/train_size, train_total_loss2/train_size)        
-            # Do predictions for testing data
-            if epoch == epochs-1:
-                #pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
-                pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict_m(model, model2, dataloader1, criterion, device, n_class)
-                print('pred_y:', torch.exp(pred_y[1:10]))
-                print('pred_y2:', torch.exp(pred_y2[1:10]))
-                
-                #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
-                y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
-                data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
-
-                # For FeedForward-only model
-                #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
-                #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
-                y_prob2 = pd.DataFrame(data=to_np(torch.exp(pred_y2)), columns=prob_names)
-                data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
-
-                '''
-                print ('3mer correlation - test: ' + str(f3mer_comp_multi(data_and_prob, n_class)))
-                print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
-                print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
-                print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
-                print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
-                print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
-                '''
-
-            if epoch == epochs-1:
-                last_pred_df = data_and_prob[['mut_type'] + prob_names]
-                last_pred_df2 = data_and_prob2[['mut_type'] + prob_names]
-
-                torch.save(model.state_dict(), pred_file+'.model1')
-                torch.save(model2.state_dict(), pred_file+'.model2')
-
-                # Get the scores
-                #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
-                test_y = data_local_test['mut_type']
-
-                # Print some data for debugging
-                for i in range(1, n_class):
-                    print('min and max of pred_y: type', i, np.min(to_np(torch.exp(pred_y))[:,i]), np.max(to_np(torch.exp(pred_y))[:,i]))
-                    print('min and max of pred_y2: type', i, np.min(to_np(torch.exp(pred_y2))[:,i]), np.max(to_np(torch.exp(pred_y2))[:,i]))
+    # Print some data for debugging
+    for i in range(1, n_class):
+        print('min and max of pred_y: type', i, np.min(to_np(torch.exp(pred_y))[:,i]), np.max(to_np(torch.exp(pred_y))[:,i]))
+        print('min and max of pred_y2: type', i, np.min(to_np(torch.exp(pred_y2))[:,i]), np.max(to_np(torch.exp(pred_y2))[:,i]))
 
     # Write the prediction
-    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], last_pred_df, last_pred_df2[prob_names]), axis=1)
+    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], test_pred_df, test_pred_df2[prob_names]), axis=1)
     pred_df.columns = ['chrom', 'start', 'end','mut_type'] + [name+'_M1' for name in prob_names] + [name+'_M2' for name in prob_names]
 
     pred_df.to_csv(pred_file, sep='\t', index=False)

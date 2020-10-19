@@ -166,7 +166,8 @@ class FeedForwardNNm(nn.Module):
         """
 
         super(FeedForwardNNm, self).__init__()
-
+        
+        self.n_class = n_class
         # Embedding layers
         self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
 
@@ -233,7 +234,7 @@ class FeedForwardNNm(nn.Module):
         
         self.eval()
         
-        pred_y = torch.empty(0, 1).to(device)
+        pred_y = torch.empty(0, self.n_class).to(device)
         total_loss = 0
 
         with torch.no_grad():
@@ -245,7 +246,7 @@ class FeedForwardNNm(nn.Module):
                 preds = self.forward(cont_x, cat_x)
                 pred_y = torch.cat((pred_y, preds), dim=0)
                 
-                loss = criterion(preds, y)
+                loss = criterion(preds, y.long().squeeze())
                 total_loss += loss.item()
 
         return pred_y, total_loss
@@ -829,7 +830,8 @@ class Network3m(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class):
         
         super(Network3m, self).__init__()
-
+        
+        self.n_class = n_class
         # FeedForward layers for local input
         # Embedding layers
         self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
@@ -1036,7 +1038,7 @@ class Network3m(nn.Module):
     def batch_predict(self, dataloader, criterion, device):
  
         self.eval()
-        pred_y = torch.empty(0, 1).to(device)
+        pred_y = torch.empty(0, self.n_class).to(device)
         
         total_loss = 0
 
@@ -1050,7 +1052,7 @@ class Network3m(nn.Module):
                 preds = self.forward((cont_x, cat_x), distal_x)
                 pred_y = torch.cat((pred_y, preds), dim=0)
                 
-                loss = criterion(preds, y)
+                loss = criterion(preds, y.long().squeeze())
                 total_loss += loss.item()
 
         return pred_y, total_loss

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # Compare the observed and predicted frequencies of mutations in 3mers
 def f3mer_comp(data_and_prob):
@@ -17,8 +18,10 @@ def freq_kmer_comp_multi(data_and_prob, k, n_class):
     for i in range(1, n_class):
         obs_pred_freq = pd.concat([data_and_prob[ mer_list + [prob_list[i]]], data_and_prob['mut_type']==i ], axis=1)
         
-        #print('obs_pred_freq:', obs_pred_freq[1:5])
+        #print('obs_pred_freq:', i, obs_pred_freq[1:5], np.sum(obs_pred_freq['mut_type']))
         obs_pred_freq = obs_pred_freq.groupby(mer_list).mean()
+        if k == 3:
+            print('obs_pred_freq 3mer:', obs_pred_freq)
         
         #obs_pred_freq.columns = 
         corr_list.append(obs_pred_freq['mut_type'].corr(obs_pred_freq[prob_list[i]]))
@@ -187,17 +190,13 @@ def corr_calc_sub(data, window, prob_names):
             last_chrom = chrom
             last_start = start
             
-            obs[int(data.loc[i, 'mut_type'])] += 1              
-            for j in range(n_class):
-                pred[j] += data.loc[i, prob_names[j]]
-            
-            count = count + 1
-        else:
-            obs[int(data.loc[i, 'mut_type'])] += 1           
-            for j in range(n_class):
-                pred[j] += data.loc[i, prob_names[j]]
-            
-            count = count + 1
+        #count for observed type +1
+        obs[int(data.loc[i, 'mut_type'])] += 1              
+        for j in range(n_class):
+            pred[j] += data.loc[i, prob_names[j]]
+
+        count = count + 1
+ 
     
     avg_list = []
     for j in range(n_class):
@@ -213,6 +212,6 @@ def corr_calc_sub(data, window, prob_names):
     
         #print('obs==0 rows:', result.loc[result['avg_obs']==0].shape)
         corr = result['avg_obs'+str(i)].corr(result['avg_pred'+str(i)])
-        print('corr:', corr)
+        #print('corr:', corr)
         corr_list.append(corr)
     return corr_list
