@@ -62,6 +62,8 @@ def parse_arguments(parser):
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
     
+    parser.add_argument('--optim', type=str, default='Adam', help='Optimization method')
+    
     parser.add_argument('--learning_rate', type=float, default='0.005', help='learning rate for training')
     
     parser.add_argument('--weight_decay', type=float, default='1e-5', help='weight decay (regularization) for training')
@@ -81,7 +83,7 @@ def main():
     print('Start time:', datetime.datetime.now())
 
     print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     print(' '.join(sys.argv))
 
@@ -100,6 +102,7 @@ def main():
     RNN_hidden_size = args.RNN_hidden_size   
     model_no = args.model_no   
     pred_file = args.pred_file   
+    optim = args.optim
     learning_rate = args.learning_rate   
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
@@ -202,15 +205,25 @@ def main():
     #class_count = pd.DataFrame(data_local['mut_type'].value_counts(sort=False))/data_local.shape[0]
     #class_count = np.array([np.sum(data_local['mut_type'].values.astype(np.int16) == i) for i in range(n_class)])
     #class_weight = torch.Tensor(1/class_count).squeeze()
-    print('class_count, class_weight', class_count, class_weight)
+    #print('class_count, class_weight', class_count, class_weight)
     #criterion = torch.nn.NLLLoss(weight=class_weight).to(device)
-    criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.NLLLoss(reduction='mean')
 
     # Set Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    if optim == 'Adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        optimizer2 = torch.optim.Adam(model2.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        
+    elif optim == 'SGD':
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.98, nesterov=True)
+        optimizer2 = torch.optim.SGD(model2.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=0.98, nesterov=True)
+        
+    else:
+        print('Error: unsupported optimization method')
+        sys.exit()
+
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=LR_gamma)
 
-    optimizer2 = torch.optim.Adam(model2.parameters(), lr=learning_rate, weight_decay=weight_decay)
     scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=LR_gamma)
     print('optimizer, optimizer2:', optimizer, optimizer2)
     #print('scheduler, scheduler2:', scheduler, scheduler2)
@@ -236,7 +249,7 @@ def main():
         torch.cuda.empty_cache()
         
         #re-shuffling
-        dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
+        #dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
 
         for y, cont_x, cat_x, distal_x in dataloader:
             cat_x = cat_x.to(device)
@@ -271,7 +284,7 @@ def main():
             scheduler.step()
             scheduler2.step()
 
-            if epoch <5:
+            if epoch <0:
                 continue
 
             # Do predictions for training data
@@ -324,7 +337,15 @@ def main():
                 #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
                 y_prob2 = pd.DataFrame(data=to_np(torch.exp(pred_y2)), columns=prob_names)
                 data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
+                
+                print('3mer correlation - test: ', freq_kmer_comp_multi(data_and_prob, 3, n_class))
+                print('5mer correlation - test: ', freq_kmer_comp_multi(data_and_prob, 5, n_class))
+                print('7mer correlation - test: ', freq_kmer_comp_multi(data_and_prob, 7, n_class))
 
+                print('3mer correlation - test (FF only): ', freq_kmer_comp_multi(data_and_prob2, 3, n_class))
+                print('5mer correlation - test (FF only): ', freq_kmer_comp_multi(data_and_prob2, 5, n_class))
+                print('7mer correlation - test (FF only): ', freq_kmer_comp_multi(data_and_prob2, 7, n_class))
+               
                 '''
                 print ('3mer correlation - test: ' + str(f3mer_comp_multi(data_and_prob, n_class)))
                 print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))

@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import LabelEncoder
 from sklearn import metrics, calibration
 
-from torchsummary import summary
+#from torchsummary import summary
 
 
 class FeedForwardNN(nn.Module):
@@ -1774,14 +1774,17 @@ def two_model_predict_m(model, model2, dataloader, criterion, device, n_class):
         
             preds = model.forward((cont_x, cat_x), distal_x)
             pred_y = torch.cat((pred_y, preds), dim=0)
+            #print('pred_y:', pred_y[1:10])
+            #print('y:', y[1:10])
+            #print('pred_y.shape, preds.shape, y.shape, distal_x.shape', pred_y.shape, preds.shape, y.shape, distal_x.shape)
                 
-            loss = criterion(preds, y.long().squeeze())
+            loss = criterion(preds, y.long().squeeze(1))
             total_loss += loss.item()
             
             preds = model2.forward(cont_x, cat_x)
             #print('pred_y2.shape, preds.shape', pred_y2.shape, preds.shape)
             pred_y2 = torch.cat((pred_y2, preds), dim=0)
-            loss2 = criterion(preds, y.long().squeeze())
+            loss2 = criterion(preds, y.long().squeeze(1))
             total_loss2 += loss2.item()
 
     return pred_y, total_loss, pred_y2, total_loss2 

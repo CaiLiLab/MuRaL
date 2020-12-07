@@ -1,10 +1,10 @@
 
 import os, os.path
 import sys
-stderr = sys.stderr
-sys.stderr = open(os.devnull, 'w')
+#stderr = sys.stderr
+#sys.stderr = open(os.devnull, 'w')
 from janggu.data import Bioseq, Cover
-sys.stderr = stderr
+#sys.stderr = stderr
 
 from pybedtools import BedTool
 
@@ -332,6 +332,7 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     # Names of the categorical variables
     categorical_features = ['us'+str(radius - i) for i in range(radius)] + ['mid'] + ['ds'+str(i+1) for i in range(radius)]
 
+    print('local_seq_cat.shape:', local_seq_cat.shape, categorical_features)
     local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
 
     # The 'score' field in the BED file stores the label/class information

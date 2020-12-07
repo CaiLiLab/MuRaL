@@ -15,13 +15,13 @@ def freq_kmer_comp_multi(data_and_prob, k, n_class):
     prob_list = ['prob'+str(i) for i in range(n_class)]
     
     corr_list = []
-    for i in range(1, n_class):
+    for i in range(0, n_class):
         obs_pred_freq = pd.concat([data_and_prob[ mer_list + [prob_list[i]]], data_and_prob['mut_type']==i ], axis=1)
         
         #print('obs_pred_freq:', i, obs_pred_freq[1:5], np.sum(obs_pred_freq['mut_type']))
         obs_pred_freq = obs_pred_freq.groupby(mer_list).mean()
-        if k == 3:
-            print('obs_pred_freq 3mer:', obs_pred_freq)
+        #if k == 3:
+        #    print('obs_pred_freq 3mer:\n', obs_pred_freq)
         
         #obs_pred_freq.columns = 
         corr_list.append(obs_pred_freq['mut_type'].corr(obs_pred_freq[prob_list[i]]))

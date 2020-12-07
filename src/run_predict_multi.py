@@ -227,8 +227,8 @@ def main():
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
     test_pred_df2 = data_and_prob2[['mut_type'] + prob_names]
 
-    torch.save(model.state_dict(), pred_file+'.model1')
-    torch.save(model2.state_dict(), pred_file+'.model2')
+    #torch.save(model.state_dict(), pred_file+'.model1')
+    #torch.save(model2.state_dict(), pred_file+'.model2')
 
     # Get the scores
     #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
