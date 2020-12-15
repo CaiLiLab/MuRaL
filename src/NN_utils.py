@@ -1057,6 +1057,342 @@ class Network3m(nn.Module):
 
         return pred_y, total_loss
 
+class AttentionModule_stage1(nn.Module):
+
+    def __init__(self, in_channels, out_channels, seq_len=101):
+        super(AttentionModule_stage1, self).__init__()
+        self.seq_len = seq_len
+        
+        self.first_residual_blocks = ResidualBlock(in_channels, out_channels)
+
+        self.trunk_branches = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+         )
+
+        self.mpool1 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)  # 8*8
+        
+        #new_seq_len = (seq_len + 2*padding - kernel_size + stride)//stride
+        seq_len1 = (self.seq_len + 2 * 1 - (3 - 2))//2
+
+        self.down_residual_blocks1 = ResidualBlock(in_channels, out_channels)
+
+        self.skip1_connection_residual_block = ResidualBlock(in_channels, out_channels)
+
+        self.mpool2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)  # 4*4
+        seq_len2 = (seq_len1 + 2 * 1 - (3 - 2))//2
+
+        self.middle_2r_blocks = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+        )
+
+        self.interpolation1 = nn.Upsample(size=seq_len1)  # 8*8
+
+        self.up_residual_blocks1 = ResidualBlock(in_channels, out_channels)
+
+        self.interpolation2 = nn.Upsample(size=self.seq_len)  # 16*16
+
+        self.conv1_1_blocks = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias = False),
+            nn.Sigmoid()
+        )
+
+        self.last_blocks = ResidualBlock(in_channels, out_channels)
+
+    def forward(self, x):
+        x = self.first_residual_blocks(x)
+        out_trunk = self.trunk_branches(x)
+        out_mpool1 = self.mpool1(x)
+        out_down_residual_blocks1 = self.down_residual_blocks1(out_mpool1)
+        out_skip1_connection = self.skip1_connection_residual_block(out_down_residual_blocks1)
+        out_mpool2 = self.mpool2(out_down_residual_blocks1)
+        out_middle_2r_blocks = self.middle_2r_blocks(out_mpool2)
+        #
+        out_interp = self.interpolation1(out_middle_2r_blocks) + out_down_residual_blocks1
+        # print(out_skip2_connection.data)
+        # print(out_interp3.data)
+        out = out_interp + out_skip1_connection
+        out_up_residual_blocks1 = self.up_residual_blocks1(out)
+        out_interp2 = self.interpolation2(out_up_residual_blocks1) + out_trunk
+        out_conv1_1_blocks = self.conv1_1_blocks(out_interp2)
+        out = (1 + out_conv1_1_blocks) * out_trunk
+        out_last = self.last_blocks(out)
+
+        return out_last
+
+class AttentionModule_stage2(nn.Module):
+    # input size is 8*8
+    def __init__(self, in_channels, out_channels, seq_len):
+        super(AttentionModule_stage2, self).__init__()
+        
+        self.seq_len = seq_len
+        self.first_residual_blocks = ResidualBlock(in_channels, out_channels)
+
+        self.trunk_branches = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+         )
+
+        self.mpool1 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+        #new_seq_len = (seq_len + 2*padding - kernel_size + stride)//stride
+        seq_len1 = (self.seq_len + 2 * 1 - (3 - 2))//2
+
+        self.middle_2r_blocks = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+        )
+
+        self.interpolation1 = nn.Upsample(size=self.seq_len)
+
+        self.conv1_1_blocks = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias = False),
+            nn.Sigmoid()
+        )
+
+        self.last_blocks = ResidualBlock(in_channels, out_channels)
+
+    def forward(self, x):
+        x = self.first_residual_blocks(x)
+        out_trunk = self.trunk_branches(x)
+        out_mpool1 = self.mpool1(x)
+        out_middle_2r_blocks = self.middle_2r_blocks(out_mpool1)
+        #
+        out_interp = self.interpolation1(out_middle_2r_blocks) + out_trunk
+        # print(out_skip2_connection.data)
+        # print(out_interp3.data)
+        out_conv1_1_blocks = self.conv1_1_blocks(out_interp)
+        out = (1 + out_conv1_1_blocks) * out_trunk
+        out_last = self.last_blocks(out)
+
+        return out_last    
+
+    
+class AttentionModule_stage3(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super(AttentionModule_stage3, self).__init__()
+        self.first_residual_blocks = ResidualBlock(in_channels, out_channels)
+
+        self.trunk_branches = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+         )
+
+        self.middle_2r_blocks = nn.Sequential(
+            ResidualBlock(in_channels, out_channels),
+            ResidualBlock(in_channels, out_channels)
+        )
+
+        self.conv1_1_blocks = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, stride=1, bias = False),
+            nn.Sigmoid()
+        )
+
+        self.last_blocks = ResidualBlock(in_channels, out_channels)
+
+    def forward(self, x):
+        x = self.first_residual_blocks(x)
+        out_trunk = self.trunk_branches(x)
+        out_middle_2r_blocks = self.middle_2r_blocks(x)
+        #
+        out_conv1_1_blocks = self.conv1_1_blocks(out_middle_2r_blocks)
+        out = (1 + out_conv1_1_blocks) * out_trunk
+        out_last = self.last_blocks(out)
+
+        return out_last
+    
+class ResidualAttionNetwork3m(nn.Module):
+    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class):
+        
+        super(ResidualAttionNetwork3m, self).__init__()
+        
+        self.n_class = n_class
+        self.seq_len = distal_radius*2+1 - (distal_order-1)
+        # FeedForward layers for local input
+        # Embedding layers
+        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
+
+        no_of_embs = sum([y for x, y in emb_dims])
+        self.no_of_embs = no_of_embs
+        self.no_of_cont = no_of_cont
+
+        # Linear Layers
+        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont, lin_layer_sizes[0])
+
+        self.lin_layers = nn.ModuleList([first_lin_layer] + [nn.Linear(lin_layer_sizes[i], lin_layer_sizes[i + 1]) for i in range(len(lin_layer_sizes) - 1)])
+        
+        for lin_layer in self.lin_layers:
+            nn.init.kaiming_normal_(lin_layer.weight.data)
+
+        # Batch Norm Layers
+        self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
+        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
+
+        # Dropout Layers
+        self.emb_dropout_layer = nn.Dropout(emb_dropout)
+        self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
+
+        
+        self.kernel_size = kernel_size
+        self.RNN_hidden_size = RNN_hidden_size
+        self.RNN_layers = RNN_layers
+        #self.seq_len = distal_radius*2+1 - (distal_order-1)
+        
+        #===========================================================
+        # CNN layers for distal input
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.mpool1 = nn.MaxPool1d(kernel_size=5, stride=3, padding=2)        
+        #new_seq_len = (seq_len + 2*padding - kernel_size + stride)//stride
+        seq_len1 = (self.seq_len + 2 * 2 - (5 - 3))//3
+        
+        self.residual_block1 = ResidualBlock(out_channels, out_channels*2)
+        self.attention_module1 = AttentionModule_stage1(out_channels*2, out_channels*2, seq_len1)  
+        self.residual_block2 = ResidualBlock(out_channels*2, out_channels*4, 4)  
+        seq_len2 = (seq_len1 + 3)//4
+        self.attention_module2 = AttentionModule_stage2(out_channels*4, out_channels*4, seq_len2) 
+        self.attention_module2_2 = AttentionModule_stage2(out_channels*4, out_channels*4, seq_len2) 
+        self.residual_block3 = ResidualBlock(out_channels*4, out_channels*8, 4)
+        
+        seq_len3 = (seq_len2 + 3)//4
+        self.attention_module3 = AttentionModule_stage3(out_channels*8, out_channels*8)
+        self.attention_module3_2 = AttentionModule_stage3(out_channels*8, out_channels*8) 
+        self.attention_module3_3 = AttentionModule_stage3(out_channels*8, out_channels*8) 
+        self.residual_block4 = ResidualBlock(out_channels*8, out_channels*8) 
+        self.residual_block5 = ResidualBlock(out_channels*8, out_channels*8)
+        self.residual_block6 = ResidualBlock(out_channels*8, out_channels*8)  
+        self.mpool2 = nn.Sequential(
+            nn.BatchNorm1d(out_channels*8),
+            nn.ReLU(inplace=True),
+            nn.AvgPool1d(kernel_size=4, stride=2)
+        )
+        
+        self.distal_fc = nn.Linear(out_channels*8, n_class)
+        #=========================================================
+        
+        # Local FC layers
+        self.local_fc = nn.Sequential(
+            #nn.BatchNorm1d(lin_layer_sizes[-1]),
+            #nn.Dropout(0.15),
+            nn.Linear(lin_layer_sizes[-1], n_class), 
+        )       
+        
+
+        # Learn the weight parameter 
+        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        
+    
+    def forward(self, local_input, distal_input):
+        
+        # FeedForward layers for local input
+        cont_data, cat_data = local_input
+        if self.no_of_embs != 0:
+            local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
+            
+        
+        local_out = torch.cat(local_out, dim = 1) #x.shape: batch_size * sum(emb_size)
+        local_out = self.emb_dropout_layer(local_out)
+
+        if self.no_of_cont != 0:
+            normalized_cont_data = self.first_bn_layer(cont_data)
+
+            if self.no_of_embs != 0:
+                local_out = torch.cat([local_out, normalized_cont_data], dim = 1) 
+            else:
+                local_out = normalized_cont_data
+        
+        for lin_layer, dropout_layer, bn_layer in zip(self.lin_layers, self.droput_layers, self.bn_layers):
+            local_out = F.relu(lin_layer(local_out))
+            local_out = bn_layer(local_out)
+            local_out = dropout_layer(local_out)
+        
+        # CNN layers for distal_input
+        #====================================================================
+        distal_out = self.conv1(distal_input)
+        distal_out = self.mpool1(distal_out)
+        # print(out.data)
+        distal_out = self.residual_block1(distal_out)
+        distal_out = self.attention_module1(distal_out)
+        distal_out = self.residual_block2(distal_out)
+        distal_out = self.attention_module2(distal_out)
+        distal_out = self.attention_module2_2(distal_out)
+        distal_out = self.residual_block3(distal_out)
+        # print(out.data)
+        distal_out = self.attention_module3(distal_out)
+        distal_out = self.attention_module3_2(distal_out)
+        distal_out = self.attention_module3_3(distal_out)
+        distal_out = self.residual_block4(distal_out)
+        distal_out = self.residual_block5(distal_out)
+        distal_out = self.residual_block6(distal_out)
+        distal_out = self.mpool2(distal_out)
+        #print('1. distal_out.shape:', distal_out.shape)
+        #distal_out = distal_out.view(distal_out.size(0), -1)
+        distal_out, _ = torch.max(distal_out, dim=2)
+        #print('2. distal_out.shape:', distal_out.shape)   
+        
+        distal_out = self.distal_fc(distal_out)
+        #====================================================================
+        
+        # Separate FC layers 
+        local_out = self.local_fc(local_out)
+        #distal_out = self.distal_fc(distal_out)
+        
+        if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
+            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out)[:,1]).item())
+            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out)[:,1]).item())
+        
+        
+        out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        
+        #out = torch.log(F.softmax(distal_out, dim=1))
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
+        
+        return out
+    
+    # Do prediction using batches in DataLoader to save memory 
+    def batch_predict(self, dataloader, criterion, device):
+ 
+        self.eval()
+        pred_y = torch.empty(0, self.n_class).to(device)
+        
+        total_loss = 0
+
+        with torch.no_grad():
+            for y, cont_x, cat_x, distal_x in dataloader:
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+                distal_x = distal_x.to(device)
+                y  = y.to(device)
+        
+                preds = self.forward((cont_x, cat_x), distal_x)
+                pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y.long().squeeze())
+                total_loss += loss.item()
+
+        return pred_y, total_loss
+
     
 class Network4(nn.Module):
     def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order):
@@ -1528,81 +1864,6 @@ class Network5(nn.Module):
 
         return pred_y, total_loss
 
-# Residual block
-class L1Block(nn.Module):
-
-    def __init__(self, channels=64):
-        super(L1Block, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, (3, 1), stride=(1, 1), padding=(1, 0))
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.conv2 = nn.Conv2d(channels, channels, (3, 1), stride=(1, 1), padding=(1, 0))
-        self.bn2 = nn.BatchNorm2d(channels)
-        self.layer = nn.Sequential(self.conv1, self.bn1, nn.ReLU(inplace=True), self.conv2, self.bn2)
-
-    def forward(self, x):
-        out = self.layer(x)
-        out += x
-        out = F.relu(out)
-        return out
-
-# Residual block
-class L2Block(nn.Module):
-
-    def __init__(self, channels=128):
-        super(L2Block, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, (7, 1), stride=(1, 1), padding=(3, 0))
-        self.conv2 = nn.Conv2d(channels, channels, (7, 1), stride=(1, 1), padding=(3, 0))
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.bn2 = nn.BatchNorm2d(channels)
-        self.layer = nn.Sequential(self.conv1, self.bn1, nn.ReLU(inplace=True), self.conv2, self.bn2)
-
-    def forward(self, x):
-        out = self.layer(x)
-        out += x
-        out = F.relu(out)
-        return out
-
-# Residual block
-class L3Block(nn.Module):
-
-    def __init__(self, channels=200):
-        super(L3Block, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, (7, 1), stride=(1, 1), padding=(3, 0))
-        self.conv2 = nn.Conv2d(channels, channels, (3, 1), stride=(1, 1), padding=(1, 0))
-        self.conv3 = nn.Conv2d(channels, channels, (3, 1), stride=(1, 1), padding=(1, 0))
-
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.bn2 = nn.BatchNorm2d(channels)
-        self.bn3 = nn.BatchNorm2d(channels)
-
-        self.layer = nn.Sequential(self.conv1, self.bn1, nn.ReLU(inplace=True),
-                                   self.conv2, self.bn2, nn.ReLU(inplace=True),
-                                   self.conv3, self.bn3)
-
-    def forward(self, x):
-        out = self.layer(x)
-        out += x
-        out = F.relu(out)
-        return out
-
-# Residual block
-class L4Block(nn.Module):
-
-    def __init__(self, channels=200):
-        super(L4Block, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, (7, 1), stride=(1, 1), padding=(3, 0))
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.conv2 = nn.Conv2d(channels, channels, (7, 1), stride=(1, 1), padding=(3, 0))
-        self.bn2 = nn.BatchNorm2d(channels)
-        self.layer = nn.Sequential(self.conv1, self.bn1, nn.ReLU(inplace=True),
-                                   self.conv2, self.bn2)
-
-    def forward(self, x):
-        out = self.layer(x)
-        out += x
-        out = F.relu(out)
-        return out
-
 
 # Residual block (according to Jaganathan et al. 2019 Cell)
 class ResBlock(nn.Module):
@@ -1628,7 +1889,45 @@ class ResBlock(nn.Module):
         #out += x
         
         return out
-    
+
+# Residual block ('bottleneck' version)
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(ResidualBlock, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.stride = stride
+        self.bn1 = nn.BatchNorm1d(in_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv1d(in_channels, out_channels//4, 1, 1, bias = False)
+        self.bn2 = nn.BatchNorm1d(out_channels//4)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv1d(out_channels//4, out_channels//4, 3, stride, padding = 1, bias = False)
+        #new_seq_len = (seq_len + 2*padding - kernel_size + stride)//stride
+        #seq_len1 = (self.seq_len + 2 * 1 - (3 - stride))//stride
+        self.bn3 = nn.BatchNorm1d(out_channels//4)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv3 = nn.Conv1d(out_channels//4, out_channels, 1, 1, bias = False)
+        self.conv4 = nn.Conv1d(in_channels, out_channels, 1, stride, bias = False)
+        #new_seq_len = (seq_len + 2*padding - kernel_size + stride)//stride
+        #seq_len1 = (self.seq_len + 2 * 0 - (1 - stride))//stride
+        
+    def forward(self, x):
+        residual = x
+        out = self.bn1(x)
+        out1 = self.relu(out)
+        out = self.conv1(out1)
+        out = self.bn2(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn3(out)
+        out = self.relu(out)
+        out = self.conv3(out)
+        if (self.in_channels != self.out_channels) or (self.stride !=1 ):
+            residual = self.conv4(out1)
+        out += residual
+        return out   
+
 # Hybrid loss function: BCELoss + the difference between observed and predicted mutation probabilities in bins
 class HybridLoss(nn.Module):
     
@@ -1701,7 +2000,8 @@ def weights_init(m):
         #nn.init.normal_(m.weight, 0.0, 1e-06)
         nn.init.xavier_uniform_(m.weight)
         #nn.init.kaiming_normal_(m.weight)
-        nn.init.normal_(m.bias)
+        if m.bias is not None:
+            nn.init.normal_(m.bias)
         
         #print(m.weight.shape)
         
@@ -1710,7 +2010,8 @@ def weights_init(m):
         #nn.init.xavier_uniform_(m.weight)
         nn.init.kaiming_normal_(m.weight)
             
-        nn.init.normal_(m.bias)
+        if m.bias is not None:
+            nn.init.normal_(m.bias)
         #print(m.weight.shape)
         
     elif classname.find('LSTM') != -1 or classname.find('GRU') != -1:
@@ -1764,7 +2065,9 @@ def two_model_predict_m(model, model2, dataloader, criterion, device, n_class):
         
     total_loss = 0
     total_loss2 = 0
-
+    
+    #print("in two_model_predict_m, current CUDA:", torch.cuda.current_device())
+    
     with torch.no_grad():
         for y, cont_x, cat_x, distal_x in dataloader:
             cat_x = cat_x.to(device)

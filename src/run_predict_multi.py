@@ -85,10 +85,12 @@ def main():
     print('Start time:', datetime.datetime.now())
 
     print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    
     print(' '.join(sys.argv))
-
+    
+    torch.cuda.set_device(1) 
+    
     # Set train file
     train_file = args.train_data
     test_file = args.test_data   
@@ -195,8 +197,9 @@ def main():
     print('model2:')
     print(model2)
 
-    model.load_state_dict(torch.load(model1_path))
-    model2.load_state_dict(torch.load(model2_path))
+    #NOTE: by default, the model will be loaded into 'cuda:0' 
+    model.load_state_dict(torch.load(model1_path, map_location=device))
+    model2.load_state_dict(torch.load(model2_path, map_location=device))
 
     criterion = torch.nn.NLLLoss()
     
@@ -209,15 +212,17 @@ def main():
     test_pred_df2 = None
     prob_names = ['prob'+str(i) for i in range(n_class)]
     
+    #print("1. current CUDA:", torch.cuda.current_device())
 
     pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict_m(model, model2, dataloader1, criterion, device, n_class)
     print('pred_y:', torch.exp(pred_y[1:10]))
     print('pred_y2:', torch.exp(pred_y2[1:10]))
-
+    
     #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
     y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
-
+    
+    #print("2. current CUDA:", torch.cuda.current_device())
     # For FeedForward-only model
     #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
     #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
