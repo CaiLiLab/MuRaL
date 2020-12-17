@@ -64,6 +64,8 @@ def parse_arguments(parser):
     
     parser.add_argument('--optim', type=str, default='Adam', help='Optimization method')
     
+    parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
+    
     parser.add_argument('--learning_rate', type=float, default='0.005', help='learning rate for training')
     
     parser.add_argument('--weight_decay', type=float, default='1e-5', help='weight decay (regularization) for training')
@@ -78,12 +80,7 @@ def parse_arguments(parser):
 def main():
     parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
     args = parse_arguments(parser)
-    
-    start_time = time.time()
-    print('Start time:', datetime.datetime.now())
 
-    print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     print(' '.join(sys.argv))
 
@@ -107,9 +104,14 @@ def main():
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
+    n_class = args.n_class  
+    cuda_id = args.cuda_id
     
-    n_class = args.n_class
-    
+    start_time = time.time()
+    print('Start time:', datetime.datetime.now())
+
+    print("CUDA: ", torch.cuda.is_available())
+    device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else "cpu")  
     # Read BED files
     train_bed = BedTool(train_file)
     test_bed = BedTool(test_file)
@@ -185,7 +187,8 @@ def main():
     else:
         print('Error: no model selected!')
         sys.exit() 
-
+    
+    count_parameters(model)
     print('model:')
     print(model)
 
@@ -193,6 +196,7 @@ def main():
     #model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
     model2 = FeedForwardNNm(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class).to(device)
     
+    count_parameters(model2)
     print('model2:')
     print(model2)
 

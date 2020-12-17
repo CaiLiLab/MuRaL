@@ -23,6 +23,7 @@ from sklearn import metrics, calibration
 from NN_utils import *
 from preprocessing import *
 from evaluation import *
+from pynvml import *
 
 
 def parse_arguments(parser):
@@ -80,16 +81,10 @@ def parse_arguments(parser):
 def main():
     parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
     args = parse_arguments(parser)
-    
-    start_time = time.time()
-    print('Start time:', datetime.datetime.now())
 
-    print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    
     print(' '.join(sys.argv))
     
-    torch.cuda.set_device(1) 
+    #torch.cuda.set_device(1) 
     
     # Set train file
     train_file = args.train_data
@@ -114,6 +109,22 @@ def main():
     model2_path = args.model2_path
     
     n_class = args.n_class
+    
+    start_time = time.time()
+    print('Start time:', datetime.datetime.now())
+    
+    #find a device with enough memory
+    nvmlInit()
+    cuda_id = '0'
+    for i in range(nvmlDeviceGetCount()):
+        h = nvmlDeviceGetHandleByIndex(i)
+        info = nvmlDeviceGetMemoryInfo(h)
+        if info.free > 1.5*(2**30): #reserve 1.5G
+            cuda_id = str(i)
+            break
+        
+    print("CUDA: ", torch.cuda.is_available())
+    device = torch.device("cuda:"+cuda_id if torch.cuda.is_available() else "cpu")
     
     # Read BED files
     train_bed = BedTool(train_file)
@@ -181,7 +192,8 @@ def main():
         model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
 
     elif model_no == 3:
-        model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        model = ResidualAttionNetwork3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
+        #model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     else:
         print('Error: no model selected!')
