@@ -66,6 +66,8 @@ def parse_arguments(parser):
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
     
+    parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
+    
     parser.add_argument('--learning_rate', type=float, default='0.005', help='learning rate for training')
     
     parser.add_argument('--weight_decay', type=float, default='1e-5', help='weight decay (regularization) for training')
@@ -86,11 +88,6 @@ def main():
     parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
     args = parse_arguments(parser)
     
-    start_time = time.time()
-    print('Start time:', datetime.datetime.now())
-
-    print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     print(' '.join(sys.argv))
 
@@ -115,7 +112,13 @@ def main():
     epochs = args.epochs
     n_class = args.n_class
     learn_hyper = args.learn_hyper
-    
+    cuda_id = args.cuda_id
+
+    start_time = time.time()
+    print('Start time:', datetime.datetime.now())
+
+    print("CUDA: ", torch.cuda.is_available())
+    device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else "cpu")  
     # Read BED files
     train_bed = BedTool(train_file)
     test_bed = BedTool(test_file)
@@ -134,16 +137,20 @@ def main():
         print('Warnings: no bigWig files provided')
     
     if len(train_h5f_path) == 0:
+        train_h5f_path = train_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            train_h5f_path = train_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius) + '.'.join(list(bw_names)) + '.h5'
-        else:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius) + '.'.join(list(bw_names)) + '.h5'
+            train_h5f_path = train_h5f_path + '.' + '.'.join(list(bw_names))
+        train_h5f_path = train_h5f_path + '.h5'
     
     if len(test_h5f_path) == 0:
+        test_h5f_path = test_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            test_h5f_path = test_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.'.join(list(bw_names)) + '.h5'
-        else:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.'.join(list(bw_names)) + '.h5'
+            test_h5f_path = test_h5f_path + '.' + '.'.join(list(bw_names))
+        test_h5f_path = test_h5f_path + '.h5'
     
     # Prepare the datasets for trainging
     #dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
@@ -175,12 +182,14 @@ def main():
         model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device) 
 
     elif model_no == 3:
-        model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        model = ResidualAttionNetwork3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
+        #model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     else:
         print('Error: no model selected!')
         sys.exit() 
-
+    
+    count_parameters(model)
     print('model:')
     print(model)
 
@@ -370,7 +379,7 @@ def get_learning_hyperparam(model, train_bed, dataloader_train, dataloader_valid
         weight_decay = random.choice(weight_decay_list)
         LR_gamma_list = [0.5, 0.6]
         LR_gamma = random.choice(LR_gamma_list)
-        epochs_list = [6, 8]
+        epochs_list = [12, 8]
         epochs = random.choice(epochs_list)
 
         print('learning_rate:', learning_rate)
@@ -464,7 +473,7 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
     
     best_hyper_param = HyperParam(learning_rate=0, weight_decay=0, LR_gamma=0, epochs=0, optim='Adam')
     
-    for number in range(8):
+    for number in range(5):
         
         learning_rate_list = [5e-4, 5e-3, 1e-2]
         learning_rate = random.choice(learning_rate_list)
@@ -473,7 +482,7 @@ def get_learning_hyperparamCV(model, train_bed, dataset, data_local, batch_size,
         LR_gamma_list = [0.4, 0.5, 0.6]
         #LR_gamma_list = [0.5, 1]
         LR_gamma = random.choice(LR_gamma_list)
-        epochs_list = [4, 8]
+        epochs_list = [7, 5]
         epochs = random.choice(epochs_list)
         optim_list=['Adam','Adam']
         optim=random.choice(optim_list)

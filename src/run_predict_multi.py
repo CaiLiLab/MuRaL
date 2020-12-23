@@ -144,16 +144,20 @@ def main():
         print('Warnings: no bigWig files provided')
     
     if len(train_h5f_path) == 0:
+        train_h5f_path = train_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            train_h5f_path = train_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius) + '.' + '.'.join(list(bw_names)) + '.h5'
-        else:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius)  + '.h5'
+            train_h5f_path = train_h5f_path + '.' + '.'.join(list(bw_names))
+        train_h5f_path = train_h5f_path + '.h5'
     
     if len(test_h5f_path) == 0:
+        test_h5f_path = test_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            test_h5f_path = test_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.' + '.'.join(list(bw_names)) + '.h5'
-        else:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.h5'
+            test_h5f_path = test_h5f_path + '.' + '.'.join(list(bw_names))
+        test_h5f_path = test_h5f_path + '.h5'   
     
     # Prepare the datasets for trainging
     dataset = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
@@ -240,6 +244,14 @@ def main():
     #y_prob2 = pd.Series(data=to_np(torch.exp(pred_y2)).T[1], name="prob")    
     y_prob2 = pd.DataFrame(data=to_np(torch.exp(pred_y2)), columns=prob_names)
     data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
+    
+    print('3mer correlation: ', freq_kmer_comp_multi(data_and_prob, 3, n_class))
+    print('5mer correlation: ', freq_kmer_comp_multi(data_and_prob, 5, n_class))
+    print('7mer correlation: ', freq_kmer_comp_multi(data_and_prob, 7, n_class))
+
+    print('3mer correlation(FF only): ', freq_kmer_comp_multi(data_and_prob2, 3, n_class))
+    print('5mer correlation(FF only): ', freq_kmer_comp_multi(data_and_prob2, 5, n_class))
+    print('7mer correlation(FF only): ', freq_kmer_comp_multi(data_and_prob2, 7, n_class))
 
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
     test_pred_df2 = data_and_prob2[['mut_type'] + prob_names]

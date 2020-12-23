@@ -130,16 +130,21 @@ def main():
         print('Warnings: no bigWig files provided')
     
     if len(train_h5f_path) == 0:
+        train_h5f_path = train_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            train_h5f_path = train_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius) + '.' + '.'.join(list(bw_names)) + '.h5'
-        else:
-            train_h5f_path = train_file + '.distal_' + str(distal_radius)  + '.h5'
+            train_h5f_path = train_h5f_path + '.' + '.'.join(list(bw_names))
+        train_h5f_path = train_h5f_path + '.h5'
     
     if len(test_h5f_path) == 0:
+        test_h5f_path = test_file + '.distal_' + str(distal_radius)
+        if(distal_order >1):
+            test_h5f_path = test_h5f_path + '_' + str(distal_order)
         if len(bw_names) > 0:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.' + '.'.join(list(bw_names)) + '.h5'
-        else:
-            test_h5f_path = test_file + '.distal_' + str(distal_radius) + '.h5'
+            test_h5f_path = test_h5f_path + '.' + '.'.join(list(bw_names))
+        test_h5f_path = test_h5f_path + '.h5'   
+
     
     # Prepare the datasets for trainging
     dataset = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)

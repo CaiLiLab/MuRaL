@@ -357,7 +357,7 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
     # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
     #distal_seq = np.empty((0, 4, distal_radius*2+1), dtype=np.float32)
     
-    n_channels = 4 + len(bw_files)
+    n_channels = 4**distal_order + len(bw_files)
     
     write_h5f = True
     if os.path.exists(h5f_path):
@@ -373,7 +373,8 @@ def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, dis
         with h5py.File(h5f_path, 'w') as hf:
             #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
             #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-            hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, distal_radius*2+1), maxshape=(None,n_channels, distal_radius*2+1)) 
+            seq_len =  distal_radius*2+1-(distal_order-1)
+            hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
 
             chunk_size = 50000
             for start in range(0, len(bed_regions), chunk_size):
