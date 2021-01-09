@@ -657,7 +657,7 @@ def train_model(model, model2, train_bed, dataset, data_local, batch_size, learn
 
             print('score1, score2: ', score1, score2)
             
-            print ("Total Loss: ", valid_total_loss/valid_size, valid_total_loss2/valid_size)
+            print ("Validation Loss: ", valid_total_loss/valid_size, valid_total_loss2/valid_size)
     
     return model, model2
 

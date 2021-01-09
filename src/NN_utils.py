@@ -1010,8 +1010,10 @@ class Network3m(nn.Module):
         distal_out = self.distal_fc(distal_out)
         
         if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
-            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out)[:,1]).item())
-            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out)[:,1]).item())
+            print('local_out1:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out, dim=1)[:,1]).item())
+            print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
+            print('local_out2:', torch.min(local_out[:,2]).item(), torch.max(local_out[:,2]).item(), torch.var(local_out[:,2]).item(), torch.var(F.softmax(local_out, dim=1)[:,2]).item())
+            print('distal_out2:', torch.min(distal_out[:,2]).item(), torch.max(distal_out[:,2]).item(),torch.var(distal_out[:,2]).item(), torch.var(F.softmax(distal_out, dim=1)[:,2]).item())
         
         #out = local_out * torch.sigmoid(distal_out)
         #out = local_out * torch.exp(distal_out)
@@ -1366,8 +1368,8 @@ class ResidualAttionNetwork3m(nn.Module):
         #distal_out = self.distal_fc(distal_out)
         
         if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
-            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out)[:,1]).item())
-            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out)[:,1]).item())
+            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out, dim=1)[:,1]).item())
+            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
         
         
         out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
@@ -1543,8 +1545,8 @@ class ResidualAttionNetwork4m(nn.Module):
         #distal_out = self.distal_fc(distal_out)
         
         if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
-            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out)[:,1]).item())
-            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out)[:,1]).item())
+            print('local_out:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out, dim=1)[:,1]).item())
+            print('distal_out:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
         
         
         out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)

@@ -20,7 +20,7 @@ import datetime
 
 from sklearn import metrics, calibration
 
-from NN_utils import *
+from NN_utils_test import *
 from preprocessing import *
 from evaluation import *
 
@@ -46,11 +46,15 @@ def parse_arguments(parser):
     
     parser.add_argument('--local_radius', type=int, default='5', help='radius of local sequences to be considered')
     
+    parser.add_argument('--local_order', type=int, default='1', help='order of local sequences to be considered')
+    
     parser.add_argument('--distal_radius', type=int, default='50', help='radius of distal sequences to be considered')
     
     parser.add_argument('--distal_order', type=int, default='1', help='order of distal sequences to be considered')
     
-    parser.add_argument('--batch_size', type=int, default='200', help='size of mini batches')
+    parser.add_argument('--emb_4th_root', default=False, action='store_true')
+    
+    parser.add_argument('--batch_size', type=int, default='100', help='size of mini batches')
     
     parser.add_argument('--CNN_kernel_size', type=int, default='3', help='kernel size for CNN layers')
     
@@ -90,9 +94,11 @@ def main():
     train_h5f_path = args.train_data_h5f
     test_h5f_path = args.test_data_h5f   
     ref_genome= args.ref_genome
-    local_radius = args.local_radius    
+    local_radius = args.local_radius
+    local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
+    emb_4th_root = args.emb_4th_root
     batch_size = args.batch_size  
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels    
@@ -147,7 +153,7 @@ def main():
 
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset2(train_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, train_h5f_path)
+    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
     
@@ -160,14 +166,18 @@ def main():
     dataloader2 = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # Number of categorical features
-    cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
-
+    #cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
+    cat_dims = dataset.cat_dims
+    
     #Embedding dimensions for categorical features
-    emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
+    if emb_4th_root:
+        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
+    else:
+        emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
     #emb_dims
 
     # Prepare testing data 
-    dataset_test = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, local_radius, distal_radius, distal_order, test_h5f_path, 1)
+    dataset_test = prepare_dataset1(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
     data_local_test = dataset_test.data_local
     
     test_size = len(dataset_test)
@@ -183,13 +193,13 @@ def main():
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     elif model_no == 2:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
+        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 3:
         model = ResidualAttionNetwork3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
 
     elif model_no == 4:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[300, 100], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
+        model = Network4m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
         #model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     else:
@@ -202,7 +212,7 @@ def main():
 
     # FeedForward-only model for comparison
     #model2 = FeedForwardNN(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15]).to(device)
-    model2 = FeedForwardNNm(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class).to(device)
+    model2 = FeedForwardNNm(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
     
     count_parameters(model2)
     print('model2:')
