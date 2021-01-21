@@ -244,10 +244,17 @@ def main():
     else:
         print('Error: unsupported optimization method')
         sys.exit()
+    ######
+    #scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.001, steps_per_epoch=len(dataloader), epochs=epochs)
+    
+    schedule_steps = 2000    
+    
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=schedule_steps, gamma=LR_gamma)
+    
+    scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=schedule_steps, gamma=LR_gamma)
+    
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=LR_gamma)
-
-    scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=LR_gamma)
+    
     print('optimizer, optimizer2:', optimizer, optimizer2)
     #print('scheduler, scheduler2:', scheduler, scheduler2)
 
@@ -259,6 +266,8 @@ def main():
     pred_df2 = None
     last_pred_df2 = None
     prob_names = ['prob'+str(i) for i in range(n_class)]
+    
+    train_steps = 0
     
     # Training
     for epoch in range(epochs):
@@ -298,17 +307,22 @@ def main():
             total_loss += loss.item()
             total_loss2 += loss2.item()
             #print('in the training loop...')
+            
+            train_steps += 1
+            scheduler.step()    
+            scheduler2.step()
+                
+            #for OneCycleLR
+            #scheduler.step()
 
         model.eval()
         model2.eval()
         with torch.no_grad():
 
             print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
-            scheduler.step()
-            scheduler2.step()
 
-            if epoch <0:
-                continue
+            #if epoch <0:
+            #    continue
 
             # Do predictions for training data
             #all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      

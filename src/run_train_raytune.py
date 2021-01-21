@@ -89,6 +89,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--epochs', type=int, default='10', help='number of epochs for training')
     
+    parser.add_argument('--n_trials', type=int, default='3', help='number of trials for training')
+    
+    parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
+    
     args = parser.parse_args()
 
     return args
@@ -98,7 +102,7 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
-    ray.init(num_cpus=6, num_gpus=2)
+    ray.init(num_cpus=8, num_gpus=2, dashboard_host="0.0.0.0")
 
     print(' '.join(sys.argv))
     train_file = args.train_data
@@ -122,8 +126,11 @@ def main():
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
+    n_trials = args.n_trials
+    experiment_name = args.experiment_name
     n_class = args.n_class  
     cuda_id = args.cuda_id
+    
     
     # Read bigWig file names
     bw_paths = args.bw_paths
@@ -131,7 +138,7 @@ def main():
     bw_names = []
     
     
-    print('optim: ', optim)
+    #print('optim: ', optim)
     
     try:
         bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
@@ -170,17 +177,18 @@ def main():
     metric='loss',
     mode='min',
     max_t=epochs,
-    grace_period=1,
+    grace_period=5,
     reduction_factor=2)
     
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'CNN_out_channels', 'learning_rate', 'optim'], metric_columns=['loss', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'training_iteration'])
     
     result = tune.run(
     partial(train, args=args),
-    name = 'MuRaL',
-    resources_per_trial={'cpu': 2, 'gpu': 1},
+    name=experiment_name,
+    resources_per_trial={'cpu': 2, 'gpu': 0.2},
     config=config,
-    num_samples=2,
+    num_samples=n_trials,
+    local_dir='./ray_results',
     scheduler=scheduler,
     progress_reporter=reporter)
 
@@ -229,7 +237,7 @@ def train(config, args, checkpoint_dir=None):
 
     # Read BED files
     train_bed = BedTool(train_file)
-    test_bed = BedTool(test_file)
+    #test_bed = BedTool(test_file)
 
 
     train_h5f_path = get_h5f_path(train_file, config['bw_names'], config['distal_radius'], distal_order)
@@ -246,7 +254,7 @@ def train(config, args, checkpoint_dir=None):
     #train_size = len(dataset)
 
     # Dataloader for training
-    dataloader = DataLoader(dataset, config['batch_size'], shuffle=True, num_workers=2) #shuffle=False for HybridLoss
+    dataloader = DataLoader(dataset, config['batch_size'], shuffle=True, num_workers=2, pin_memory=True) #shuffle=False for HybridLoss
 
     '''
     # Dataloader for predicting
@@ -275,10 +283,10 @@ def train(config, args, checkpoint_dir=None):
     #data_local_valid = dataset_valid.data_local
     
     # Dataloader for training
-    dataloader_train = DataLoader(dataset_train,  config['batch_size'], shuffle=True, num_workers=2) #shuffle=False for HybridLoss
+    dataloader_train = DataLoader(dataset_train,  config['batch_size'], shuffle=True, num_workers=2, pin_memory=True) #shuffle=False for HybridLoss
 
     # Dataloader for predicting
-    dataloader_valid = DataLoader(dataset_valid,  config['batch_size'], shuffle=False, num_workers=1)
+    dataloader_valid = DataLoader(dataset_valid,  config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
     
     # Number of categorical features
