@@ -102,7 +102,7 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
-    ray.init(num_cpus=8, num_gpus=2, dashboard_host="0.0.0.0")
+    ray.init(num_cpus=8, num_gpus=1, dashboard_host="0.0.0.0")
 
     print(' '.join(sys.argv))
     train_file = args.train_data
@@ -195,6 +195,9 @@ def main():
     best_trial = result.get_best_trial('loss', 'min', 'last')
     print('Best trial config: {}'.format(best_trial.config))
     print('Best trial final validation loss: {}'.format(best_trial.last_result['loss'])) 
+    
+    if ray.is_initialized():
+        ray.shutdown() 
 
 def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
     
@@ -271,8 +274,8 @@ def train(config, args, checkpoint_dir=None):
     '''
     
     print('CUDA is available: ', torch.cuda.is_available())
-    device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
-    
+    #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     train_size = int(len(dataset)*0.8) #
     valid_size = len(dataset) - train_size
@@ -441,7 +444,7 @@ def train(config, args, checkpoint_dir=None):
             tune.report(loss=valid_total_loss/valid_size)
     #print('Total time used: %s seconds' % (time.time() - start_time))
 
-
+    
     
 if __name__ == '__main__':
     main()
