@@ -291,13 +291,13 @@ def main():
         #print('min and max of pred_y2: type', i, np.min(to_np(torch.exp(pred_y2))[:,i]), np.max(to_np(torch.exp(pred_y2))[:,i]))
 
     # Write the prediction
-    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], test_pred_df), axis=1)
-    pred_df.columns = ['chrom', 'start', 'end','mut_type'] + [name for name in prob_names]
+    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end', 'strand']], test_pred_df), axis=1)
+    pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] +  prob_names
 
     pred_df.to_csv(pred_file, sep='\t', index=False)
     
     for win_size in [10000, 50000, 200000]:
-        corr1 = corr_calc_sub(pred_df, win_size, [name for name in prob_names])
+        corr1 = corr_calc_sub(pred_df, win_size, prob_names)
         #corr2 = corr_calc_sub(pred_df, win_size, [name+'_M2' for name in prob_names])
         print('regional corr:', str(win_size)+'bp', corr1)
         #print('regional corr2:', str(win_size)+'bp', corr2)

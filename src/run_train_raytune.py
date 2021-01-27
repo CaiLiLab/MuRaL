@@ -32,6 +32,7 @@ from sklearn import metrics, calibration
 from NN_utils_test import *
 from preprocessing import *
 from evaluation import *
+#from temperature_scaling import ModelWithTemperature
 
 
 
@@ -92,6 +93,8 @@ def parse_arguments(parser):
     parser.add_argument('--n_trials', type=int, default='3', help='number of trials for training')
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
+    
+    parser.add_argument('--temperature_scaling', default=False, action='store_true')
     
     args = parser.parse_args()
 
@@ -180,7 +183,7 @@ def main():
     grace_period=5,
     reduction_factor=2)
     
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'score', 'training_iteration'])
     
     result = tune.run(
     partial(train, args=args),
@@ -237,6 +240,7 @@ def train(config, args, checkpoint_dir=None):
     epochs = args.epochs
     n_class = args.n_class  
     cuda_id = args.cuda_id
+    temperature_scaling = args.temperature_scaling
 
     # Read BED files
     train_bed = BedTool(train_file)
@@ -427,22 +431,80 @@ def train(config, args, checkpoint_dir=None):
             print('7mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 7, n_class))
             
             print ('Validation Loss: ', valid_total_loss/valid_size)  
+            
+            ###############
+            region_size = 10000
+            n_regions = valid_size//region_size
+            
+            score = 0
+            corr_3mer = []
+            corr_5mer = []
+            
+            for i in range(n_regions):
+                corr_3mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 3, n_class)    
+                corr_5mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 5, n_class)
+                
+                score += np.sum([(1-corr)**2 for corr in corr_3mer]) + np.sum([(1-corr)**2 for corr in corr_5mer])
+           
+            print('corr_3mer:', corr_3mer)
+            print('corr_5mer:', corr_5mer)
+            print('regional score:', score, n_regions)
+            ###############
+            
             chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end']].reset_index(drop=True)
             valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
             valid_pred_df.columns = ['chrom', 'start', 'end','mut_type'] + prob_names
-    
+            
+            print('valid_pred_df: ', valid_pred_df.head())
     
             for win_size in [20000, 100000, 500000]:
                 #corr = corr_calc(valid_pred_df, win_size, 'valid_prob')
                 corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
                 print('regional corr (validation):', str(win_size)+'bp', corr_win)
             
+            ##################
+            #valid_pred_df = pd.concat((chr_pos, valid_data_and_prob), axis=1)
+            #valid_pred_df.columns = ['chrom', 'start', 'end'] + valid_data_and_prob.columns
+            
+            ###################
+            
             with tune.checkpoint_dir(epoch) as checkpoint_dir:
                 path = os.path.join(checkpoint_dir, 'checkpoint')
                 torch.save((model.state_dict(), optimizer.state_dict()), path)
 
-            tune.report(loss=valid_total_loss/valid_size)
+            tune.report(loss=valid_total_loss/valid_size, score=score)
     #print('Total time used: %s seconds' % (time.time() - start_time))
+                
+        ################
+            if temperature_scaling and epochs > 0:
+                modelS = ModelWithTemperature(model)
+                modelS.set_temperature(dataloader_valid, device)
+                
+                with tune.checkpoint_dir(epoch) as checkpoint_dir:
+                    path = os.path.join(checkpoint_dir, 'checkpointS')
+                    torch.save((modelS.state_dict(), optimizer.state_dict()), path)
+                
+                valid_pred_y, valid_total_loss = model_predict_m(modelS, dataloader_valid, criterion, device, n_class, distal=True)
+
+                valid_y_prob = pd.DataFrame(data=to_np(torch.exp(valid_pred_y)), columns=prob_names)
+                valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)        
+
+                print('3mer correlation (scaling): ', freq_kmer_comp_multi(valid_data_and_prob, 3, n_class))
+                print('5mer correlation (scaling):  ', freq_kmer_comp_multi(valid_data_and_prob, 5, n_class))
+                print('7mer correlation (scaling): ', freq_kmer_comp_multi(valid_data_and_prob, 7, n_class))
+
+                print ('Validation Loss  (scaling): ', valid_total_loss/valid_size)
+            
+                #####
+                chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end']].reset_index(drop=True)
+                valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
+                valid_pred_df.columns = ['chrom', 'start', 'end','mut_type'] + prob_names
+                print('valid_pred_df: ', valid_pred_df.head())
+
+                for win_size in [20000, 100000, 500000]:
+                    #corr = corr_calc(valid_pred_df, win_size, 'valid_prob')
+                    corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
+                    print('regional corr (scaling):', str(win_size)+'bp', corr_win)
 
     
     
