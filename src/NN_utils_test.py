@@ -13,6 +13,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn import metrics, calibration
 from scipy.special import lambertw
 
+from evaluation import *
+
 #from torchsummary import summary
 
 
@@ -227,7 +229,8 @@ class FeedForwardNNm(nn.Module):
         #x = self.output_layer(x) #oringial output
         
         #out = torch.sigmoid(self.output_layer(x))
-        out = F.log_softmax(self.output_layer(x), dim=1)
+        #out = F.log_softmax(self.output_layer(x), dim=1)
+        out = self.output_layer(x)
 
         return out
     
@@ -2218,17 +2221,18 @@ class ModelWithTemperature(nn.Module):
     def __init__(self, model):
         super(ModelWithTemperature, self).__init__()
         self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1)
+        self.temperature = nn.Parameter(torch.ones(1) * 1.1)
 
     def forward(self, local_x, distal_x):
         #logits = self.model(input)
         #cont_x, cat_x = local_x
-        preds = self.model.forward(local_x, distal_x)
-        logits = preds
+        logits = self.model.forward(local_x, distal_x)
+        
         #logits = torch.cat((1-preds,preds),1)
         #logits = torch.log(logits/(1-logits))
                 
-        return F.log_softmax(self.temperature_scale(logits), dim=1)
+        #return F.log_softmax(self.temperature_scale(logits), dim=1)
+        return self.temperature_scale(logits)
         #return torch.sigmoid(self.temperature_scale(logits))[:,1].unsqueeze(1)
 
     def temperature_scale(self, logits):
@@ -2249,7 +2253,9 @@ class ModelWithTemperature(nn.Module):
         self.to(device)
         nll_criterion = nn.CrossEntropyLoss().to(device)
         #nll_criterion = torch.nn.NLLLoss(reduction='mean').to(device)
-        #ece_criterion = _ECELoss().to(device)
+        ece_criterion = ECELoss(n_bins=25).to(device)
+        c_ece_criterion = ClasswiseECELoss(n_bins=25).to(device)
+        ada_ece_criterion = AdaptiveECELoss(n_bins=15).to(device)
 
         # First: collect all the logits and labels for the validation set
         logits_list = []
@@ -2264,8 +2270,7 @@ class ModelWithTemperature(nn.Module):
                 distal_x = distal_x.to(device)
                 y  = y.to(device)
         
-                preds = self.model.forward((cont_x, cat_x), distal_x)
-                logits = preds
+                logits = self.model.forward((cont_x, cat_x), distal_x)
                 #logits = torch.cat((1-preds,preds),1)
                 #logits = torch.log(logits/(1-logits))
                 
@@ -2277,12 +2282,16 @@ class ModelWithTemperature(nn.Module):
         print(logits, labels)
         # Calculate NLL and ECE before temperature scaling
         before_temperature_nll = nll_criterion(logits, labels).item()
-        #before_temperature_ece = ece_criterion(logits, labels).item()
-        print('Before temperature - NLL:', before_temperature_nll)
-        #print('Before temperature - NLL: %.3f, ECE: %.3f' % (before_temperature_nll, before_temperature_ece))
+        before_temperature_ece = ece_criterion(logits, labels).item()
+        before_temperature_c_ece = c_ece_criterion(logits, labels).item()
+        before_temperature_ada_ece = ada_ece_criterion(logits, labels).item()
+        
+        #print('Before temperature - NLL:', before_temperature_nll)
+        print('Before temperature - NLL: %.5f, ECE: %.5f, ClassECE: %.5f, AdaECE: %.5f,' % (before_temperature_nll, before_temperature_ece, before_temperature_c_ece, before_temperature_ada_ece))
 
         # Next: optimize the temperature w.r.t. NLL
-        optimizer = optim.LBFGS([self.temperature], lr=0.01, max_iter=100)
+        optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=10000)
+        print('temp optimizer:', optimizer)
 
         def eval():
             loss = nll_criterion(self.temperature_scale(logits), labels)
@@ -2292,10 +2301,12 @@ class ModelWithTemperature(nn.Module):
 
         # Calculate NLL and ECE after temperature scaling
         after_temperature_nll = nll_criterion(self.temperature_scale(logits), labels).item()
-        #after_temperature_ece = ece_criterion(self.temperature_scale(logits), labels).item()
-        print('Optimal temperature: %.3f' % self.temperature.item())
-        print('After temperature - NLL:', after_temperature_nll)
-        #print('After temperature - NLL: %.3f, ECE: %.3f' % (after_temperature_nll, after_temperature_ece))
+        after_temperature_ece = ece_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_c_ece = c_ece_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_ada_ece = ada_ece_criterion(self.temperature_scale(logits), labels).item()
+        print('Optimal temperature: %.5f' % self.temperature.item())
+        #print('After temperature - NLL:', after_temperature_nll)
+        print('After temperature - NLL: %.5f, ECE: %.5f, ClassECE: %.5f, AdaECE: %.5f,' % (after_temperature_nll, after_temperature_ece, after_temperature_c_ece, after_temperature_ada_ece))
 
         return self
     
@@ -2322,6 +2333,7 @@ class ModelWithTemperature(nn.Module):
 
         return pred_y, total_loss
 
+'''
 class _ECELoss(nn.Module):
     """
     Calculates the Expected Calibration Error of a model.
@@ -2361,3 +2373,4 @@ class _ECELoss(nn.Module):
                 ece += torch.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
 
         return ece
+'''

@@ -100,6 +100,8 @@ def parse_arguments(parser):
 
     return args
 def main():
+    #torch.backends.cudnn.benchmark=True
+    
     parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
     args = parse_arguments(parser)
     
@@ -342,7 +344,8 @@ def train(config, args, checkpoint_dir=None):
 
     # Loss function
     #criterion = torch.nn.BCELoss()
-    criterion = torch.nn.NLLLoss(reduction='mean')
+    #criterion = torch.nn.NLLLoss(reduction='mean')
+    criterion = torch.nn.CrossEntropyLoss()
 
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -421,8 +424,8 @@ def train(config, args, checkpoint_dir=None):
             
             valid_pred_y, valid_total_loss = model_predict_m(model, dataloader_valid, criterion, device, n_class, distal=True)
 
-            #all_y_prob = pd.Series(data=to_np(torch.exp(all_pred_y)).T[1], name='prob')
-            valid_y_prob = pd.DataFrame(data=to_np(torch.exp(valid_pred_y)), columns=prob_names)
+            #all_y_prob = pd.Series(data=to_np(F.softmax(all_pred_y)).T[1], name='prob')
+            valid_y_prob = pd.DataFrame(data=to_np(F.softmax(valid_pred_y, dim=1)), columns=prob_names)
             valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)        
 
             # Compare observed/predicted 3/5/7mer mutation frequencies
@@ -476,7 +479,7 @@ def train(config, args, checkpoint_dir=None):
     #print('Total time used: %s seconds' % (time.time() - start_time))
                 
         ################
-            if temperature_scaling and epochs > 0:
+            if temperature_scaling and epoch > 0:
                 modelS = ModelWithTemperature(model)
                 modelS.set_temperature(dataloader_valid, device)
                 
@@ -486,7 +489,7 @@ def train(config, args, checkpoint_dir=None):
                 
                 valid_pred_y, valid_total_loss = model_predict_m(modelS, dataloader_valid, criterion, device, n_class, distal=True)
 
-                valid_y_prob = pd.DataFrame(data=to_np(torch.exp(valid_pred_y)), columns=prob_names)
+                valid_y_prob = pd.DataFrame(data=to_np(F.softmax(valid_pred_y, dim=1)), columns=prob_names)
                 valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)        
 
                 print('3mer correlation (scaling): ', freq_kmer_comp_multi(valid_data_and_prob, 3, n_class))

@@ -85,6 +85,9 @@ def parse_arguments(parser):
     return args
 
 def main():
+    
+    torch.backends.cudnn.benchmark=True
+    
     parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
     args = parse_arguments(parser)
     
