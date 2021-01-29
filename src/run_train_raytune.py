@@ -498,6 +498,11 @@ def train(config, args, checkpoint_dir=None):
 
                 print ('Validation Loss  (scaling): ', valid_total_loss/valid_size)
             
+                ################Vector scaling
+                #y= valid_data_and_prob[['mut_type']
+                
+                ################
+                
                 #####
                 chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end']].reset_index(drop=True)
                 valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)

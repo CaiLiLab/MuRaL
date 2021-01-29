@@ -2221,7 +2221,7 @@ class ModelWithTemperature(nn.Module):
     def __init__(self, model):
         super(ModelWithTemperature, self).__init__()
         self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1.1)
+        self.temperature = nn.Parameter(torch.ones(1) * 1.2)
 
     def forward(self, local_x, distal_x):
         #logits = self.model(input)
@@ -2287,11 +2287,11 @@ class ModelWithTemperature(nn.Module):
         before_temperature_ada_ece = ada_ece_criterion(logits, labels).item()
         
         #print('Before temperature - NLL:', before_temperature_nll)
-        print('Before temperature - NLL: %.5f, ECE: %.5f, ClassECE: %.5f, AdaECE: %.5f,' % (before_temperature_nll, before_temperature_ece, before_temperature_c_ece, before_temperature_ada_ece))
+        print('Before temperature - NLL: %.5f, ECE: %.5f, CwECE: %.5f, AdaECE: %.5f,' % (before_temperature_nll, before_temperature_ece, before_temperature_c_ece, before_temperature_ada_ece))
 
         # Next: optimize the temperature w.r.t. NLL
         optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=10000)
-        print('temp optimizer:', optimizer)
+        #print('temp optimizer:', optimizer)
 
         def eval():
             loss = nll_criterion(self.temperature_scale(logits), labels)
@@ -2306,7 +2306,7 @@ class ModelWithTemperature(nn.Module):
         after_temperature_ada_ece = ada_ece_criterion(self.temperature_scale(logits), labels).item()
         print('Optimal temperature: %.5f' % self.temperature.item())
         #print('After temperature - NLL:', after_temperature_nll)
-        print('After temperature - NLL: %.5f, ECE: %.5f, ClassECE: %.5f, AdaECE: %.5f,' % (after_temperature_nll, after_temperature_ece, after_temperature_c_ece, after_temperature_ada_ece))
+        print('After temperature - NLL: %.5f, ECE: %.5f, CwECE: %.5f, AdaECE: %.5f,' % (after_temperature_nll, after_temperature_ece, after_temperature_c_ece, after_temperature_ada_ece))
 
         return self
     
