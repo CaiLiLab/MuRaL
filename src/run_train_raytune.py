@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
+import pickle
 
 from torch.utils.data import random_split
 
@@ -32,6 +33,9 @@ from sklearn import metrics, calibration
 from NN_utils_test import *
 from preprocessing import *
 from evaluation import *
+
+
+
 #from temperature_scaling import ModelWithTemperature
 
 
@@ -82,6 +86,8 @@ def parse_arguments(parser):
     
     parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
     
+    parser.add_argument('--valid_ratio', type=float, default='0.2', help='the ratio of validation data relative to the whole training data')
+    
     parser.add_argument('--learning_rate', type=float, default='0.005', nargs='+', help='learning rate for training')
     
     parser.add_argument('--weight_decay', type=float, default='1e-5', nargs='+', help='weight decay (regularization) for training')
@@ -95,6 +101,10 @@ def parse_arguments(parser):
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
     
     parser.add_argument('--temperature_scaling', default=False, action='store_true')
+    
+    parser.add_argument('--label_smoothing', default=False, action='store_true')
+    
+    parser.add_argument('--MultiStepLR', default=False, action='store_true')
     
     args = parser.parse_args()
 
@@ -135,6 +145,7 @@ def main():
     experiment_name = args.experiment_name
     n_class = args.n_class  
     cuda_id = args.cuda_id
+    valid_ratio = args.valid_ratio
     
     
     # Read bigWig file names
@@ -243,6 +254,11 @@ def train(config, args, checkpoint_dir=None):
     n_class = args.n_class  
     cuda_id = args.cuda_id
     temperature_scaling = args.temperature_scaling
+    valid_ratio = args.valid_ratio
+    MultiStepLR = args.MultiStepLR
+    label_smoothing =args.label_smoothing
+    
+
 
     # Read BED files
     train_bed = BedTool(train_file)
@@ -283,8 +299,9 @@ def train(config, args, checkpoint_dir=None):
     #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    train_size = int(len(dataset)*0.8) #
-    valid_size = len(dataset) - train_size
+    
+    valid_size = int(len(dataset)*valid_ratio)
+    train_size = len(dataset) - valid_size
     print('train_size, valid_size:', train_size, valid_size)
     
     dataset_train, dataset_valid = random_split(dataset, [train_size, valid_size])
@@ -345,7 +362,11 @@ def train(config, args, checkpoint_dir=None):
     # Loss function
     #criterion = torch.nn.BCELoss()
     #criterion = torch.nn.NLLLoss(reduction='mean')
-    criterion = torch.nn.CrossEntropyLoss()
+    if label_smoothing:
+        criterion = LabelSmoothingCrossEntropy(epsilon=0.1)
+        print('using LabelSmoothingCrossEntropy ...')
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
 
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -359,7 +380,10 @@ def train(config, args, checkpoint_dir=None):
         print('Error: unsupported optimization method', config['optim'])
         sys.exit()
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
+    if MultiStepLR:
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 6], gamma=config['LR_gamma'])
+    else:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
 
     #scheduler2 = torch.optim.lr_scheduler.StepLR(optimizer2, step_size=1, gamma=config['LR_gamma'])
     print('optimizer:', optimizer)
@@ -426,7 +450,21 @@ def train(config, args, checkpoint_dir=None):
 
             #all_y_prob = pd.Series(data=to_np(F.softmax(all_pred_y)).T[1], name='prob')
             valid_y_prob = pd.DataFrame(data=to_np(F.softmax(valid_pred_y, dim=1)), columns=prob_names)
-            valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)        
+            valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)    
+            
+            ###############
+            #y_prob = pd.DataFrame(data=to_np(F.softmax(pred_y, dim=1)), columns=prob_names)
+            #data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
+            
+            valid_y = valid_data_and_prob['mut_type'].to_numpy().squeeze()
+            
+            vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
+            tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
+            
+            fdiri_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
+            fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
+            ##############
+            
 
             # Compare observed/predicted 3/5/7mer mutation frequencies
             print('3mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 3, n_class))
@@ -474,12 +512,17 @@ def train(config, args, checkpoint_dir=None):
             with tune.checkpoint_dir(epoch) as checkpoint_dir:
                 path = os.path.join(checkpoint_dir, 'checkpoint')
                 torch.save((model.state_dict(), optimizer.state_dict()), path)
+            
+                with open(path + '.fdiri_cal.pkl', 'wb') as pkl_file:
+                    pickle.dump(fdiri_cal, pkl_file)
+                with open(path + '.vec_cal.pkl', 'wb') as pkl_file:
+                    pickle.dump(vec_cal, pkl_file)
 
             tune.report(loss=valid_total_loss/valid_size, score=score)
     #print('Total time used: %s seconds' % (time.time() - start_time))
                 
         ################
-            if temperature_scaling and epoch > 0:
+            if temperature_scaling and epoch > 5:
                 modelS = ModelWithTemperature(model)
                 modelS.set_temperature(dataloader_valid, device)
                 

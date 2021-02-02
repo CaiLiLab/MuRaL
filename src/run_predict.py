@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
+import pickle
 
 import os
 import time
@@ -86,7 +87,11 @@ def parse_arguments(parser):
     
     parser.add_argument('--model_path', type=str, default='', help='model path')
     
-    #parser.add_argument('--model2_path', type=str, default='', help='model2 path')
+    parser.add_argument('--optim', default=False, action='store_true')
+    
+    #parser.add_argument('--model_path', type=str, default='', help='model path')
+    
+    parser.add_argument('--calibrator_path', type=str, default='', help='calibrator path')
     
     args = parser.parse_args()
 
@@ -122,6 +127,8 @@ def main():
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
     model_path = args.model_path
+    optim = args.optim
+    calibrator_path = args.calibrator_path
     #model2_path = args.model2_path
     
     n_class = args.n_class
@@ -237,7 +244,10 @@ def main():
     #print(model2)
 
     #NOTE: by default, the model will be loaded into 'cuda:0' 
-    model_state, optimizer_state = torch.load(model_path, map_location=device)
+    if optim:
+        model_state, optimizer_state = torch.load(model_path, map_location=device)
+    else:
+        model_state = torch.load(model_path, map_location=device)
     model.load_state_dict(model_state)
     #model2.load_state_dict(torch.load(model2_path, map_location=device))
 
@@ -260,6 +270,19 @@ def main():
     
     #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
     y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
+    
+    #######
+    if calibrator_path != '':
+        with open(calibrator_path, 'rb') as fcal:
+            
+            print('using calibrator for scaling ...')
+            calibr = pickle.load(fcal)
+            
+            prob_cal = calibr.predict_proba(y_prob.to_numpy())
+            
+            y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
+    #######
+    
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
     
     #print("2. current CUDA:", torch.cuda.current_device())

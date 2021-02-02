@@ -8,6 +8,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
+from dirichletcal.calib.vectorscaling import VectorScaling
+from dirichletcal.calib.tempscaling import TemperatureScaling
+from dirichletcal.calib.fulldirichlet import FullDirichletCalibrator
+
 def count_parameters(model):
     table = PrettyTable(["Modules", "Parameters"])
     total_params = 0
@@ -335,3 +339,43 @@ class ClasswiseECELoss(nn.Module):
         sce = torch.mean(per_class_sce)
         return sce
 ################
+
+def calibrate_prob(y_prob, y, device, calibr_name='VectS'):
+    if calibr_name == 'VectS':
+        calibr = VectorScaling(logit_constant=0.0)
+        #calibr = VectorScaling()
+    elif calibr_name == 'TempS':
+        calibr = TemperatureScaling(logit_constant=0.0)
+        #calibr = TemperatureScaling()
+    elif calibr_name == 'FullDiri':
+        calibr = FullDirichletCalibrator()
+        
+    elif calibr_name == 'FullDiriODIR':
+        l2_odir = 1e-2
+        calibr = FullDirichletCalibrator(reg_lambda=l2_odir, reg_mu=l2_odir, reg_norm=False)
+        
+    calibr.fit(y_prob, y)
+    prob_cal = calibr.predict_proba(y_prob)
+    print('y_prob.head():', y_prob[0:6,])
+    print('prob_cal:', prob_cal[0:6, ])
+    print('calibr.coef_: ', calibr.coef_)
+    print('calibr.weights_:', calibr.weights_)
+    
+    nll_criterion = nn.CrossEntropyLoss().to(device)
+    ece_criterion = ECELoss(n_bins=25).to(device)
+    c_ece_criterion = ClasswiseECELoss(n_bins=25).to(device)
+
+    logits0 = torch.log(torch.from_numpy(y_prob)).to(device)
+    logits = torch.log(torch.from_numpy(np.copy(prob_cal))).to(device)
+    labels = torch.from_numpy(y).long().to(device)
+
+    nll0 = nll_criterion(logits0, labels).item()
+    nll = nll_criterion(logits, labels).item()
+    ece0 = ece_criterion(logits0, labels).item()
+    ece = ece_criterion(logits, labels).item()
+    c_ece0 = c_ece_criterion(logits0, labels).item()
+    c_ece = c_ece_criterion(logits, labels).item()
+    print('Before ' + calibr_name + ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll0, ece0, c_ece0))
+    print('After ' + calibr_name +  ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll, ece, c_ece))
+    
+    return calibr, prob_cal
