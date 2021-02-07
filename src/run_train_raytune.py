@@ -5,7 +5,7 @@ from pybedtools import BedTool
 
 import sys
 import argparse
-from sklearn.preprocessing import LabelEncoder
+#from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -28,7 +28,7 @@ import time
 import datetime
 
 
-from sklearn import metrics, calibration
+#from sklearn import metrics, calibration
 
 from NN_utils_test import *
 from preprocessing import *
@@ -60,25 +60,29 @@ def parse_arguments(parser):
     
     parser.add_argument('--n_class', type=int, default='4', help='number of mutation classes')
     
-    parser.add_argument('--local_radius', type=int, default='5', nargs='+', help='radius of local sequences to be considered')
+    parser.add_argument('--local_radius', type=int, default=[5], nargs='+', help='radius of local sequences to be considered')
     
-    parser.add_argument('--local_order', type=int, default='1', nargs='+', help='order of local sequences to be considered')
+    parser.add_argument('--local_order', type=int, default=[1], nargs='+', help='order of local sequences to be considered')
     
-    parser.add_argument('--distal_radius', type=int, default='50', nargs='+', help='radius of distal sequences to be considered')
+    parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
     
-    parser.add_argument('--distal_order', type=int, default='1', help='order of distal sequences to be considered')
+    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
     
     parser.add_argument('--emb_4th_root', default=False, action='store_true')
     
-    parser.add_argument('--batch_size', type=int, default='100', nargs='+', help='size of mini batches')
+    parser.add_argument('--batch_size', type=int, default=[128], nargs='+', help='size of mini batches')
     
-    parser.add_argument('--CNN_kernel_size', type=int, default='3', nargs='+', help='kernel size for CNN layers')
+    parser.add_argument('--emb_dropout', type=float, default=[0.2], nargs='+', help='dropout rate for k-mer embedding')
     
-    parser.add_argument('--CNN_out_channels', type=int, default='60', nargs='+', help='number of output channels for CNN layers')
+    parser.add_argument('--local_dropout', type=float, default=[0.15], nargs='+', help='dropout rate for local network')
     
-    parser.add_argument('--RNN_hidden_size', type=int, default='0', help='number of hidden neurons for RNN layers')
+    parser.add_argument('--CNN_kernel_size', type=int, default=[3], nargs='+', help='kernel size for CNN layers')
     
-    parser.add_argument('--model_no', type=int, default='2', help=' which NN model to be used')
+    parser.add_argument('--CNN_out_channels', type=int, default=[32], nargs='+', help='number of output channels for CNN layers')
+    
+    parser.add_argument('--RNN_hidden_size', type=int, default=0, help='number of hidden neurons for RNN layers')
+    
+    parser.add_argument('--model_no', type=int, default=2, help=' which NN model to be used')
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
     
@@ -88,15 +92,18 @@ def parse_arguments(parser):
     
     parser.add_argument('--valid_ratio', type=float, default='0.2', help='the ratio of validation data relative to the whole training data')
     
-    parser.add_argument('--learning_rate', type=float, default='0.005', nargs='+', help='learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=[0.005], nargs='+', help='learning rate for training')
     
-    parser.add_argument('--weight_decay', type=float, default='1e-5', nargs='+', help='weight decay (regularization) for training')
+    parser.add_argument('--weight_decay', type=float, default=[1e-5], nargs='+', help='weight decay (regularization) for training')
     
-    parser.add_argument('--LR_gamma', type=float, default='0.5', nargs='+', help='gamma for learning rate change during training')
+    parser.add_argument('--LR_gamma', type=float, default=[0.5], nargs='+', help='gamma for learning rate change during training')
     
-    parser.add_argument('--epochs', type=int, default='10', help='number of epochs for training')
+    parser.add_argument('--epochs', type=int, default=10, help='number of epochs for training')
     
-    parser.add_argument('--n_trials', type=int, default='3', help='number of trials for training')
+    parser.add_argument('--grace_period', type=int, default=5, help='grace_period for early stopping')
+    
+    
+    parser.add_argument('--n_trials', type=int, default=3, help='number of trials for training')
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
     
@@ -105,6 +112,10 @@ def parse_arguments(parser):
     parser.add_argument('--label_smoothing', default=False, action='store_true')
     
     parser.add_argument('--MultiStepLR', default=False, action='store_true')
+    
+    parser.add_argument('--mixup', default=False, action='store_true')
+    
+    parser.add_argument('--resume_ray', default=False, action='store_true', help='resume incomplete Ray experiment')
     
     args = parser.parse_args()
 
@@ -117,7 +128,9 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
-    ray.init(num_cpus=8, num_gpus=1, dashboard_host="0.0.0.0")
+    
+    #request resources
+    ray.init(num_cpus=8, num_gpus=2, dashboard_host="0.0.0.0")
 
     print(' '.join(sys.argv))
     train_file = args.train_data
@@ -130,7 +143,9 @@ def main():
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     emb_4th_root = args.emb_4th_root
-    batch_size = args.batch_size  
+    batch_size = args.batch_size 
+    emb_dropout = args.emb_dropout
+    local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels    
     RNN_hidden_size = args.RNN_hidden_size   
@@ -141,11 +156,13 @@ def main():
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
+    grace_period = args.grace_period
     n_trials = args.n_trials
     experiment_name = args.experiment_name
     n_class = args.n_class  
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
+    resume_ray = args.resume_ray
     
     
     # Read bigWig file names
@@ -154,7 +171,9 @@ def main():
     bw_names = []
     
     
-    #print('optim: ', optim)
+    #print('emb_dropout: ', emb_dropout)
+    #print('local_dropout: ', local_dropout)
+    #print('CNN_kernel_size:', CNN_kernel_size)
     
     try:
         bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
@@ -178,6 +197,8 @@ def main():
         'local_radius': tune.choice(local_radius),
         'local_order': tune.choice(local_order),
         'distal_radius': tune.choice(distal_radius),
+        'emb_dropout': tune.choice(emb_dropout),
+        'local_dropout': tune.choice(local_dropout),
         'CNN_kernel_size': tune.choice(CNN_kernel_size),
         'CNN_out_channels': tune.choice(CNN_out_channels),
         'batch_size': tune.choice(batch_size),
@@ -185,32 +206,40 @@ def main():
         'optim': tune.choice(optim),
         'LR_gamma': tune.choice(LR_gamma),
         'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
-        'bw_files': bw_files,
-        'bw_names': bw_names,
+        #'bw_files': bw_files,
+        #'bw_names': bw_names,
     }
     
     scheduler = ASHAScheduler(
     metric='loss',
     mode='min',
     max_t=epochs,
-    grace_period=5,
+    grace_period=grace_period,
     reduction_factor=2)
     
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'score', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'score', 'training_iteration'])
     
+    trainable_id = 'Train'
+    tune.register_trainable(trainable_id, partial(train, args=args))
+                       
     result = tune.run(
-    partial(train, args=args),
+    trainable_id,
     name=experiment_name,
     resources_per_trial={'cpu': 2, 'gpu': 0.2},
     config=config,
     num_samples=n_trials,
     local_dir='./ray_results',
     scheduler=scheduler,
-    progress_reporter=reporter)
+    progress_reporter=reporter,
+    resume=resume_ray)
 
-    best_trial = result.get_best_trial('loss', 'min', 'last')
+    #best_trial = result.get_best_trial('loss', 'min', 'last')
+    best_trial = result.get_best_trial('loss', 'min', 'last-5-avg')
     print('Best trial config: {}'.format(best_trial.config))
     print('Best trial final validation loss: {}'.format(best_trial.last_result['loss'])) 
+    
+    best_checkpoint = result.get_best_checkpoint(best_trial, metric='loss', mode='min')
+    print('best_checkpoint:', best_checkpoint)
     
     if ray.is_initialized():
         ray.shutdown() 
@@ -240,7 +269,8 @@ def train(config, args, checkpoint_dir=None):
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     emb_4th_root = args.emb_4th_root
-    batch_size = args.batch_size  
+    batch_size = args.batch_size 
+    local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels    
     RNN_hidden_size = args.RNN_hidden_size   
@@ -257,20 +287,30 @@ def train(config, args, checkpoint_dir=None):
     valid_ratio = args.valid_ratio
     MultiStepLR = args.MultiStepLR
     label_smoothing =args.label_smoothing
+    mixup = args.mixup
     
-
+    bw_paths = args.bw_paths
+    bw_files = []
+    bw_names = []
+    
+    try:
+        bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
+        bw_files = list(bw_list[0])
+        bw_names = list(bw_list[1])
+    except pd.errors.EmptyDataError:
+        print('Warnings: no bigWig files provided')
 
     # Read BED files
     train_bed = BedTool(train_file)
     #test_bed = BedTool(test_file)
 
 
-    train_h5f_path = get_h5f_path(train_file, config['bw_names'], config['distal_radius'], distal_order)
+    train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
     #test_h5f_path = get_h5f_path(bw_names, config['distal_radius'], distal_order)
 
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset1(train_bed, ref_genome, config['bw_files'], config['bw_names'], config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path)
+    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path)
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
     n_cont = len(dataset.cont_cols)
@@ -335,7 +375,7 @@ def train(config, args, checkpoint_dir=None):
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     elif model_no == 2:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     else:
         print('Error: no model selected!')
@@ -366,7 +406,7 @@ def train(config, args, checkpoint_dir=None):
         criterion = LabelSmoothingCrossEntropy(epsilon=0.1)
         print('using LabelSmoothingCrossEntropy ...')
     else:
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss(reduction='sum')
 
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -418,12 +458,25 @@ def train(config, args, checkpoint_dir=None):
             cont_x = cont_x.to(device)
             distal_x = distal_x.to(device)
             y  = y.to(device)
-
-            # Forward Pass
-            #preds = model(cont_x, cat_x) #original
-            preds = model.forward((cont_x, cat_x), distal_x)
             
-            loss = criterion(preds, y.long().squeeze())
+            #print('before mixup - cat_x, cont_x, distal_x:', cat_x.shape, cont_x.shape, distal_x.shape)
+            
+            if not mixup:   
+                # Forward Pass
+                #preds = model(cont_x, cat_x) #original
+                preds = model.forward((cont_x, cat_x), distal_x)
+                loss = criterion(preds, y.long().squeeze())
+            else:
+                cat_x, cont_x, distal_x, y_a, y_b, lam = mixup_data(cat_x, cont_x, distal_x, y.long().squeeze(), alpha=0.2)
+                
+                #print('cat_x, cont_x, distal_x:', cat_x.shape, cont_x.shape, distal_x.shape)
+                preds = model.forward((cont_x, cat_x), distal_x)
+                
+                loss_func = mixup_criterion(y_a, y_b, lam)
+                loss = loss_func(criterion, preds)
+                
+            
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

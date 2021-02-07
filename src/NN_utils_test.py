@@ -2131,7 +2131,7 @@ class LabelSmoothingCrossEntropy(nn.Module):
 
 #### mixup method
 
-def mixup_data(x, y, alpha=1.0, use_cuda=True):
+def mixup_data_orig(x, y, alpha=1.0, use_cuda=True):
 
     '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
     if alpha > 0.:
@@ -2148,6 +2148,25 @@ def mixup_data(x, y, alpha=1.0, use_cuda=True):
     y_a, y_b = y, y[index]
     return mixed_x, y_a, y_b, lam
 
+def mixup_data(cat_x, cont_x, distal_x, y, alpha=0.2):
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.   
+
+    batch_size = cat_x.shape[0]
+    index = torch.randperm(batch_size)
+    
+    cat_x1 = lam * cat_x + (1 - lam) * cat_x[index,:]
+    cat_x1 = cat_x1.long() #need to be Long type
+    
+    cont_x1 = lam * cont_x + (1 - lam) * cont_x[index,:]
+    distal_x1 = lam * distal_x + (1 - lam) * distal_x[index,:]
+    
+    y_a, y_b = y, y[index]
+    
+    return cat_x1, cont_x1, distal_x1, y_a, y_b, lam
+    
 def mixup_criterion(y_a, y_b, lam):
     return lambda criterion, pred: lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 

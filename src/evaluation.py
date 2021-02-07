@@ -8,6 +8,12 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
+
+# import warnings filter
+from warnings import simplefilter
+# ignore all future warnings
+simplefilter(action='ignore', category=FutureWarning)
+
 from dirichletcal.calib.vectorscaling import VectorScaling
 from dirichletcal.calib.tempscaling import TemperatureScaling
 from dirichletcal.calib.fulldirichlet import FullDirichletCalibrator
@@ -361,7 +367,7 @@ def calibrate_prob(y_prob, y, device, calibr_name='VectS'):
     print('calibr.coef_: ', calibr.coef_)
     print('calibr.weights_:', calibr.weights_)
     
-    nll_criterion = nn.CrossEntropyLoss().to(device)
+    nll_criterion = nn.CrossEntropyLoss(reduction='mean').to(device)
     ece_criterion = ECELoss(n_bins=25).to(device)
     c_ece_criterion = ClasswiseECELoss(n_bins=25).to(device)
 
