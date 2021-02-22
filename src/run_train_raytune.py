@@ -130,7 +130,7 @@ def main():
     print('Start time:', datetime.datetime.now())
     
     #request resources
-    ray.init(num_cpus=8, num_gpus=2, dashboard_host="0.0.0.0")
+    ray.init(num_cpus=9, num_gpus=1, dashboard_host="0.0.0.0")
 
     print(' '.join(sys.argv))
     train_file = args.train_data
@@ -225,7 +225,7 @@ def main():
     result = tune.run(
     trainable_id,
     name=experiment_name,
-    resources_per_trial={'cpu': 2, 'gpu': 0.2},
+    resources_per_trial={'cpu': 3, 'gpu': 0.2},
     config=config,
     num_samples=n_trials,
     local_dir='./ray_results',
@@ -336,8 +336,8 @@ def train(config, args, checkpoint_dir=None):
     '''
     
     print('CUDA is available: ', torch.cuda.is_available())
-    #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     
     valid_size = int(len(dataset)*valid_ratio)
