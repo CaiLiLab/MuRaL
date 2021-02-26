@@ -136,19 +136,6 @@ def main():
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
     
-    #find a device with enough memory
-    nvmlInit()
-    cuda_id = '0'
-    for i in range(nvmlDeviceGetCount()):
-        h = nvmlDeviceGetHandleByIndex(i)
-        info = nvmlDeviceGetMemoryInfo(h)
-        if info.free > 1.5*(2**30): #reserve 1.5G
-            cuda_id = str(i)
-            break
-        
-    print("CUDA: ", torch.cuda.is_available())
-    device = torch.device("cuda:"+cuda_id if torch.cuda.is_available() else "cpu")
-    
     # Read BED files
     train_bed = BedTool(train_file)
     test_bed = BedTool(test_file)
@@ -213,9 +200,24 @@ def main():
     # Dataloader for testing data
     dataloader1 = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=2)
 
+    #find a device with enough memory
+    nvmlInit()
+    cuda_id = '0'
+    for i in range(nvmlDeviceGetCount()):
+        h = nvmlDeviceGetHandleByIndex(i)
+        info = nvmlDeviceGetMemoryInfo(h)
+        if info.free > 1.5*(2**30): #reserve 1.5G
+            cuda_id = str(i)
+            break
+        
+    print("CUDA: ", torch.cuda.is_available())
+    print("using  ", "cuda:"+cuda_id)
+    device = torch.device("cuda:"+cuda_id if torch.cuda.is_available() else "cpu")
+    
     # Choose the network model
     if model_no == 0:
-        model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        #model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
@@ -251,7 +253,8 @@ def main():
     model.load_state_dict(model_state)
     #model2.load_state_dict(torch.load(model2_path, map_location=device))
 
-    criterion = torch.nn.NLLLoss()
+    #criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     
     best_loss = 0
     pred_df = None
@@ -265,11 +268,12 @@ def main():
     #print("1. current CUDA:", torch.cuda.current_device())
 
     pred_y, test_total_loss = model_predict_m(model, dataloader1, criterion, device, n_class, distal=True)
-    print('pred_y:', torch.exp(pred_y[1:10]))
+    #print('pred_y:', torch.exp(pred_y[1:10]))
+    print('pred_y:', F.softmax(pred_y[1:10]))
     #print('pred_y2:', torch.exp(pred_y2[1:10]))
     
     #y_prob = pd.Series(data=to_np(torch.exp(pred_y)).T[1], name="prob")    
-    y_prob = pd.DataFrame(data=to_np(torch.exp(pred_y)), columns=prob_names)
+    y_prob = pd.DataFrame(data=to_np(F.softmax(pred_y)), columns=prob_names)
     
     #######
     if calibrator_path != '':
@@ -310,7 +314,7 @@ def main():
 
     # Print some data for debugging
     for i in range(1, n_class):
-        print('min and max of pred_y: type', i, np.min(to_np(torch.exp(pred_y))[:,i]), np.max(to_np(torch.exp(pred_y))[:,i]))
+        print('min and max of pred_y: type', i, np.min(to_np(F.softmax(pred_y))[:,i]), np.max(to_np(F.softmax(pred_y))[:,i]))
         #print('min and max of pred_y2: type', i, np.min(to_np(torch.exp(pred_y2))[:,i]), np.max(to_np(torch.exp(pred_y2))[:,i]))
 
     # Write the prediction

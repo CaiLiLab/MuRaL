@@ -256,6 +256,21 @@ class FeedForwardNNm(nn.Module):
 
         return pred_y, total_loss
 
+####
+class Network0(nn.Module):
+    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class, emb_padding_idx=None):
+        
+        super(Network0, self).__init__()
+        self.model = FeedForwardNNm(emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class, emb_padding_idx)
+    
+    def forward(self, local_input, distal_input=None):
+        cont_data, cat_data = local_input
+        
+        return self.model.forward(cont_data, cat_data)
+        
+#####        
+    
+    
     
 # Hybrid network with feedforward (local) and CNN/RNN (distal) layers, followed by a FC layer for combined output 
 class Network(nn.Module):

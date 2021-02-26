@@ -129,8 +129,7 @@ def main():
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
     
-    #request resources
-    ray.init(num_cpus=9, num_gpus=1, dashboard_host="0.0.0.0")
+
 
     print(' '.join(sys.argv))
     train_file = args.train_data
@@ -193,19 +192,27 @@ def main():
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
+        #request resources
+    os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"]=cuda_id
+    ray.init(num_cpus=9, num_gpus=1, dashboard_host="0.0.0.0")
+    
+    
     config = {
-        'local_radius': tune.choice(local_radius),
-        'local_order': tune.choice(local_order),
-        'distal_radius': tune.choice(distal_radius),
+        'local_radius': tune.grid_search(local_radius),
+        'local_order': tune.grid_search(local_order),
+        'distal_radius': tune.grid_search(distal_radius),
         'emb_dropout': tune.choice(emb_dropout),
         'local_dropout': tune.choice(local_dropout),
         'CNN_kernel_size': tune.choice(CNN_kernel_size),
         'CNN_out_channels': tune.choice(CNN_out_channels),
         'batch_size': tune.choice(batch_size),
-        'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
+        #'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
+        'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
         'LR_gamma': tune.choice(LR_gamma),
-        'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
+        #'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
+        'weight_decay': tune.choice(weight_decay),
         #'bw_files': bw_files,
         #'bw_names': bw_names,
     }
@@ -217,7 +224,7 @@ def main():
     grace_period=grace_period,
     reduction_factor=2)
     
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'score', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -336,8 +343,9 @@ def train(config, args, checkpoint_dir=None):
     '''
     
     print('CUDA is available: ', torch.cuda.is_available())
-    device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')  
+      
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     
     valid_size = int(len(dataset)*valid_ratio)
@@ -369,7 +377,8 @@ def train(config, args, checkpoint_dir=None):
 
     # Choose the network model
     if model_no == 0:
-        model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        #model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     elif model_no == 1:
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
@@ -512,10 +521,10 @@ def train(config, args, checkpoint_dir=None):
             valid_y = valid_data_and_prob['mut_type'].to_numpy().squeeze()
             
             vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
-            tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
+            #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
             
-            fdiri_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
-            fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
+            fdiri_cal, fdiri_nll = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
+            #fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
             ##############
             
 
@@ -524,7 +533,8 @@ def train(config, args, checkpoint_dir=None):
             print('5mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 5, n_class))
             print('7mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 7, n_class))
             
-            print ('Validation Loss: ', valid_total_loss/valid_size)  
+            print ('Validation Loss: ', valid_total_loss/valid_size)
+            print ('Validation Loss (after fdiri_cal): ', fdiri_nll) 
             
             ###############
             region_size = 10000
@@ -571,7 +581,7 @@ def train(config, args, checkpoint_dir=None):
                 with open(path + '.vec_cal.pkl', 'wb') as pkl_file:
                     pickle.dump(vec_cal, pkl_file)
 
-            tune.report(loss=valid_total_loss/valid_size, score=score)
+            tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score)
     #print('Total time used: %s seconds' % (time.time() - start_time))
                 
         ################

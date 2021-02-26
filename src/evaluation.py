@@ -384,4 +384,5 @@ def calibrate_prob(y_prob, y, device, calibr_name='VectS'):
     print('Before ' + calibr_name + ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll0, ece0, c_ece0))
     print('After ' + calibr_name +  ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll, ece, c_ece))
     
-    return calibr, prob_cal
+    #return calibr, prob_cal
+    return calibr, nll
