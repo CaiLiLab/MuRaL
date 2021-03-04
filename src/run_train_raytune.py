@@ -115,6 +115,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--mixup', default=False, action='store_true')
     
+    parser.add_argument('--ray_ncpus', type=int, default=9, help='number of CPUs used by Ray')
+    
+    parser.add_argument('--ray_ngpus', type=int, default=1, help='number of GPUs used by Ray')
+        
     parser.add_argument('--resume_ray', default=False, action='store_true', help='resume incomplete Ray experiment')
     
     args = parser.parse_args()
@@ -162,6 +166,8 @@ def main():
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
     resume_ray = args.resume_ray
+    ray_ncpus = args.ray_ncpus
+    ray_ngpus = args.ray_ngpus
     
     
     # Read bigWig file names
@@ -195,24 +201,24 @@ def main():
         #request resources
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=cuda_id
-    ray.init(num_cpus=9, num_gpus=1, dashboard_host="0.0.0.0")
+    ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
     
     
     config = {
         'local_radius': tune.grid_search(local_radius),
-        'local_order': tune.grid_search(local_order),
-        'distal_radius': tune.grid_search(distal_radius),
+        'local_order': tune.choice(local_order),
+        'distal_radius': tune.choice(distal_radius),
         'emb_dropout': tune.choice(emb_dropout),
         'local_dropout': tune.choice(local_dropout),
         'CNN_kernel_size': tune.choice(CNN_kernel_size),
         'CNN_out_channels': tune.choice(CNN_out_channels),
         'batch_size': tune.choice(batch_size),
-        #'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
-        'learning_rate': tune.choice(learning_rate),
+        'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
+        #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
         'LR_gamma': tune.choice(LR_gamma),
-        #'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
-        'weight_decay': tune.choice(weight_decay),
+        'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
+        #'weight_decay': tune.choice(weight_decay),
         #'bw_files': bw_files,
         #'bw_names': bw_names,
     }
@@ -381,7 +387,8 @@ def train(config, args, checkpoint_dir=None):
         model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     elif model_no == 1:
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        #model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
+        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     elif model_no == 2:
         model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)

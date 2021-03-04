@@ -269,7 +269,153 @@ class Network0(nn.Module):
         return self.model.forward(cont_data, cat_data)
         
 #####        
+class Network0r(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class, emb_padding_idx=None):
+        
+        super(Network0r, self).__init__()
+        
+        self.n_class = n_class     
+        
+        self.kernel_size = kernel_size
+        self.RNN_hidden_size = RNN_hidden_size
+        self.RNN_layers = RNN_layers
+        self.seq_len = distal_radius*2+1 - (distal_order-1)
+        
+        # CNN layers for distal input
+        maxpool_kernel_size = 10
+        maxpool_stride = 10
+        second_kernel_size = kernel_size
+        third_kernel_size = kernel_size
+        rb1_kernel_size = 3
+        rb2_kernel_size = 5
+        self.conv1 = nn.Sequential(
+            nn.BatchNorm1d(in_channels), # This is important!
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb1_kernel_size, stride=1, padding=(rb1_kernel_size-1)//2, dilation=1) for x in range(4)])
+            
+
+        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
+        
+        self.conv2 = nn.Sequential(    
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, second_kernel_size),
+            #nn.ReLU(),
+        )
+        
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
     
+        self.conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
+            nn.ReLU(),
+        )
+        
+        
+        # RNN layers
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+            crnn_fc_in_size = RNN_hidden_size*2
+        else:
+            #fc_in_size = out_channels + lin_layer_sizes[-1]
+            #crnn_fc_in_size = out_channels*2
+            crnn_fc_in_size = out_channels
+            
+            # Use the flattened output of CNN instead of torch.max
+            last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
+            
+            #crnn_fc_in_size = out_channels*last_seq_len
+        
+        # Separate FC layers for distal and local data
+        self.distal_fc = nn.Sequential(
+            nn.BatchNorm1d(crnn_fc_in_size),
+            nn.Dropout(0.25), #control overfitting
+            nn.Linear(crnn_fc_in_size, n_class), 
+            #nn.ReLU(),
+            
+            #nn.Linear(crnn_fc_in_size, 1),
+            #nn.Linear(out_channels*2, 1),
+            #nn.BatchNorm1d(30),
+            #nn.Dropout(0.25), #dropout prob
+            #nn.Linear(30, 1),
+            #nn.Dropout(0.1)
+        )     
+        
+
+        # Learn the weight parameter 
+        #self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        
+    
+    def forward(self, local_input, distal_input):
+        
+        # FeedForward layers for local input
+        cont_data, cat_data = local_input
+            
+        
+
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        
+        jump_input = distal_out = self.conv1(distal_input)
+        distal_out = self.RBs1(distal_out)    
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool1(distal_out)
+        
+        jump_input = distal_out = self.conv2(distal_out)
+        distal_out = self.RBs2(distal_out)
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool2(distal_out)
+        
+        distal_out = self.conv3(distal_out)
+        #d = x.shape[2] - out.shape[2]
+        #out = x[:,:,0:x.shape[2]-d] + out
+        
+        #out, _ = torch.max(out, dim=2)
+        #print("out.shape")
+        #print(out.shape)
+
+        # RNN after CNN
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            distal_out = distal_out.permute(2,0,1)
+            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
+            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        else:
+            
+            distal_out, _ = torch.max(distal_out, dim=2)
+            
+            # Use flattened layer instead of torchmax
+            #distal_out = distal_out.view(distal_out.shape[0], -1)
+ 
+        distal_out = self.distal_fc(distal_out)
+        
+        if np.random.uniform(0,1) < 0.00005*distal_out.shape[0] and self.training == False:
+            print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
+            print('distal_out2:', torch.min(distal_out[:,2]).item(), torch.max(distal_out[:,2]).item(),torch.var(distal_out[:,2]).item(), torch.var(F.softmax(distal_out, dim=1)[:,2]).item())
+        
+        
+        #out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
+        
+        return distal_out
+    
+
+#====
+
+
     
     
 # Hybrid network with feedforward (local) and CNN/RNN (distal) layers, followed by a FC layer for combined output 
