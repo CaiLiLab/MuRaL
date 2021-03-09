@@ -508,6 +508,8 @@ def train(config, args, checkpoint_dir=None):
             '''
             #print('in the training loop...')
 
+        sys.stdout.flush()
+
         model.eval()
         #model2.eval()
         with torch.no_grad():
@@ -527,7 +529,7 @@ def train(config, args, checkpoint_dir=None):
             
             valid_y = valid_data_and_prob['mut_type'].to_numpy().squeeze()
             
-            vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
+            #vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
             #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
             
             fdiri_cal, fdiri_nll = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
@@ -585,8 +587,8 @@ def train(config, args, checkpoint_dir=None):
             
                 with open(path + '.fdiri_cal.pkl', 'wb') as pkl_file:
                     pickle.dump(fdiri_cal, pkl_file)
-                with open(path + '.vec_cal.pkl', 'wb') as pkl_file:
-                    pickle.dump(vec_cal, pkl_file)
+                #with open(path + '.vec_cal.pkl', 'wb') as pkl_file:
+                #    pickle.dump(vec_cal, pkl_file)
 
             tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score)
     #print('Total time used: %s seconds' % (time.time() - start_time))
