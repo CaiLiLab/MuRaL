@@ -198,7 +198,7 @@ def main():
     test_size = len(dataset_test)
 
     # Dataloader for testing data
-    dataloader1 = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=2)
+    dataloader1 = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)
 
     #find a device with enough memory
     nvmlInit()
