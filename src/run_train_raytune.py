@@ -224,7 +224,8 @@ def main():
     }
     
     scheduler = ASHAScheduler(
-    metric='loss',
+    #metric='loss',
+    metric='score',
     mode='min',
     max_t=epochs,
     grace_period=grace_period,
@@ -428,6 +429,8 @@ def train(config, args, checkpoint_dir=None):
     if config['optim'] == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
         #optimizer2 = torch.optim.Adam(model2.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+    elif config['optim'] == 'AdamW':
+        optimizer = torch.optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
         
     elif config['optim'] == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'], momentum=0.98, nesterov=True)
@@ -548,6 +551,7 @@ def train(config, args, checkpoint_dir=None):
             ###############
             region_size = 10000
             n_regions = valid_size//region_size
+            print('n_regions:', n_regions)
             
             score = 0
             corr_3mer = []

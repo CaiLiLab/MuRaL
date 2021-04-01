@@ -1186,6 +1186,8 @@ class Network3m(nn.Module):
             print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
             print('local_out2:', torch.min(local_out[:,2]).item(), torch.max(local_out[:,2]).item(), torch.var(local_out[:,2]).item(), torch.var(F.softmax(local_out, dim=1)[:,2]).item())
             print('distal_out2:', torch.min(distal_out[:,2]).item(), torch.max(distal_out[:,2]).item(),torch.var(distal_out[:,2]).item(), torch.var(F.softmax(distal_out, dim=1)[:,2]).item())
+            #print('local_out3:', torch.min(local_out[:,3]).item(), torch.max(local_out[:,3]).item(), torch.var(local_out[:,3]).item(), torch.var(F.softmax(local_out, dim=1)[:,3]).item())
+            #print('distal_out3:', torch.min(distal_out[:,3]).item(), torch.max(distal_out[:,3]).item(),torch.var(distal_out[:,3]).item(), torch.var(F.softmax(distal_out, dim=1)[:,3]).item())
         
         #out = local_out * torch.sigmoid(distal_out)
         #out = local_out * torch.exp(distal_out)
