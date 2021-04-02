@@ -151,7 +151,7 @@ class HDF5Dataset(Dataset):
     
 # 
 class HDF5Dataset1(Dataset):
-    def __init__(self, data, seq_cols, cat_cols, output_col, h5f_path):
+    def __init__(self, data, seq_cols, cat_cols, output_col, h5f_path, n_channels):
         
         self.data_local = data[seq_cols+[output_col]]
         
@@ -187,6 +187,8 @@ class HDF5Dataset1(Dataset):
         #============================
         self.h5f_path = h5f_path
         self.distal_X = None
+        self.n_channels = n_channels
+        print('Number of channels to be used for distal data:', self.n_channels)
         
 
     def __len__(self):
@@ -206,7 +208,7 @@ class HDF5Dataset1(Dataset):
             #print('idx is:', idx)
         
         
-        return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.distal_X[idx])
+        return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.distal_X[idx, 0:self.n_channels, :])
     
 # Define a Dataset with both local data and distal data
 class CombinedDataset(Dataset):
@@ -421,7 +423,7 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
     return None
 
 # Prepare the datasets for given regions
-def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1):
+def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
     
     # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=local_radius, order=1)    
@@ -465,7 +467,7 @@ def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=
     y = pd.DataFrame(y, columns=['mut_type'])
     output_feature = 'mut_type'
 
-    if len(bw_files) > 0:
+    if len(bw_files) > 0 and seq_only == False:
         # Use the mean value of the region of 2*radius+1 bp around the focal site
         bw_data = np.array(Cover.create_from_bigwig(name='local', bigwigfiles=bw_files, roi=bed_regions, resolution=2*local_radius+1, flank=local_radius)).reshape(len(bed_regions), -1)
 
@@ -535,7 +537,14 @@ def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=
     
     # Combine local Dataset and distal Dataset
     #dataset = CombinedDataset(dataset_local, dataset_distal)
-    dataset = HDF5Dataset1(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path)
+    
+    if seq_only:
+        n_channels = 4**distal_order
+        print('NOTE: seq_only flag was set, so will not use any bigWig track!')
+    else:
+        n_channels = 4**distal_order + len(bw_files)
+    
+    dataset = HDF5Dataset1(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path, n_channels=n_channels)
     
     #return dataset, data_local, categorical_features
     return dataset

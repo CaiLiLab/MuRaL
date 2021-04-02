@@ -58,6 +58,8 @@ def parse_arguments(parser):
     #parser.add_argument('--', type=str, default='', help='')
     parser.add_argument('--bw_paths', type=str, default='/public/home/licai/DNMML/analysis/test/bw_files.txt', help='path for the list of BigWig files for non-sequence features')
     
+    parser.add_argument('--seq_only', default=False, action='store_true')
+    
     parser.add_argument('--n_class', type=int, default='4', help='number of mutation classes')
     
     parser.add_argument('--local_radius', type=int, default=[5], nargs='+', help='radius of local sequences to be considered')
@@ -115,7 +117,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--mixup', default=False, action='store_true')
     
-    parser.add_argument('--ray_ncpus', type=int, default=9, help='number of CPUs used by Ray')
+    parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs used by Ray')
     
     parser.add_argument('--ray_ngpus', type=int, default=1, help='number of GPUs used by Ray')
         
@@ -174,6 +176,7 @@ def main():
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
+    
     
     
     #print('emb_dropout: ', emb_dropout)
@@ -306,6 +309,7 @@ def train(config, args, checkpoint_dir=None):
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
+    seq_only = args.seq_only
     
     try:
         bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
@@ -324,7 +328,7 @@ def train(config, args, checkpoint_dir=None):
 
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path)
+    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
     n_cont = len(dataset.cont_cols)
