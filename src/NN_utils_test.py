@@ -11,6 +11,9 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import LabelEncoder
 from sklearn import metrics, calibration
+from scipy.special import lambertw
+
+from evaluation import *
 
 #from torchsummary import summary
 
@@ -134,7 +137,7 @@ class FeedForwardNN(nn.Module):
 
 class FeedForwardNNm(nn.Module):
 
-    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class):
+    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class, emb_padding_idx=None):
 
         """
         Parameters
@@ -169,7 +172,8 @@ class FeedForwardNNm(nn.Module):
         
         self.n_class = n_class
         # Embedding layers
-        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
+        #self.emb_layers = nn.ModuleList([nn.Embedding(x, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
+        self.emb_layers = nn.ModuleList([nn.Embedding(emb_padding_idx+1, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
 
         no_of_embs = sum([y for x, y in emb_dims])
         self.no_of_embs = no_of_embs
@@ -225,7 +229,8 @@ class FeedForwardNNm(nn.Module):
         #x = self.output_layer(x) #oringial output
         
         #out = torch.sigmoid(self.output_layer(x))
-        out = F.log_softmax(self.output_layer(x), dim=1)
+        #out = F.log_softmax(self.output_layer(x), dim=1)
+        out = self.output_layer(x)
 
         return out
     
@@ -251,6 +256,167 @@ class FeedForwardNNm(nn.Module):
 
         return pred_y, total_loss
 
+####
+class Network0(nn.Module):
+    def __init__(self, emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class, emb_padding_idx=None):
+        
+        super(Network0, self).__init__()
+        self.model = FeedForwardNNm(emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, n_class, emb_padding_idx)
+    
+    def forward(self, local_input, distal_input=None):
+        cont_data, cat_data = local_input
+        
+        return self.model.forward(cont_data, cat_data)
+        
+#####        
+class Network0r(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class, emb_padding_idx=None):
+        
+        super(Network0r, self).__init__()
+        
+        self.n_class = n_class     
+        
+        self.kernel_size = kernel_size
+        self.RNN_hidden_size = RNN_hidden_size
+        self.RNN_layers = RNN_layers
+        self.seq_len = distal_radius*2+1 - (distal_order-1)
+        
+        # CNN layers for distal input
+        maxpool_kernel_size = 10
+        maxpool_stride = 10
+        second_kernel_size = kernel_size
+        third_kernel_size = kernel_size
+        rb1_kernel_size = 3
+        rb2_kernel_size = 5
+        self.conv1 = nn.Sequential(
+            nn.BatchNorm1d(in_channels), # This is important!
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb1_kernel_size, stride=1, padding=(rb1_kernel_size-1)//2, dilation=1) for x in range(4)])
+            
+
+        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
+        
+        self.conv2 = nn.Sequential(    
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, second_kernel_size),
+            #nn.ReLU(),
+        )
+        
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
+    
+        self.conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
+            nn.ReLU(),
+        )
+        
+        
+        # RNN layers
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+            crnn_fc_in_size = RNN_hidden_size*2
+        else:
+            #fc_in_size = out_channels + lin_layer_sizes[-1]
+            #crnn_fc_in_size = out_channels*2
+            crnn_fc_in_size = out_channels
+            
+            # Use the flattened output of CNN instead of torch.max
+            last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
+            
+            #crnn_fc_in_size = out_channels*last_seq_len
+        
+        # Separate FC layers for distal and local data
+        self.distal_fc = nn.Sequential(
+            nn.BatchNorm1d(crnn_fc_in_size),
+            nn.Dropout(0.25), #control overfitting
+            nn.Linear(crnn_fc_in_size, n_class), 
+            #nn.ReLU(),
+            
+            #nn.Linear(crnn_fc_in_size, 1),
+            #nn.Linear(out_channels*2, 1),
+            #nn.BatchNorm1d(30),
+            #nn.Dropout(0.25), #dropout prob
+            #nn.Linear(30, 1),
+            #nn.Dropout(0.1)
+        )     
+        
+
+        # Learn the weight parameter 
+        #self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        
+    
+    def forward(self, local_input, distal_input):
+        
+        # FeedForward layers for local input
+        cont_data, cat_data = local_input
+            
+        
+
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        
+        jump_input = distal_out = self.conv1(distal_input)
+        distal_out = self.RBs1(distal_out)    
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool1(distal_out)
+        
+        jump_input = distal_out = self.conv2(distal_out)
+        distal_out = self.RBs2(distal_out)
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool2(distal_out)
+        
+        distal_out = self.conv3(distal_out)
+        #d = x.shape[2] - out.shape[2]
+        #out = x[:,:,0:x.shape[2]-d] + out
+        
+        #out, _ = torch.max(out, dim=2)
+        #print("out.shape")
+        #print(out.shape)
+
+        # RNN after CNN
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            distal_out = distal_out.permute(2,0,1)
+            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
+            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        else:
+            
+            distal_out, _ = torch.max(distal_out, dim=2)
+            
+            # Use flattened layer instead of torchmax
+            #distal_out = distal_out.view(distal_out.shape[0], -1)
+ 
+        distal_out = self.distal_fc(distal_out)
+        
+        if np.random.uniform(0,1) < 0.00005*distal_out.shape[0] and self.training == False:
+            print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
+            print('distal_out2:', torch.min(distal_out[:,2]).item(), torch.max(distal_out[:,2]).item(),torch.var(distal_out[:,2]).item(), torch.var(F.softmax(distal_out, dim=1)[:,2]).item())
+        
+        
+        #out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
+        
+        return distal_out
+    
+
+#====
+
+
+    
     
 # Hybrid network with feedforward (local) and CNN/RNN (distal) layers, followed by a FC layer for combined output 
 class Network(nn.Module):
@@ -827,14 +993,18 @@ class Network3(nn.Module):
 
 # Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
 class Network3m(nn.Module):
-    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class):
+    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class, emb_padding_idx=None):
         
         super(Network3m, self).__init__()
         
         self.n_class = n_class
         # FeedForward layers for local input
         # Embedding layers
-        self.emb_layers = nn.ModuleList([nn.Embedding(x, y) for x, y in emb_dims])
+        print('emb_dims: ', emb_dims)
+        print('emb_padding_idx: ', emb_padding_idx)
+        
+        #self.emb_layers = nn.ModuleList([nn.Embedding(x, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
+        self.emb_layers = nn.ModuleList([nn.Embedding(emb_padding_idx+1, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
 
         no_of_embs = sum([y for x, y in emb_dims])
         self.no_of_embs = no_of_embs
@@ -961,6 +1131,255 @@ class Network3m(nn.Module):
                 local_out = normalized_cont_data
         
         for lin_layer, dropout_layer, bn_layer in zip(self.lin_layers, self.droput_layers, self.bn_layers):
+            #print('local_out.shape: ', local_out.shape)
+            #print('local_out: ', local_out[0, 0:10])
+            local_out = F.relu(lin_layer(local_out))
+            local_out = bn_layer(local_out)
+            local_out = dropout_layer(local_out)
+        
+        # CNN layers for distal_input
+        # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
+        #distal_out = self.conv1(distal_input) #out_shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1)
+        
+        jump_input = distal_out = self.conv1(distal_input)
+        distal_out = self.RBs1(distal_out)    
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool1(distal_out)
+        
+        jump_input = distal_out = self.conv2(distal_out)
+        distal_out = self.RBs2(distal_out)
+        assert(jump_input.shape[2] >= distal_out.shape[2])
+        distal_out = distal_out + jump_input[:,:,0:distal_out.shape[2]]
+        distal_out = self.maxpool2(distal_out)
+        
+        distal_out = self.conv3(distal_out)
+        #d = x.shape[2] - out.shape[2]
+        #out = x[:,:,0:x.shape[2]-d] + out
+        
+        #out, _ = torch.max(out, dim=2)
+        #print("out.shape")
+        #print(out.shape)
+
+        # RNN after CNN
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            distal_out = distal_out.permute(2,0,1)
+            distal_out, _ = self.rnn(distal_out) # output of shape (seq_len, batch, num_directions * hidden_size)
+            Fwd_RNN=distal_out[-1, :, :self.RNN_hidden_size] # output of last position
+            Rev_RNN=distal_out[0, :, self.RNN_hidden_size:] # output of last position
+            distal_out = torch.cat([Fwd_RNN, Rev_RNN], dim=1)
+        else:
+            
+            distal_out, _ = torch.max(distal_out, dim=2)
+            
+            # Use flattened layer instead of torchmax
+            #distal_out = distal_out.view(distal_out.shape[0], -1)
+        #print("RNN out.shape")
+        #print(distal_out.shape)        
+        
+        # Separate FC layers 
+        local_out = self.local_fc(local_out)
+        distal_out = self.distal_fc(distal_out)
+        
+        if np.random.uniform(0,1) < 0.00005*local_out.shape[0] and self.training == False:
+            print('local_out1:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item(), torch.var(F.softmax(local_out, dim=1)[:,1]).item())
+            print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item(), torch.var(F.softmax(distal_out, dim=1)[:,1]).item())
+            print('local_out2:', torch.min(local_out[:,2]).item(), torch.max(local_out[:,2]).item(), torch.var(local_out[:,2]).item(), torch.var(F.softmax(local_out, dim=1)[:,2]).item())
+            print('distal_out2:', torch.min(distal_out[:,2]).item(), torch.max(distal_out[:,2]).item(),torch.var(distal_out[:,2]).item(), torch.var(F.softmax(distal_out, dim=1)[:,2]).item())
+            #print('local_out3:', torch.min(local_out[:,3]).item(), torch.max(local_out[:,3]).item(), torch.var(local_out[:,3]).item(), torch.var(F.softmax(local_out, dim=1)[:,3]).item())
+            #print('distal_out3:', torch.min(distal_out[:,3]).item(), torch.max(distal_out[:,3]).item(),torch.var(distal_out[:,3]).item(), torch.var(F.softmax(distal_out, dim=1)[:,3]).item())
+        
+        #out = local_out * torch.sigmoid(distal_out)
+        #out = local_out * torch.exp(distal_out)
+        #out = local_out + distal_out
+        
+        #out = torch.cat([local_out, distal_out], dim=1)
+        
+        #out = torch.sigmoid(local_out + distal_out)
+        
+        #out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
+        
+        out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        
+        #out = torch.sigmoid(out)
+        #out = torch.sigmoid(local_out)
+        #out = torch.sigmoid(distal_out)
+        
+        # Set the weight as a Parameter when adding local and distal
+        #out = torch.sigmoid(local_out) * torch.sigmoid(self.w_ld) + torch.sigmoid(distal_out)*(1-torch.sigmoid(self.w_ld)) 
+        
+        return out
+    
+    # Do prediction using batches in DataLoader to save memory 
+    def batch_predict(self, dataloader, criterion, device):
+ 
+        self.eval()
+        pred_y = torch.empty(0, self.n_class).to(device)
+        
+        total_loss = 0
+
+        with torch.no_grad():
+            for y, cont_x, cat_x, distal_x in dataloader:
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+                distal_x = distal_x.to(device)
+                y  = y.to(device)
+        
+                preds = self.forward((cont_x, cat_x), distal_x)
+                pred_y = torch.cat((pred_y, preds), dim=0)
+                
+                loss = criterion(preds, y.long().squeeze())
+                total_loss += loss.item()
+
+        return pred_y, total_loss
+
+#====
+class Network4m(nn.Module):
+    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, RNN_hidden_size, RNN_layers, last_lin_size, distal_radius, distal_order, n_class, emb_padding_idx=None):
+        
+        super(Network4m, self).__init__()
+        
+        self.n_class = n_class
+        # FeedForward layers for local input
+        # Embedding layers
+        print('emb_dims: ', emb_dims)
+        print('emb_padding_idx: ', emb_padding_idx)
+        
+        #self.emb_layers = nn.ModuleList([nn.Embedding(x, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
+        self.emb_layers = nn.ModuleList([nn.Embedding(emb_padding_idx+1, y, padding_idx = emb_padding_idx) for x, y in emb_dims])
+
+        no_of_embs = sum([y for x, y in emb_dims])
+        self.no_of_embs = no_of_embs
+        self.no_of_cont = no_of_cont
+
+        # Linear Layers
+        first_lin_layer = nn.Linear(self.no_of_embs + self.no_of_cont, lin_layer_sizes[0])
+
+        self.lin_layers = nn.ModuleList([first_lin_layer] + [nn.Linear(lin_layer_sizes[i], lin_layer_sizes[i + 1]) for i in range(len(lin_layer_sizes) - 1)])
+        
+        for lin_layer in self.lin_layers:
+            nn.init.kaiming_normal_(lin_layer.weight.data)
+
+        # Batch Norm Layers
+        self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
+        self.bn_layers = nn.ModuleList([nn.BatchNorm1d(size) for size in lin_layer_sizes])
+
+        # Dropout Layers
+        self.emb_dropout_layer = nn.Dropout(emb_dropout)
+        self.droput_layers = nn.ModuleList([nn.Dropout(size) for size in lin_layer_dropouts])
+
+        
+        self.kernel_size = kernel_size
+        self.RNN_hidden_size = RNN_hidden_size
+        self.RNN_layers = RNN_layers
+        self.seq_len = distal_radius*2+1 - (distal_order-1)
+        
+        # CNN layers for distal input
+        maxpool_kernel_size = 10
+        maxpool_stride = 10
+        second_kernel_size = kernel_size
+        third_kernel_size = kernel_size
+        rb1_kernel_size = 3
+        rb2_kernel_size = 5
+        self.conv1 = nn.Sequential(
+            nn.BatchNorm1d(in_channels), # This is important!
+            nn.Conv1d(in_channels, out_channels, kernel_size), # in_channels, out_channels, kernel_size
+            #nn.ReLU(),
+        )
+        
+        self.RBs1 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb1_kernel_size, stride=1, padding=(rb1_kernel_size-1)//2, dilation=1) for x in range(4)])
+            
+
+        self.maxpool1 = nn.MaxPool1d(maxpool_kernel_size, maxpool_stride) # kernel_size, stride
+        
+        self.conv2 = nn.Sequential(    
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, second_kernel_size),
+            #nn.ReLU(),
+        )
+        
+        self.RBs2 = nn.Sequential(*[ResBlock(out_channels, kernel_size=rb2_kernel_size, stride=1, padding=(rb2_kernel_size-1)//2, dilation=1) for x in range(4)])
+
+        self.maxpool2 = nn.MaxPool1d(4, 4)
+    
+        self.conv3 = nn.Sequential(
+            nn.BatchNorm1d(out_channels),
+            nn.Conv1d(out_channels, out_channels, third_kernel_size),
+            nn.ReLU(),
+        )
+        
+        
+        # RNN layers
+        if self.RNN_hidden_size > 0 and self.RNN_layers > 0:
+            #self.rnn = nn.LSTM(out_channels*2, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            self.rnn = nn.LSTM(out_channels, RNN_hidden_size, num_layers=RNN_layers, bidirectional=True)
+            #fc_in_size = RNN_hidden_size*2 + lin_layer_sizes[-1]
+            crnn_fc_in_size = RNN_hidden_size*2
+        else:
+            #fc_in_size = out_channels + lin_layer_sizes[-1]
+            #crnn_fc_in_size = out_channels*2
+            crnn_fc_in_size = out_channels
+            
+            # Use the flattened output of CNN instead of torch.max
+            last_seq_len = (distal_radius*2+1 - (distal_order-1) - (kernel_size-1) - (maxpool_kernel_size-maxpool_stride))//maxpool_stride
+            last_seq_len = (last_seq_len - (second_kernel_size-1) )//2 # For the 2nd conv1d
+            
+            #crnn_fc_in_size = out_channels*last_seq_len
+        
+        # Separate FC layers for distal and local data
+        self.distal_fc = nn.Sequential(
+            nn.BatchNorm1d(crnn_fc_in_size),
+            nn.Dropout(0.25), #control overfitting
+            nn.Linear(crnn_fc_in_size, n_class), 
+            #nn.ReLU(),
+            
+            #nn.Linear(crnn_fc_in_size, 1),
+            #nn.Linear(out_channels*2, 1),
+            #nn.BatchNorm1d(30),
+            #nn.Dropout(0.25), #dropout prob
+            #nn.Linear(30, 1),
+            #nn.Dropout(0.1)
+        )
+        
+        # Local FC layers
+        self.local_fc = nn.Sequential(
+            #nn.BatchNorm1d(lin_layer_sizes[-1]),
+            #nn.Dropout(0.15),
+            nn.Linear(lin_layer_sizes[-1], n_class), 
+        )       
+
+        self.combined_fc = nn.Sequential(
+            nn.BatchNorm1d(n_class*2),
+            #nn.ReLU(),
+            nn.Linear(n_class, n_class), 
+        )
+
+        # Learn the weight parameter 
+        self.w_ld = torch.nn.Parameter(torch.Tensor([0]))
+        
+    
+    def forward(self, local_input, distal_input):
+        
+        # FeedForward layers for local input
+        cont_data, cat_data = local_input
+        if self.no_of_embs != 0:
+            local_out = [emb_layer(cat_data[:, i]) for i,emb_layer in enumerate(self.emb_layers)]
+            
+        
+        local_out = torch.cat(local_out, dim = 1) #x.shape: batch_size * sum(emb_size)
+        local_out = self.emb_dropout_layer(local_out)
+
+        if self.no_of_cont != 0:
+            normalized_cont_data = self.first_bn_layer(cont_data)
+
+            if self.no_of_embs != 0:
+                local_out = torch.cat([local_out, normalized_cont_data], dim = 1) 
+            else:
+                local_out = normalized_cont_data
+        
+        for lin_layer, dropout_layer, bn_layer in zip(self.lin_layers, self.droput_layers, self.bn_layers):
+            #print('local_out.shape: ', local_out.shape)
+            #print('local_out: ', local_out[0, 0:10])
             local_out = F.relu(lin_layer(local_out))
             local_out = bn_layer(local_out)
             local_out = dropout_layer(local_out)
@@ -1025,7 +1444,14 @@ class Network3m(nn.Module):
         
         #out = (torch.sigmoid(local_out) + torch.sigmoid(distal_out))/2
         
-        out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        #out = self.combined_fc(torch.cat([F.softmax(local_out, dim=1), F.softmax(distal_out, dim=1)], dim=1))
+        
+        #For cross entropy loss
+        out = self.combined_fc((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
+        
+        #out = F.log_softmax(out, dim=1)
+        
+        #out = torch.log((F.softmax(local_out, dim=1) + F.softmax(distal_out, dim=1))/2)
         
         #out = torch.sigmoid(out)
         #out = torch.sigmoid(local_out)
@@ -1059,6 +1485,8 @@ class Network3m(nn.Module):
 
         return pred_y, total_loss
 
+    
+    
 class AttentionModule_stage1(nn.Module):
 
     def __init__(self, in_channels, out_channels, seq_len=101):
@@ -1644,6 +2072,26 @@ class ResidualBlock(nn.Module):
         out += residual
         return out   
 
+class BrierScore(nn.Module):
+    def __init__(self):
+        super(BrierScore, self).__init__()
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+        target_one_hot = torch.FloatTensor(input.shape).to(target.get_device())
+        target_one_hot.zero_()
+        target_one_hot.scatter_(1, target, 1)
+
+        pt = F.softmax(input)
+        squared_diff = (target_one_hot - pt) ** 2
+
+        loss = torch.sum(squared_diff) / float(input.shape[0])
+        return loss
+    
 # Hybrid loss function: BCELoss + the difference between observed and predicted mutation probabilities in bins
 class HybridLoss(nn.Module):
     
@@ -1710,6 +2158,92 @@ def pearsonr(x, y):
     
     return r_val
 
+'''
+Implementation of Focal Loss.
+Reference:
+[1]  T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Dollar, Focal loss for dense object detection.
+     arXiv preprint arXiv:1708.02002, 2017.
+'''
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=0, size_average=False):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+
+        logpt = F.log_softmax(input)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = logpt.exp()
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
+
+def get_gamma(p=0.2):
+    '''
+    Get the gamma for a given pt where the function g(p, gamma) = 1
+    '''
+    y = ((1-p)**(1-(1-p)/(p*np.log(p)))/(p*np.log(p)))*np.log(1-p)
+    gamma_complex = (1-p)/(p*np.log(p)) + lambertw(-y + 1e-12, k=-1)/np.log(1-p)
+    gamma = np.real(gamma_complex) #gamma for which p_t > p results in g(p_t,gamma)<1
+    return gamma
+
+'''
+ps = [0.2, 0.5]
+gammas = [5.0, 3.0]
+i = 0
+gamma_dic = {}
+for p in ps:
+    gamma_dic[p] = gammas[i]
+    i += 1
+'''
+
+class FocalLossAdaptive(nn.Module):
+    def __init__(self, gamma=0, size_average=False, device=None):
+        super(FocalLossAdaptive, self).__init__()
+        self.size_average = size_average
+        self.gamma = gamma
+        self.device = device
+
+    def get_gamma_list(self, pt):
+        gamma_list = []
+        batch_size = pt.shape[0]
+        gamma_dic = {0.2: 5.0, 0.5: 3.0}
+        for i in range(batch_size):
+            pt_sample = pt[i].item()
+            if (pt_sample >= 0.5):
+                gamma_list.append(self.gamma)
+                continue
+            # Choosing the gamma for the sample
+            for key in sorted(gamma_dic.keys()):
+                if pt_sample < key:
+                    gamma_list.append(gamma_dic[key])
+                    break
+        return torch.tensor(gamma_list).to(self.device)
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+        logpt = F.log_softmax(input, dim=1)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = logpt.exp()
+        gamma = self.get_gamma_list(pt)
+        loss = -1 * (1-pt)**gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
+
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv1d') != -1 or classname.find('Conv2d') != -1:
@@ -1736,6 +2270,71 @@ def weights_init(m):
                 if 'weight' in p:
                     torch.nn.init.xavier_uniform_(m.__getattr__(p))
 
+##label smoothing
+def reduce_loss(loss, reduction='mean'):
+    return loss.mean() if reduction=='mean' else loss.sum() if reduction=='sum' else loss
+
+def linear_combination(x, y, epsilon): 
+    return epsilon*x + (1-epsilon)*y
+
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self, epsilon:float=0.1, reduction='mean'):
+        super().__init__()
+        self.epsilon = epsilon
+        self.reduction = reduction
+    
+    def forward(self, preds, target):
+        n = preds.size()[-1]
+        log_preds = F.log_softmax(preds, dim=-1)
+        loss = reduce_loss(-log_preds.sum(dim=-1), self.reduction)
+        nll = F.nll_loss(log_preds, target, reduction=self.reduction)
+        return linear_combination(loss/n, nll, self.epsilon)
+##label smoothing
+
+
+#### mixup method
+
+def mixup_data_orig(x, y, alpha=1.0, use_cuda=True):
+
+    '''Compute the mixup data. Return mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index,:]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+def mixup_data(cat_x, cont_x, distal_x, y, alpha=0.2):
+    if alpha > 0.:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1.   
+
+    batch_size = cat_x.shape[0]
+    index = torch.randperm(batch_size)
+    
+    cat_x1 = lam * cat_x + (1 - lam) * cat_x[index,:]
+    cat_x1 = cat_x1.long() #need to be Long type
+    
+    cont_x1 = lam * cont_x + (1 - lam) * cont_x[index,:]
+    distal_x1 = lam * distal_x + (1 - lam) * distal_x[index,:]
+    
+    y_a, y_b = y, y[index]
+    
+    return cat_x1, cont_x1, distal_x1, y_a, y_b, lam
+    
+def mixup_criterion(y_a, y_b, lam):
+    return lambda criterion, pred: lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+#### mixup
+                    
 def two_model_predict(model, model2, dataloader, criterion, device):
  
     model = model.to(device)
@@ -1808,6 +2407,37 @@ def two_model_predict_m(model, model2, dataloader, criterion, device, n_class):
 
     return pred_y, total_loss, pred_y2, total_loss2 
 
+def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
+ 
+    model = model.to(device)
+    model.eval()
+    
+    pred_y = torch.empty(0, n_class).to(device)        
+    total_loss = 0
+    
+    #print("in two_model_predict_m, current CUDA:", torch.cuda.current_device())
+    
+    with torch.no_grad():
+        for y, cont_x, cat_x, distal_x in dataloader:
+            cat_x = cat_x.to(device)
+            cont_x = cont_x.to(device)
+            distal_x = distal_x.to(device)
+            y  = y.to(device)
+        
+            if distal:
+                preds = model.forward((cont_x, cat_x), distal_x)
+            else:
+                preds = model.forward(cont_x, cat_x)
+            pred_y = torch.cat((pred_y, preds), dim=0)
+            #print('pred_y:', pred_y[1:10])
+            #print('y:', y[1:10])
+            #print('pred_y.shape, preds.shape, y.shape, distal_x.shape', pred_y.shape, preds.shape, y.shape, distal_x.shape)
+                
+            loss = criterion(preds, y.long().squeeze(1))
+            total_loss += loss.item()
+
+    return pred_y, total_loss
+
 class ModelWithTemperature(nn.Module):
     """
     A thin decorator, which wraps a model with temperature scaling
@@ -1819,17 +2449,19 @@ class ModelWithTemperature(nn.Module):
     def __init__(self, model):
         super(ModelWithTemperature, self).__init__()
         self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1.5)
+        self.temperature = nn.Parameter(torch.ones(1) * 1.2)
 
     def forward(self, local_x, distal_x):
         #logits = self.model(input)
         #cont_x, cat_x = local_x
-        preds = self.model.forward(local_x, distal_x)
-        logits = torch.cat((1-preds,preds),1)
-        logits = torch.log(logits/(1-logits))
+        logits = self.model.forward(local_x, distal_x)
+        
+        #logits = torch.cat((1-preds,preds),1)
+        #logits = torch.log(logits/(1-logits))
                 
-        #return self.temperature_scale(logits)
-        return torch.sigmoid(self.temperature_scale(logits))[:,1].unsqueeze(1)
+        #return F.log_softmax(self.temperature_scale(logits), dim=1)
+        return self.temperature_scale(logits)
+        #return torch.sigmoid(self.temperature_scale(logits))[:,1].unsqueeze(1)
 
     def temperature_scale(self, logits):
         """
@@ -1840,15 +2472,18 @@ class ModelWithTemperature(nn.Module):
         return logits / temperature
 
     # This function probably should live outside of this class, but whatever
-    def set_temperature(self, dataloader):
+    def set_temperature(self, dataloader, device):
         """
         Tune the tempearature of the model (using the validation set).
         We're going to set it to optimize NLL.
         valid_loader (DataLoader): validation set loader
         """
-        self.cuda()
-        nll_criterion = nn.CrossEntropyLoss().cuda()
-        #ece_criterion = _ECELoss().cuda()
+        self.to(device)
+        nll_criterion = nn.CrossEntropyLoss().to(device)
+        #nll_criterion = torch.nn.NLLLoss(reduction='mean').to(device)
+        ece_criterion = ECELoss(n_bins=25).to(device)
+        c_ece_criterion = ClasswiseECELoss(n_bins=25).to(device)
+        ada_ece_criterion = AdaptiveECELoss(n_bins=15).to(device)
 
         # First: collect all the logits and labels for the validation set
         logits_list = []
@@ -1856,31 +2491,35 @@ class ModelWithTemperature(nn.Module):
         with torch.no_grad():
             #for input, label in valid_loader:
             for y, cont_x, cat_x, distal_x in dataloader:
-                #input = input.cuda()
+                #input = input.to(device)
                 #logits = self.model(input)
-                cat_x = cat_x.cuda()
-                cont_x = cont_x.cuda()
-                distal_x = distal_x.cuda()
-                y  = y.cuda()
+                cat_x = cat_x.to(device)
+                cont_x = cont_x.to(device)
+                distal_x = distal_x.to(device)
+                y  = y.to(device)
         
-                preds = self.model.forward((cont_x, cat_x), distal_x)
-                logits = torch.cat((1-preds,preds),1)
-                logits = torch.log(logits/(1-logits))
+                logits = self.model.forward((cont_x, cat_x), distal_x)
+                #logits = torch.cat((1-preds,preds),1)
+                #logits = torch.log(logits/(1-logits))
                 
                 logits_list.append(logits)
                 labels_list.append(y.long())
-            logits = torch.cat(logits_list).cuda()
-            labels = torch.cat(labels_list).squeeze().cuda()
+            logits = torch.cat(logits_list).to(device)
+            labels = torch.cat(labels_list).squeeze().to(device)
         print('logits.shape:', logits.shape, labels.shape)
         print(logits, labels)
         # Calculate NLL and ECE before temperature scaling
         before_temperature_nll = nll_criterion(logits, labels).item()
-        #before_temperature_ece = ece_criterion(logits, labels).item()
-        print('Before temperature - NLL:', before_temperature_nll)
-        #print('Before temperature - NLL: %.3f, ECE: %.3f' % (before_temperature_nll, before_temperature_ece))
+        before_temperature_ece = ece_criterion(logits, labels).item()
+        before_temperature_c_ece = c_ece_criterion(logits, labels).item()
+        before_temperature_ada_ece = ada_ece_criterion(logits, labels).item()
+        
+        #print('Before temperature - NLL:', before_temperature_nll)
+        print('Before temperature - NLL: %.5f, ECE: %.5f, CwECE: %.5f, AdaECE: %.5f,' % (before_temperature_nll, before_temperature_ece, before_temperature_c_ece, before_temperature_ada_ece))
 
         # Next: optimize the temperature w.r.t. NLL
-        optimizer = optim.LBFGS([self.temperature], lr=0.01, max_iter=100)
+        optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=10000)
+        #print('temp optimizer:', optimizer)
 
         def eval():
             loss = nll_criterion(self.temperature_scale(logits), labels)
@@ -1889,10 +2528,13 @@ class ModelWithTemperature(nn.Module):
         optimizer.step(eval)
 
         # Calculate NLL and ECE after temperature scaling
-        #after_temperature_nll = nll_criterion(self.temperature_scale(logits), labels).item()
-        #after_temperature_ece = ece_criterion(self.temperature_scale(logits), labels).item()
-        print('Optimal temperature: %.3f' % self.temperature.item())
-        #print('After temperature - NLL: %.3f, ECE: %.3f' % (after_temperature_nll, after_temperature_ece))
+        after_temperature_nll = nll_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_ece = ece_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_c_ece = c_ece_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_ada_ece = ada_ece_criterion(self.temperature_scale(logits), labels).item()
+        print('Optimal temperature: %.5f' % self.temperature.item())
+        #print('After temperature - NLL:', after_temperature_nll)
+        print('After temperature - NLL: %.5f, ECE: %.5f, CwECE: %.5f, AdaECE: %.5f,' % (after_temperature_nll, after_temperature_ece, after_temperature_c_ece, after_temperature_ada_ece))
 
         return self
     
@@ -1919,6 +2561,7 @@ class ModelWithTemperature(nn.Module):
 
         return pred_y, total_loss
 
+'''
 class _ECELoss(nn.Module):
     """
     Calculates the Expected Calibration Error of a model.
@@ -1958,3 +2601,4 @@ class _ECELoss(nn.Module):
                 ece += torch.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
 
         return ece
+'''

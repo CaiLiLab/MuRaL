@@ -9,11 +9,21 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 
+import os
+import time
+import datetime
+
+
+
 from sklearn import metrics, calibration
 
 from NN_utils import *
 from preprocessing import *
 from evaluation import *
+
+start_time = time.time()
+print('Start time:', datetime.datetime.now())
+
 
 print("CUDA: ", torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -69,8 +79,13 @@ else:
     distal_order = 1
 print('distal_order:', distal_order)
 
+train_h5f_path = sys.argv[11] + '.train_distal.h5'
+test_h5f_path = sys.argv[11] + '.test_distal.h5'
+
 # Prepare the datasets for trainging
-dataset, data_local, categorical_features = prepare_dataset(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order)
+dataset, data_local, categorical_features = prepare_dataset2(train_bed, ref_genome, bw_files,bw_names, radius, distal_radius, distal_order, train_h5f_path)
+
+#sys.exit()
 
 # Batch size for training
 if len(sys.argv)>6:
@@ -103,10 +118,10 @@ else:
 print('RNN_hidden_size:', RNN_hidden_size)
 
 # Dataloader for training
-dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=1) #shuffle=False for HybridLoss
+dataloader = DataLoader(dataset, batchsize, shuffle=True, num_workers=2) #shuffle=False for HybridLoss
 
 # Dataloader for predicting
-dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader2 = DataLoader(dataset, batch_size=batchsize, shuffle=False, num_workers=2)
 
 # Number of categorical features
 cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
@@ -116,10 +131,10 @@ emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
 #emb_dims
 
 # Prepare testing data 
-dataset_test, data_local_test, _ = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order)
+dataset_test, data_local_test, _ = prepare_dataset2(test_bed, ref_genome, bw_files, bw_names, radius, distal_radius, distal_order, test_h5f_path, 1)
 
 # Dataloader for testing data
-dataloader1 = DataLoader(dataset_test, batch_size=batchsize, shuffle=False, num_workers=1)
+dataloader1 = DataLoader(dataset_test, batch_size=10, shuffle=False, num_workers=2)
 
 # Choose the network model
 if len(sys.argv) < 10:
@@ -147,8 +162,8 @@ print('model2:')
 print(model2)
 
 # Initiating weights of the models;
-weights_init(model)
-weights_init(model2)
+model.apply(weights_init)
+model2.apply(weights_init)
 
 # Loss function
 criterion = torch.nn.BCELoss()
@@ -234,6 +249,7 @@ for epoch in range(no_of_epochs):
         
         total_loss += loss.item()
         total_loss2 += loss2.item()
+        #print('in the training loop...')
        
     model.eval()
     model2.eval()
@@ -242,46 +258,66 @@ for epoch in range(no_of_epochs):
         print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
         scheduler.step()
         scheduler2.step()
-    
+        
+        if epoch <5:
+            continue
         #if len(sys.argv)>7 and int(sys.argv[7]) > 0:
         #    print('torch.sigmoid(model.w_ld):', torch.sigmoid(model.w_ld))
     
-        # Do predictions for testing data
-        pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
-        y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
-        data_and_prob = pd.concat([data_local_test, y_prob], axis=1)
+
     
         # Do predictions for training data
-        all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
+        #all_pred_y, train_total_loss = model.batch_predict(dataloader2, criterion, device)      
+        all_pred_y, train_total_loss, all_pred_y2, train_total_loss2 = two_model_predict(model, model2, dataloader2, criterion, device)
+        
         all_y_prob = pd.Series(data=to_np(all_pred_y).T[0], name="prob")
         all_data_and_prob = pd.concat([data_local, all_y_prob], axis=1)
-    
-        # Compare observed/predicted 3/5/7mer mutation frequencies
-        print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
-        print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
-        print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
-        print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
-        print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
-        print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
-    
-        # For FeedForward-only model
-        pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
-        y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
-        data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
-    
-        all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)      
+        
+        #all_pred_y2, train_total_loss2 = model2.batch_predict(dataloader2, criterion, device)     
         all_y_prob2 = pd.Series(data=to_np(all_pred_y2).T[0], name="prob")
-        all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)
+        all_data_and_prob2 = pd.concat([data_local, all_y_prob2], axis=1)        
+        
+        # Compare observed/predicted 3/5/7mer mutation frequencies
+        #print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+        print ('3mer correlation - all: ' + str(f3mer_comp(all_data_and_prob)))
+        #print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+        print ('5mer correlation - all: ' + str(f5mer_comp(all_data_and_prob)))
+        #print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+        print ('7mer correlation - all: ' + str(f7mer_comp(all_data_and_prob)))
 
-        print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
+
+        #print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
         print ('3mer correlation - all (FF only): ' + str(f3mer_comp(all_data_and_prob2)))
-        print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
+        #print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
         print ('5mer correlation - all (FF only): ' + str(f5mer_comp(all_data_and_prob2)))
-        print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
+        #print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
         print ('7mer correlation - all (FF only): ' + str(f7mer_comp(all_data_and_prob2)))
-    
+        
+        print ("Total Loss: ", train_total_loss, train_total_loss2)        
+        # Do predictions for testing data
+        if epoch == no_of_epochs-1:
+            #pred_y, test_total_loss = model.batch_predict(dataloader1, criterion, device)
+            pred_y, test_total_loss, pred_y2, test_total_loss2 = two_model_predict(model, model2, dataloader1, criterion, device)
+            y_prob = pd.Series(data=to_np(pred_y).T[0], name="prob")    
+            data_and_prob = pd.concat([data_local_test, y_prob], axis=1)        
+        
+            # For FeedForward-only model
+            #pred_y2, test_total_loss2 = model2.batch_predict(dataloader1, criterion, device)
+            y_prob2 = pd.Series(data=to_np(pred_y2).T[0], name="prob")    
+            data_and_prob2 = pd.concat([data_local_test, y_prob2], axis=1)
+            
+            print ('3mer correlation - test: ' + str(f3mer_comp(data_and_prob)))
+            print ('5mer correlation - test: ' + str(f5mer_comp(data_and_prob)))
+            print ('7mer correlation - test: ' + str(f7mer_comp(data_and_prob)))
+            print ('3mer correlation - test (FF only): ' + str(f3mer_comp(data_and_prob2)))
+            print ('5mer correlation - test (FF only): ' + str(f5mer_comp(data_and_prob2)))
+            print ('7mer correlation - test (FF only): ' + str(f7mer_comp(data_and_prob2)))
+            
+            
+            
         # Save the predictions of the best model
-        if epoch == 0:
+        '''
+        if epoch == 0 or best_loss ==0:
             best_loss = test_total_loss
             best_loss2 = test_total_loss2
             pred_df = data_and_prob[['mut_type','prob']]
@@ -294,7 +330,7 @@ for epoch in range(no_of_epochs):
         if test_total_loss2 < best_loss2:
             best_loss2 = test_total_loss2
             pred_df2 = data_and_prob2[['mut_type','prob']]
-    
+        '''
         if epoch == no_of_epochs-1:
             last_pred_df = data_and_prob[['mut_type','prob']]
             last_pred_df2 = data_and_prob2[['mut_type','prob']]
@@ -302,37 +338,47 @@ for epoch in range(no_of_epochs):
             torch.save(model.state_dict(), pred_outfile+'.model1')
             torch.save(model2.state_dict(), pred_outfile+'.model2')
 
-        # Get the scores
-        #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
-        test_y = data_local_test['mut_type']
-        auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
-        auc_score2 = metrics.roc_auc_score(test_y, to_np(pred_y2))
+            # Get the scores
+            #auc_score = metrics.roc_auc_score(to_np(test_y), to_np(pred_y))
+            test_y = data_local_test['mut_type']
+            #auc_score = metrics.roc_auc_score(test_y, to_np(pred_y))
+            #auc_score2 = metrics.roc_auc_score(test_y, to_np(pred_y2))
     
-        # Print some data for debugging
-        print("print test_y, pred_y:")
-        print(test_y)
-        print(to_np(pred_y))
-        print('min and max of pred_y:', np.min(to_np(pred_y)), np.max(to_np(pred_y)))
-        print('min and max of pred_y2:', np.min(to_np(pred_y2)), np.max(to_np(pred_y2)))
+            # Print some data for debugging
+            print("print test_y, pred_y:")
+            print(test_y)
+            print(to_np(pred_y))
+            print('min and max of pred_y:', np.min(to_np(pred_y)), np.max(to_np(pred_y)))
+            print('min and max of pred_y2:', np.min(to_np(pred_y2)), np.max(to_np(pred_y2)))
    
-        brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
-        brier_score2 = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y2))
+            #brier_score = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y))
+            #brier_score2 = metrics.brier_score_loss(data_local_test['mut_type'], to_np(pred_y2))
 
     
-        prob_true, prob_pred = calibration.calibration_curve(test_y, to_np(pred_y),n_bins=50)
+            #prob_true, prob_pred = calibration.calibration_curve(test_y, to_np(pred_y),n_bins=50)
     
-        #print("calibration: ", np.column_stack((prob_pred,prob_true)))
+            #print("calibration: ", np.column_stack((prob_pred,prob_true)))
     
-        print ("AUC score: ", auc_score, auc_score2)
-        print ("Brier score: ", brier_score, brier_score2)
+            #print ("AUC score: ", auc_score, auc_score2)
+            #print ("Brier score: ", brier_score, brier_score2)
     
-        print ("Total Loss: ", train_total_loss, train_total_loss2, test_total_loss, test_total_loss2)
+        #print ("Total Loss: ", train_total_loss, train_total_loss2, test_total_loss, test_total_loss2)
         #np.savetxt(sys.stdout, test_pred, fmt='%s', delimiter='\t')
 
 # Write the prediction
-print('best loss, best loss2:', best_loss, best_loss2)
+#print('best loss, best loss2:', best_loss, best_loss2)
 
-pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
-pred_df.columns = ['chrom', 'start', 'end','mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
+#pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], pred_df, pred_df2['prob'], last_pred_df['prob'], last_pred_df2['prob']), axis=1)
+pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end']], last_pred_df, last_pred_df2['prob']), axis=1)
+
+#pred_df.columns = ['chrom', 'start', 'end','mut_type','prob1', 'prob2', 'last_prob', 'last_prob2']
+pred_df.columns = ['chrom', 'start', 'end','mut_type', 'last_prob', 'last_prob2']
+
 pred_df.to_csv(pred_outfile, sep='\t', index=False)
+
+os.remove(train_h5f_path)
+os.remove(test_h5f_path)
+
+print("Total time used: %s seconds" % (time.time() - start_time))
+
 
