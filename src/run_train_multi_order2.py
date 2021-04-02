@@ -20,7 +20,7 @@ import datetime
 
 from sklearn import metrics, calibration
 
-from NN_utils_test import *
+from nn_models import *
 from preprocessing import *
 from evaluation import *
 
