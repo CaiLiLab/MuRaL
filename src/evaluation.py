@@ -171,13 +171,10 @@ def corr_calc(data, window, model):
     result = result.append(pd.DataFrame({'avg_obs':[avg_obs], 'avg_pred':[avg_pred]}))
     #print(chrom, start, count, avg_obs, avg_pred, sep='\t')
     #print('no of sites:', site_length)
-    #print('result.head', result.head(5))
-    #print('result.tail', result.tail(5))
+
     #print('result.shape', result.shape)
     if sum(list(result['avg_obs'] == 0) | (result['avg_obs'] == 1))/result.shape[0] > 0.5:
         print('Warning: too many zeros/ones in the obs windows of size', window)
-    
-    #print('obs==0 rows:', result.loc[result['avg_obs']==0].shape)
 
     corr = result['avg_obs'].corr(result['avg_pred'])
     return corr

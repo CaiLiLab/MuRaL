@@ -23,6 +23,8 @@ import datetime
 from sklearn import metrics, calibration
 
 from nn_models import *
+from nn_utils import *
+
 from preprocessing import *
 from evaluation import *
 from pynvml import *
@@ -71,7 +73,6 @@ def parse_arguments(parser):
     
     parser.add_argument('--CNN_out_channels', type=int, default='60', help='number of output channels for CNN layers')
     
-    parser.add_argument('--RNN_hidden_size', type=int, default='0', help='number of hidden neurons for RNN layers')
     
     parser.add_argument('--model_no', type=int, default='2', help=' which NN model to be used')
     
@@ -119,7 +120,6 @@ def main():
     pred_batch_size = args.pred_batch_size
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels    
-    RNN_hidden_size = args.RNN_hidden_size   
     model_no = args.model_no   
     pred_file = args.pred_file   
     learning_rate = args.learning_rate   
@@ -216,22 +216,14 @@ def main():
     
     # Choose the network model
     if model_no == 0:
-        #model = Network(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=cnn_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
         model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
-        #model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
-        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 2:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
-    elif model_no == 3:
-        model = ResidualAttionNetwork3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
-    
-    elif model_no == 4:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[300, 100], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
-        #model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, RNN_hidden_size=RNN_hidden_size, RNN_layers=1, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order).to(device)
 
     else:
         print('Error: no model selected!')
@@ -240,13 +232,7 @@ def main():
     print('model:')
     print(model)
 
-    # FeedForward-only model for comparison
-    #model2 = FeedForwardNNm(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
-    
-    #print('model2:')
-    #print(model2)
 
-    #NOTE: by default, the model will be loaded into 'cuda:0' 
     if optim:
         model_state, optimizer_state = torch.load(model_path, map_location=device)
     else:
@@ -261,9 +247,7 @@ def main():
     pred_df = None
     test_pred_df = None
 
-    #best_loss2 = 0
-    #pred_df2 = None
-    #test_pred_df2 = None
+
     prob_names = ['prob'+str(i) for i in range(n_class)]
     
     #print("1. current CUDA:", torch.cuda.current_device())
