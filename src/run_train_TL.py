@@ -61,9 +61,7 @@ def parse_arguments(parser):
     parser.add_argument('--distal_radius', type=int, default='50', help='radius of distal sequences to be considered')
     
     parser.add_argument('--distal_order', type=int, default='1', help='order of distal sequences to be considered')
-    
-    parser.add_argument('--emb_4th_root', default=False, action='store_true')
-    
+        
     parser.add_argument('--emb_dropout', type=float, default=0.2, help='dropout rate for k-mer embedding')
     
     parser.add_argument('--local_dropout', type=float, default=0.15, help='dropout rate for local network')
@@ -122,7 +120,6 @@ def main():
     local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
-    emb_4th_root = args.emb_4th_root
     emb_dropout = args.emb_dropout
     local_dropout = args.local_dropout
     batch_size = args.batch_size
@@ -196,10 +193,7 @@ def main():
 
     #Embedding dimensions for categorical features
     #Embedding dimensions for categorical features
-    if emb_4th_root:
-        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
-    else:
-        emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
+    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
     #emb_dims
 
     # Prepare testing data 

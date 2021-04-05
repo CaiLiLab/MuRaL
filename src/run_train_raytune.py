@@ -71,7 +71,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
     
-    parser.add_argument('--emb_4th_root', default=False, action='store_true')
+    #parser.add_argument('--emb_4th_root', default=False, action='store_true')
     
     parser.add_argument('--batch_size', type=int, default=[128], nargs='+', help='size of mini batches')
     
@@ -146,7 +146,7 @@ def main():
     local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
-    emb_4th_root = args.emb_4th_root
+    #emb_4th_root = args.emb_4th_root
     batch_size = args.batch_size 
     emb_dropout = args.emb_dropout
     local_dropout = args.local_dropout
@@ -283,7 +283,7 @@ def train(config, args, checkpoint_dir=None):
     local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
-    emb_4th_root = args.emb_4th_root
+    #emb_4th_root = args.emb_4th_root
     batch_size = args.batch_size 
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
@@ -376,10 +376,10 @@ def train(config, args, checkpoint_dir=None):
     cat_dims = dataset.cat_dims
     
     #Embedding dimensions for categorical features
-    if emb_4th_root:
-        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
-    else:
-        emb_dims = [(x, min(16, (x + 1) // 2)) for x in cat_dims]
+    #if emb_4th_root:
+    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
+    #else:
+    #    emb_dims = [(x, min(16, (x + 1) // 2)) for x in cat_dims]
     #emb_dims
     
 
@@ -585,8 +585,8 @@ def train(config, args, checkpoint_dir=None):
             ###################
             
             with tune.checkpoint_dir(epoch) as checkpoint_dir:
-                path = os.path.join(checkpoint_dir, 'checkpoint')
-                torch.save((model.state_dict(), optimizer.state_dict()), path)
+                path = os.path.join(checkpoint_dir, 'model')
+                torch.save(model.state_dict(), path)
             
                 with open(path + '.fdiri_cal.pkl', 'wb') as pkl_file:
                     pickle.dump(fdiri_cal, pkl_file)
