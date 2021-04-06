@@ -42,7 +42,7 @@ def seq2ohe(sequence,motlen):
                 S[i,j]=np.float32(0)
     return np.transpose(S)
 
-# Deprecated. One-hot encoding for multple sequences.
+# Deprecated. One-hot encoding for multiple sequences.
 def seqs2ohe(sequences,motiflen=24):
 
     dataset=[]
