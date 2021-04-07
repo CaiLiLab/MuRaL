@@ -34,6 +34,7 @@ from nn_utils import *
 from preprocessing import *
 from evaluation import *
 
+from torch.utils.tensorboard import SummaryWriter
 
 def parse_arguments(parser):
     """
@@ -367,11 +368,11 @@ def train(config, args, checkpoint_dir=None):
 
     elif model_no == 1:
         # ResNet model
-        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        model = Network1(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class).to(device)
 
     elif model_no == 2:
         # Combined model
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], last_lin_size=35, distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     else:
         print('Error: no model selected!')
@@ -381,6 +382,17 @@ def train(config, args, checkpoint_dir=None):
     count_parameters(model)
     print('model:')
     print(model)
+    
+    '''
+    writer = SummaryWriter('runs/test')
+    dataiter = iter(dataloader_train)
+    y, cont_x, cat_x, distal_x = dataiter.next()
+    cat_x = cat_x.to(device)
+    cont_x = cont_x.to(device)
+    distal_x = distal_x.to(device)
+    writer.add_graph(model, ((cont_x, cat_x), distal_x))
+    writer.close()
+    '''
 
     # Initiating weights of the models;
     model.apply(weights_init)

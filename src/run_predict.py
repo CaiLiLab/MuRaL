@@ -51,7 +51,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--ref_genome', type=str, default='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa',
                         help='reference genome')
-    #parser.add_argument('--', type=str, default='', help='')
+    
     parser.add_argument('--bw_paths', type=str, default='/public/home/licai/DNMML/analysis/test/bw_files.txt', help='path for the list of BigWig files for non-sequence features')
     
     parser.add_argument('--n_class', type=int, default='2', help='number of mutation classes')
@@ -200,13 +200,13 @@ def main():
     # Dataloader for testing data
     dataloader1 = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)
 
-    #find a device with enough memory
+    # Find a GPU with enough memory
     nvmlInit()
     cuda_id = '0'
     for i in range(nvmlDeviceGetCount()):
         h = nvmlDeviceGetHandleByIndex(i)
         info = nvmlDeviceGetMemoryInfo(h)
-        if info.free > 1.5*(2**30): #reserve 1.5G
+        if info.free > 1.5*(2**30): #reserve 1.5GB
             cuda_id = str(i)
             break
         
@@ -219,10 +219,10 @@ def main():
         model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
-        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 2:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
 
     else:

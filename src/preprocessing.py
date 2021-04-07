@@ -1,11 +1,7 @@
-
 import os, os.path
 import sys
-#stderr = sys.stderr
-#sys.stderr = open(os.devnull, 'w')
-from janggu.data import Bioseq, Cover
-#sys.stderr = stderr
 
+from janggu.data import Bioseq, Cover
 from pybedtools import BedTool
 
 from sklearn.preprocessing import LabelEncoder
@@ -19,38 +15,12 @@ import h5py
 
 from sklearn import metrics, calibration
 
-# Convert numpy arrays to Tensor
 def to_np(tensor):
+    """Convert numpy arrays to Tensor"""
     if torch.cuda.is_available():
         return tensor.cpu().detach().numpy()
     else:
         return tensor.detach().numpy()
-
-# Deprecated.One-hot encoding for the sequence. 
-def seq2ohe(sequence,motlen):
-    rows = len(sequence)+2*motlen-2
-    S = np.empty([rows,4])
-    base = 'ACGT'
-    
-    for i in range(rows):
-        for j in range(4):
-            if i-motlen+1<len(sequence) and sequence[i-motlen+1].upper() =='N' or i<motlen-1 or i>len(sequence)+motlen-2:
-                S[i,j]=np.float32(0.25)
-            elif sequence[i-motlen+1].upper() == base[j]:
-                S[i,j]=np.float32(1)
-            else:
-                S[i,j]=np.float32(0)
-    return np.transpose(S)
-
-# Deprecated. One-hot encoding for multiple sequences.
-def seqs2ohe(sequences,motiflen=24):
-
-    dataset=[]
-    for row in sequences:             
-        dataset.append(seq2ohe(row,motiflen))
-        
-  
-    return dataset
 
 # Define a Dataset for handling distal data
 class DistalDataset(Dataset):
@@ -321,61 +291,6 @@ class LocalDataset(Dataset):
         """
         return [self.y[idx], self.cont_X[idx], self.cat_X[idx]]
 
-# Prepare the datasets for given regions
-def prepare_dataset(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1):
-    
-    # Use janggu Bioseq to read the data
-    local_seq = Bioseq.create_from_refgenome(name='', refgenome=ref_genome, roi=bed_regions, flank=radius)
-
-    # Get the digitalized seq data
-    local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0])))
-
-    # TO DO: some other categorical data can be added here
-    # Names of the categorical variables
-    categorical_features = ['us'+str(radius - i)for i in range(radius)] + ['mid'] + ['ds'+str(i+1)for i in range(radius)]
-
-    local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
-
-    # The 'score' field in the BED file stores the label/class information
-    y = np.array([float(loc.score) for loc in bed_regions], ndmin=2).reshape((-1,1))
-    y = pd.DataFrame(y, columns=['mut_type'])
-    output_feature = 'mut_type'
-
-    if len(bw_files) > 0:
-        # Use the mean value of the region of 2*radius+1 bp around the focal site
-        bw_data = np.array(Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
-
-        bw_data = pd.DataFrame(bw_data, columns=bw_names)
-        #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
-
-        data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
-    else:
-        data_local = pd.concat([local_seq_cat, y], axis=1)
-
-    dataset_local = LocalDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-
-    # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
-    distal_seq = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions, flank=distal_radius, order=distal_order)
-    # Note the shape of data
-    distal_seq = np.array(distal_seq).squeeze().transpose(0,2,1)
-    
-    # Handle distal bigWig data
-    if len(bw_files) > 0:
-        bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius)
-        
-        #print('bw_distal.shape:', np.array(bw_distal).shape)
-        #bw_distal should have the same seq len as that for distal_seq
-        bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-        
-        # Concatenate the sequence data and the bigWig data
-        distal_seq = np.concatenate((distal_seq, bw_distal), axis=1)
-    
-    dataset_distal = DistalDataset([distal_seq, y])
-    
-    # Combine local Dataset and distal Dataset
-    dataset = CombinedDataset(dataset_local, dataset_distal)
-    
-    return dataset, data_local, categorical_features
 
 def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size):
     n_channels = 4**distal_order + len(bw_files)
@@ -478,65 +393,8 @@ def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=
     else:
         data_local = pd.concat([local_seq_cat2, y], axis=1)
 
-    #dataset_local = LocalDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-
-    ##=============================================
-    # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
-    #distal_seq = np.empty((0, 4, distal_radius*2+1), dtype=np.float32)
-    
-    
     generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size)
-    '''
-    n_channels = 4**distal_order + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r') as hf:
-                if len(y) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-        except OSError:
-            print('Warning: the file is empty or imcomplete:', h5f_path)
-            
-    
-    if write_h5f:            
-        with h5py.File(h5f_path, 'w') as hf:
-            #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
-            #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-            seq_len =  distal_radius*2+1-(distal_order-1)
-            hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
 
-            chunk_size = 50000
-            for start in range(0, len(bed_regions), chunk_size):
-                end = min(start+chunk_size, len(bed_regions))
-                seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-                #print('seqs:', seqs)
-                seqs = np.array(seqs).squeeze().transpose(0,2,1)
-                #print('np.array(seqs):', seqs)
-
-                # Handle distal bigWig data
-                if len(bw_files) > 0:
-                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
-
-                    #print('bw_distal.shape:', np.array(bw_distal).shape)
-                    #bw_distal should have the same seq len as that for distal_seq
-                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                    # Concatenate the sequence data and the bigWig data
-                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                    #distal_seq = np.concatenate((distal_seq, seqs), axis=0)
-
-                hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-                hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-    '''
-    
-    #dataset_distal = DistalDataset([distal_seq, y])
-    #===========================================
-    
-    
-    # Combine local Dataset and distal Dataset
-    #dataset = CombinedDataset(dataset_local, dataset_distal)
     
     if seq_only:
         n_channels = 4**distal_order
@@ -549,209 +407,6 @@ def prepare_dataset1(bed_regions, ref_genome,  bw_files, bw_names, local_radius=
     #return dataset, data_local, categorical_features
     return dataset
 
-
-# Prepare the datasets for given regions
-def prepare_dataset2(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1):
-    
-    # Use janggu Bioseq to read the data
-    local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
-    
-    # To get One-Hot encoded data, shape is [sample_size, 4*seq_len]
-    #local_seq = np.array(local_seq).squeeze().reshape(local_seq.shape[0], -1)   
-    
-    # Get the digitalized seq data; values are one of 0,1,2,3
-    local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0]))).astype(np.int32)
-
-    # TO DO: some other categorical data can be added here
-    # Names of the categorical variables
-    categorical_features = ['us'+str(radius - i) for i in range(radius)] + ['mid'] + ['ds'+str(i+1) for i in range(radius)]
-
-    print('local_seq_cat.shape:', local_seq_cat.shape, categorical_features)
-    local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
-
-    # The 'score' field in the BED file stores the label/class information
-    y = np.array([float(loc.score) for loc in bed_regions], ndmin=2).reshape((-1,1))
-    y = pd.DataFrame(y, columns=['mut_type'])
-    output_feature = 'mut_type'
-
-    if len(bw_files) > 0:
-        # Use the mean value of the region of 2*radius+1 bp around the focal site
-        bw_data = np.array(Cover.create_from_bigwig(name='local', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
-
-        bw_data = pd.DataFrame(bw_data, columns=bw_names)
-        #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
-
-        data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
-    else:
-        data_local = pd.concat([local_seq_cat, y], axis=1)
-
-    #dataset_local = LocalDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-
-    ##=============================================
-    # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
-    #distal_seq = np.empty((0, 4, distal_radius*2+1), dtype=np.float32)
-    
-    n_channels = 4**distal_order + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r') as hf:
-                if len(y) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-        except OSError:
-            print('Warning: the file is empty or imcomplete:', h5f_path)
-            
-    
-    if write_h5f:            
-        with h5py.File(h5f_path, 'w') as hf:
-            #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
-            #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-            seq_len =  distal_radius*2+1-(distal_order-1)
-            hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-
-            chunk_size = 50000
-            for start in range(0, len(bed_regions), chunk_size):
-                end = min(start+chunk_size, len(bed_regions))
-                seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-                #print('seqs:', seqs)
-                seqs = np.array(seqs).squeeze().transpose(0,2,1)
-                #print('np.array(seqs):', seqs)
-
-                # Handle distal bigWig data
-                if len(bw_files) > 0:
-                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
-
-                    #print('bw_distal.shape:', np.array(bw_distal).shape)
-                    #bw_distal should have the same seq len as that for distal_seq
-                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                    # Concatenate the sequence data and the bigWig data
-                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                    #distal_seq = np.concatenate((distal_seq, seqs), axis=0)
-
-                hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-                hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-
-    
-    #dataset_distal = DistalDataset([distal_seq, y])
-    #===========================================
-    
-    
-    # Combine local Dataset and distal Dataset
-    #dataset = CombinedDataset(dataset_local, dataset_distal)
-    dataset = HDF5Dataset(data=data_local, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path)
-    
-    #return dataset, data_local, categorical_features
-    return dataset
-
-def prepare_dataset3(bed_regions, ref_genome,  bw_files, bw_names, radius=5, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1):
-    
-    # Use janggu Bioseq to read the data
-    local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=radius)
-    
-    # To get One-Hot encoded data, shape is [sample_size, 4*seq_len]
-    #local_seq = np.array(local_seq).squeeze().reshape(local_seq.shape[0], -1)   
-    
-    # Get the digitalized seq data; values are one of 0,1,2,3
-    local_seq_cat = local_seq.iseq4idx(list(range(local_seq.shape[0]))).astype(np.int32)
-
-    # TO DO: some other categorical data can be added here
-    # Names of the categorical variables
-    categorical_features = ['us'+str(radius - i) for i in range(radius)] + ['mid'] + ['ds'+str(i+1) for i in range(radius)]
-
-    local_seq_cat = pd.DataFrame(local_seq_cat, columns = categorical_features)
-
-    # The 'score' field in the BED file stores the label/class information
-    y = np.array([float(loc.score) for loc in bed_regions], ndmin=2).reshape((-1,1))
-    y = pd.DataFrame(y, columns=['mut_type'])
-    output_feature = 'mut_type'
-
-    if len(bw_files) > 0:
-        # Use the mean value of the region of 2*radius+1 bp around the focal site
-        bw_data = np.array(Cover.create_from_bigwig(name='local', bigwigfiles=bw_files, roi=bed_regions, resolution=2*radius+1, flank=radius)).reshape(len(bed_regions), -1)
-
-        bw_data = pd.DataFrame(bw_data, columns=bw_names)
-        #print ('bw_data.shape', bw_data.shape, local_seq_cat.shape)
-
-        data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
-    else:
-        data_local = pd.concat([local_seq_cat, y], axis=1)
-
-    #dataset_local = LocalDataset(data=data_local, cat_cols=categorical_features, output_col=output_feature)
-
-    ##=============================================
-    # For the distal data, first extract the sequences and convert them to one-hot-encoding data 
-    #distal_seq = np.empty((0, 4, distal_radius*2+1), dtype=np.float32)
-    
-    n_channels = 4 + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r') as hf:
-                if len(y) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-        except OSError:
-            print('Warning: the file is empty or imcomplete:', h5f_path)
-            
-    
-    if write_h5f:            
-        with h5py.File(h5f_path, 'w') as hf:
-            #hf.create_dataset("X_train", data=X_train_data, maxshape=(None, 512, 512, 9))
-            #hf.create_dataset("X_test", data=X_test_data, maxshape=(None, 512, 512, 9))
-            hf.create_dataset(name='distal_X', shape=(0, n_channels, distal_radius*2+1), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, distal_radius*2+1), maxshape=(None,n_channels, distal_radius*2+1)) 
-
-            chunk_size = 50000
-            for start in range(0, len(bed_regions), chunk_size):
-                end = min(start+chunk_size, len(bed_regions))
-                seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-                #print('seqs:', seqs)
-                seqs = np.array(seqs).squeeze().transpose(0,2,1)
-                #print('np.array(seqs):', seqs)
-
-                # Handle distal bigWig data
-                if len(bw_files) > 0:
-                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions, resolution=1, flank=distal_radius, verbose=True)
-
-                    #print('bw_distal.shape:', np.array(bw_distal).shape)
-                    #bw_distal should have the same seq len as that for distal_seq
-                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                    # Concatenate the sequence data and the bigWig data
-                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                    #distal_seq = np.concatenate((distal_seq, seqs), axis=0)
-
-                hf["distal_X"].resize((hf["distal_X"].shape[0] + seqs.shape[0]), axis = 0)
-                hf["distal_X"][-seqs.shape[0]:] = seqs
-    
-
-    
-    #dataset_distal = DistalDataset([distal_seq, y])
-    #===========================================
-    
-    
-    # Combine local Dataset and distal Dataset
-    #dataset = CombinedDataset(dataset_local, dataset_distal)
-    dataset = HDF5Dataset(data=data_local, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path)
-    
-    #return dataset, data_local, categorical_features
-    return dataset
-
-# Deprecated. Old function
-def load_data(data_file):
-    
-    data = pd.read_csv(data_file, sep='\t').dropna()
-    seq_data = data['sequence']
-    y_data = data['label'].astype(np.float32).values.reshape(-1, 1)
-
-    seqs_ohe = seqs2ohe(seq_data, 6)
-
-    dataset = DistalDataset([seqs_ohe, y_data])
-    #print(dataset[0:2][0][0][0:4,4:10])
-    
-    return dataset
 
 
 
