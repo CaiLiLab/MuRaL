@@ -53,38 +53,40 @@ def parse_arguments(parser):
     #parser.add_argument('--', type=str, default='', help='')
     parser.add_argument('--bw_paths', type=str, default='/public/home/licai/DNMML/analysis/test/bw_files.txt', help='path for the list of BigWig files for non-sequence features')
     
-    parser.add_argument('--n_class', type=int, default='2', help='number of mutation classes')
+    parser.add_argument('--n_class', type=int, default=2, help='number of mutation classes')
     
-    parser.add_argument('--local_radius', type=int, default='5', help='radius of local sequences to be considered')
-    parser.add_argument('--local_order', type=int, default='1', help='order of local sequences to be considered')
+    parser.add_argument('--local_radius', type=int, default=5, help='radius of local sequences to be considered')
+    parser.add_argument('--local_order', type=int, default=1, help='order of local sequences to be considered')
         
-    parser.add_argument('--distal_radius', type=int, default='50', help='radius of distal sequences to be considered')
+    parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
     
-    parser.add_argument('--distal_order', type=int, default='1', help='order of distal sequences to be considered')
+    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
         
     parser.add_argument('--emb_dropout', type=float, default=0.2, help='dropout rate for k-mer embedding')
     
     parser.add_argument('--local_dropout', type=float, default=0.15, help='dropout rate for local network')
     
-    parser.add_argument('--batch_size', type=int, default='200', help='size of mini batches')
+    parser.add_argument('--batch_size', type=int, default=128, help='size of mini batches')
     
-    parser.add_argument('--pred_batch_size', type=int, default='10', help='size of mini batches for test data')
+    parser.add_argument('--pred_batch_size', type=int, default=10, help='size of mini batches for test data')
     
-    parser.add_argument('--CNN_kernel_size', type=int, default='3', help='kernel size for CNN layers')
+    parser.add_argument('--CNN_kernel_size', type=int, default=3, help='kernel size for CNN layers')
     
-    parser.add_argument('--CNN_out_channels', type=int, default='60', help='number of output channels for CNN layers')
+    parser.add_argument('--CNN_out_channels', type=int, default=32, help='number of output channels for CNN layers')
     
-    parser.add_argument('--model_no', type=int, default='2', help=' which NN model to be used')
+    parser.add_argument('--distal_fc_dropout', type=float, default=0.25, help='dropout rate for distal fc layer')
+    
+    parser.add_argument('--model_no', type=int, default=2, help=' which NN model to be used')
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
     
-    parser.add_argument('--learning_rate', type=float, default='0.005', help='learning rate for training')
+    parser.add_argument('--learning_rate', type=float, default=0.005, help='learning rate for training')
     
-    parser.add_argument('--weight_decay', type=float, default='1e-5', help='weight decay (regularization) for training')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='weight decay (L2 regularization) for training')
     
-    parser.add_argument('--LR_gamma', type=float, default='0.5', help='gamma for learning rate change during training')
+    parser.add_argument('--LR_gamma', type=float, default=0.5, help='gamma for learning rate change during training')
     
-    parser.add_argument('--epochs', type=int, default='15', help='numbe of epochs for training')
+    parser.add_argument('--epochs', type=int, default=10, help='numbe of epochs for training')
     
     parser.add_argument('--model_path', type=str, default='', help='model path')
     
@@ -125,7 +127,8 @@ def main():
     batch_size = args.batch_size
     pred_batch_size = args.pred_batch_size
     CNN_kernel_size = args.CNN_kernel_size   
-    CNN_out_channels = args.CNN_out_channels    
+    CNN_out_channels = args.CNN_out_channels
+    distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
     pred_file = args.pred_file   
     learning_rate = args.learning_rate   
@@ -178,7 +181,7 @@ def main():
         test_h5f_path = test_h5f_path + '.h5'   
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
+    dataset = prepare_dataset(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
     
@@ -197,7 +200,7 @@ def main():
     #emb_dims
 
     # Prepare testing data 
-    dataset_test = prepare_dataset1(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
+    dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
     data_local_test = dataset_test.data_local
     
     test_size = len(dataset_test)
@@ -224,16 +227,10 @@ def main():
         model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
-        model = Network0r(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 2:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
-
-    elif model_no == 3:
-        model = ResidualAttionNetwork3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
-    
-    elif model_no == 4:
-        model = Network3m(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[300, 100], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size,  last_lin_size=35, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     else:
         print('Error: no model selected!')

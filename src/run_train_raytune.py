@@ -64,6 +64,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--local_order', type=int, default=[1], nargs='+', help='order of local sequences to be considered')
     
+    parser.add_argument('--local_hidden1_size', type=int, default=[150], nargs='+', help='size of 1st hidden layer for local data')
+    
+    parser.add_argument('--local_hidden2_size', type=int, default=[80], nargs='+', help='size of 2nd hidden layer for local data')
+    
     parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
     
     parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
@@ -80,9 +84,12 @@ def parse_arguments(parser):
     
     parser.add_argument('--CNN_out_channels', type=int, default=[32], nargs='+', help='number of output channels for CNN layers')
     
-    parser.add_argument('--model_no', type=int, default=2, help=' which NN model to be used')
+    parser.add_argument('--distal_fc_dropout', type=float, default=[0.25], nargs='+', help='dropout rate for distal fc layer')
     
-    parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
+    
+    parser.add_argument('--model_no', type=int, default=2, help='which NN model to be used')
+    
+    #parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
     
     parser.add_argument('--optim', type=str, default=['Adam'], nargs='+', help='Optimization method')
     
@@ -104,14 +111,6 @@ def parse_arguments(parser):
     parser.add_argument('--n_trials', type=int, default=3, help='number of trials for training')
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
-    
-    parser.add_argument('--temperature_scaling', default=False, action='store_true')
-    
-    parser.add_argument('--label_smoothing', default=False, action='store_true')
-    
-    parser.add_argument('--MultiStepLR', default=False, action='store_true')
-    
-    parser.add_argument('--mixup', default=False, action='store_true')
     
     parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs used by Ray')
     
@@ -139,15 +138,18 @@ def main():
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
+    local_hidden1_size = args.local_hidden1_size
+    local_hidden2_size = args.local_hidden2_size
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     batch_size = args.batch_size 
     emb_dropout = args.emb_dropout
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
-    CNN_out_channels = args.CNN_out_channels    
+    CNN_out_channels = args.CNN_out_channels
+    distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
-    pred_file = args.pred_file   
+    #pred_file = args.pred_file   
     optim = args.optim
     learning_rate = args.learning_rate   
     weight_decay = args.weight_decay  
@@ -201,11 +203,14 @@ def main():
     config = {
         'local_radius': tune.grid_search(local_radius),
         'local_order': tune.choice(local_order),
+        'local_hidden1_size': tune.choice(local_hidden1_size),
+        'local_hidden2_size': tune.choice(local_hidden2_size),
         'distal_radius': tune.choice(distal_radius),
         'emb_dropout': tune.choice(emb_dropout),
         'local_dropout': tune.choice(local_dropout),
         'CNN_kernel_size': tune.choice(CNN_kernel_size),
         'CNN_out_channels': tune.choice(CNN_out_channels),
+        'distal_fc_dropout': tune.choice(distal_fc_dropout),
         'batch_size': tune.choice(batch_size),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         #'learning_rate': tune.choice(learning_rate),
@@ -225,7 +230,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_out_channels', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -291,9 +296,10 @@ def train(config, args, checkpoint_dir=None):
     batch_size = args.batch_size 
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
-    CNN_out_channels = args.CNN_out_channels    
+    CNN_out_channels = args.CNN_out_channels
+    distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
-    pred_file = args.pred_file   
+    #pred_file = args.pred_file   
     optim = args.optim
     learning_rate = args.learning_rate   
     weight_decay = args.weight_decay  
@@ -301,12 +307,8 @@ def train(config, args, checkpoint_dir=None):
     epochs = args.epochs
     n_class = args.n_class  
     cuda_id = args.cuda_id
-    temperature_scaling = args.temperature_scaling # Deprecated
     valid_ratio = args.valid_ratio
-    MultiStepLR = args.MultiStepLR # Deprecated
-    label_smoothing =args.label_smoothing # Deprecated
-    mixup = args.mixup # Deprecated
-    seq_only = args.seq_only # Deprecated
+    seq_only = args.seq_only 
     
     bw_paths = args.bw_paths
     bw_files = []
@@ -325,12 +327,18 @@ def train(config, args, checkpoint_dir=None):
     train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
+    dataset = prepare_dataset(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
     
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
     n_cont = len(dataset.cont_cols)
-    print('n_cont: ', n_cont)
+    
+    #config['n_cont'] = n_cont
+    config['n_class'] = n_class
+    config['model_no'] = model_no
+    #config['bw_paths'] = bw_paths
+    config['seq_only'] = seq_only
+    #print('n_cont: ', n_cont)
     
     # Set the device
     print('CUDA is available: ', torch.cuda.is_available())
@@ -359,20 +367,22 @@ def train(config, args, checkpoint_dir=None):
     
     # Set embedding dimensions for categorical features
     # According to https://stackoverflow.com/questions/48479915/what-is-the-preferred-ratio-between-the-vocabulary-size-and-embedding-dimension
-    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
+    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims] 
+    config['emb_dims'] = emb_dims
+
 
     # Choose the network model for training
     if model_no == 0:
         # Local-only model
-        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     elif model_no == 1:
         # ResNet model
-        model = Network1(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class).to(device)
+        model = Network1(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class).to(device)
 
     elif model_no == 2:
         # Combined model
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
     else:
         print('Error: no model selected!')
@@ -527,6 +537,10 @@ def train(config, args, checkpoint_dir=None):
             
                 with open(path + '.fdiri_cal.pkl', 'wb') as pkl_file:
                     pickle.dump(fdiri_cal, pkl_file)
+                
+                with open(path + '.config.pkl', 'wb') as fp:
+                    pickle.dump(config, fp)
+
 
             tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score)
                 

@@ -52,47 +52,43 @@ def parse_arguments(parser):
     parser.add_argument('--ref_genome', type=str, default='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa',
                         help='reference genome')
     
-    parser.add_argument('--bw_paths', type=str, default='/public/home/licai/DNMML/analysis/test/bw_files.txt', help='path for the list of BigWig files for non-sequence features')
+    parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
     
-    parser.add_argument('--n_class', type=int, default='2', help='number of mutation classes')
+    parser.add_argument('--seq_only', default=False, action='store_true')
+
     
-    parser.add_argument('--local_radius', type=int, default='5', help='radius of local sequences to be considered')
-    parser.add_argument('--local_order', type=int, default='1', help='order of local sequences to be considered')
+    parser.add_argument('--n_class', type=int, default=4, help='number of mutation classes')
+    
+    parser.add_argument('--local_radius', type=int, default=5, help='radius of local sequences to be considered')
+    parser.add_argument('--local_order', type=int, default=1, help='order of local sequences to be considered')
+    
+    parser.add_argument('--local_hidden1_size', type=int, default=150, nargs='+', help='size of 1st hidden layer for local data')
+    
+    parser.add_argument('--local_hidden2_size', type=int, default=80, nargs='+', help='size of 2nd hidden layer for local data')
+    
+    parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
+    
+    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
         
-    parser.add_argument('--distal_radius', type=int, default='50', help='radius of distal sequences to be considered')
+    parser.add_argument('--pred_batch_size', type=int, default=10, help='size of mini batches for test data')
     
-    parser.add_argument('--distal_order', type=int, default='1', help='order of distal sequences to be considered')
+    parser.add_argument('--CNN_kernel_size', type=int, default=3, help='kernel size for CNN layers')
     
-    parser.add_argument('--emb_4th_root', default=False, action='store_true')
+    parser.add_argument('--CNN_out_channels', type=int, default=32, help='number of output channels for CNN layers')
     
-    parser.add_argument('--batch_size', type=int, default='200', help='size of mini batches')
+    parser.add_argument('--distal_fc_dropout', type=float, default=0.25,  help='dropout rate for distal fc layer')
     
-    parser.add_argument('--pred_batch_size', type=int, default='10', help='size of mini batches for test data')
-    
-    parser.add_argument('--CNN_kernel_size', type=int, default='3', help='kernel size for CNN layers')
-    
-    parser.add_argument('--CNN_out_channels', type=int, default='60', help='number of output channels for CNN layers')
-    
-    
-    parser.add_argument('--model_no', type=int, default='2', help=' which NN model to be used')
+    parser.add_argument('--model_no', type=int, default=2, help=' which NN model to be used')
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
-    
-    parser.add_argument('--learning_rate', type=float, default='0.005', help='learning rate for training')
-    
-    parser.add_argument('--weight_decay', type=float, default='1e-5', help='weight decay (regularization) for training')
-    
-    parser.add_argument('--LR_gamma', type=float, default='0.5', help='gamma for learning rate change during training')
-    
-    parser.add_argument('--epochs', type=int, default='15', help='numbe of epochs for training')
-    
+            
     parser.add_argument('--model_path', type=str, default='', help='model path')
     
     parser.add_argument('--optim', default=False, action='store_true')
     
-    #parser.add_argument('--model_path', type=str, default='', help='model path')
-    
     parser.add_argument('--calibrator_path', type=str, default='', help='calibrator path')
+    
+    parser.add_argument('--model_config_path', type=str, default='', help='model config path')
     
     args = parser.parse_args()
 
@@ -106,38 +102,55 @@ def main():
     #torch.cuda.set_device(1) 
     
     # Set train file
-    train_file = args.train_data
+    #train_file = args.train_data
     test_file = args.test_data   
-    train_h5f_path = args.train_data_h5f
+    #train_h5f_path = args.train_data_h5f
     test_h5f_path = args.test_data_h5f   
     ref_genome= args.ref_genome
-    local_radius = args.local_radius
-    local_order = args.local_order
-    distal_radius = args.distal_radius  
-    distal_order = args.distal_order
-    emb_4th_root = args.emb_4th_root
-    batch_size = args.batch_size
+
     pred_batch_size = args.pred_batch_size
-    CNN_kernel_size = args.CNN_kernel_size   
-    CNN_out_channels = args.CNN_out_channels    
-    model_no = args.model_no   
+  
+    #model_no = args.model_no   
     pred_file = args.pred_file   
-    learning_rate = args.learning_rate   
-    weight_decay = args.weight_decay  
-    LR_gamma = args.LR_gamma  
-    epochs = args.epochs
+
     model_path = args.model_path
+    model_config_path = args.model_config_path
     optim = args.optim
     calibrator_path = args.calibrator_path
-    #model2_path = args.model2_path
+    #seq_only = args.seq_only 
     
-    n_class = args.n_class
+    #n_class = args.n_class
+    
+    if model_config_path != '':
+        with open(model_config_path, 'rb') as fconfig:
+            config = pickle.load(fconfig)
+    
+    local_radius = config['local_radius']
+    local_order = config['local_order']
+    local_hidden1_size = config['local_hidden1_size']
+    local_hidden2_size = config['local_hidden2_size']
+    distal_radius = config['distal_radius']
+    distal_order = 1 # reserved 
+    CNN_kernel_size = config['CNN_kernel_size']  
+    CNN_out_channels = config['CNN_out_channels']
+    emb_dropout = config['emb_dropout']
+    local_dropout = config['local_dropout']
+    distal_fc_dropout = config['distal_fc_dropout']
+    emb_dims = config['emb_dims']
+    
+        
+    #n_cont = config['n_cont']
+    n_class = config['n_class']
+    model_no = config['model_no']
+    #bw_paths = config['bw_paths']
+    seq_only = config['seq_only']
+   
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
     
     # Read BED files
-    train_bed = BedTool(train_file)
+    #train_bed = BedTool(train_file)
     test_bed = BedTool(test_file)
 
     # Read bigWig file names
@@ -152,15 +165,7 @@ def main():
         n_cont = len(bw_names)
     except pd.errors.EmptyDataError:
         print('Warnings: no bigWig files provided')
-    
-    if len(train_h5f_path) == 0:
-        train_h5f_path = train_file + '.distal_' + str(distal_radius)
-        if(distal_order >1):
-            train_h5f_path = train_h5f_path + '_' + str(distal_order)
-        if len(bw_names) > 0:
-            train_h5f_path = train_h5f_path + '.' + '.'.join(list(bw_names))
-        train_h5f_path = train_h5f_path + '.h5'
-    
+
     if len(test_h5f_path) == 0:
         test_h5f_path = test_file + '.distal_' + str(distal_radius)
         if(distal_order >1):
@@ -168,31 +173,9 @@ def main():
         if len(bw_names) > 0:
             test_h5f_path = test_h5f_path + '.' + '.'.join(list(bw_names))
         test_h5f_path = test_h5f_path + '.h5'   
-    
-    # Prepare the datasets for trainging
-    dataset = prepare_dataset1(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
-    data_local = dataset.data_local
-    categorical_features = dataset.cat_cols
-    
-    train_size = len(dataset)
-
-    # Dataloader for training
-    #dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
-
-    # Number of categorical features
-    #cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
-    cat_dims = dataset.cat_dims
-
-    #Embedding dimensions for categorical features
-    #Embedding dimensions for categorical features
-    if emb_4th_root:
-        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
-    else:
-        emb_dims = [(x, min(50, (x + 1) // 2)) for x in cat_dims]
-    #emb_dims
 
     # Prepare testing data 
-    dataset_test = prepare_dataset1(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
+    dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
     data_local_test = dataset_test.data_local
     
     test_size = len(dataset_test)
@@ -216,13 +199,13 @@ def main():
     
     # Choose the network model
     if model_no == 0:
-        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
-        model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 2:
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
 
     else:

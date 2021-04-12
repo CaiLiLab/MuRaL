@@ -47,10 +47,11 @@ class FeedForwardNN(nn.Module):
         
         #for lin_layer in self.lin_layers:
         #    nn.init.kaiming_normal_(lin_layer.weight.data)
+        #nn.init.kaiming_normal_(m.weight)
 
         # Output Layer
         self.output_layer = nn.Linear(lin_layer_sizes[-1], n_class)
-        nn.init.kaiming_normal_(self.output_layer.weight.data)
+        #nn.init.kaiming_normal_(self.output_layer.weight.data)
 
         # Batch Norm Layers
         self.first_bn_layer = nn.BatchNorm1d(self.no_of_cont)
@@ -132,7 +133,7 @@ class Network0(nn.Module):
        
 class Network1(nn.Module):
     """ResNet-only model"""
-    def __init__(self, in_channels, out_channels, kernel_size, distal_radius, distal_order, n_class):
+    def __init__(self, in_channels, out_channels, kernel_size, distal_radius, distal_order, distal_fc_dropout, n_class):
         """  
         Args:
             in_channels: number of input channels
@@ -193,7 +194,7 @@ class Network1(nn.Module):
         # last FC layers for distal data
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(cnn_fc_in_size),
-            nn.Dropout(0.25), 
+            nn.Dropout(distal_fc_dropout), 
             nn.Linear(cnn_fc_in_size, n_class), 
             #nn.ReLU(),
       
@@ -234,10 +235,26 @@ class Network1(nn.Module):
         
         
         return distal_out
-
-# Hybrid network with feedforward and ResNet layers; the FC layers of local and distal data are separated.
+ 
 class Network2(nn.Module):
-    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, distal_radius, distal_order, n_class, emb_padding_idx=None):
+    """Combined model with FeedForward and ResNet componets"""
+    def __init__(self,  emb_dims, no_of_cont, lin_layer_sizes, emb_dropout, lin_layer_dropouts, in_channels, out_channels, kernel_size, distal_radius, distal_order, distal_fc_dropout, n_class, emb_padding_idx=None):
+        """  
+        Args:
+            emb_dims: embedding dimensions
+            no_of_cont: number of continuous features
+            lin_layer_sizes: sizes of linear layers
+            emb_dropout: dropout for the embedding layer
+            lin_layer_dropouts: dropouts for linear layers            
+            in_channels: number of input channels
+            out_channels: number of output channels after first covolution layer
+            kernel_size: kernel size of first covolution layer
+            distal_radius: distal radius of a focal site to be considered
+            distal_order: sequece order for distal sequences
+            distal_fc_dropout: dropout for distal fc layer
+            n_class: number of classes (labels)
+            emb_padding_idx: number to be used for padding in embeddings
+        """
         
         super(Network2, self).__init__()
         
@@ -314,7 +331,7 @@ class Network2(nn.Module):
         # Separate FC layers for distal and local data
         self.distal_fc = nn.Sequential(
             nn.BatchNorm1d(cnn_fc_in_size),
-            nn.Dropout(0.25), 
+            nn.Dropout(distal_fc_dropout), 
             nn.Linear(cnn_fc_in_size, n_class), 
             #nn.ReLU(),
             
@@ -474,7 +491,7 @@ class ResidualBlock(nn.Module):
         return out   
 
 class BrierScore(nn.Module):
-     """implementation of Brier score using nn.Module (not used)"""
+    """implementation of Brier score using nn.Module (not used)"""
     def __init__(self):
         super(BrierScore, self).__init__()
 
