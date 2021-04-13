@@ -89,7 +89,18 @@ class HDF5Dataset(Dataset):
         
         
         return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.distal_X[idx, 0:self.n_channels, :])
+
+def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
+    """Get the H5 file path name based on input data"""
     
+    h5f_path = bed_file + '.distal_' + str(distal_radius)
+    if distal_order > 1:
+        h5f_path = h5f_path + '_' + str(distal_order)
+    if len(bw_names) > 0:
+        h5f_path = h5f_path + '.' + '.'.join(list(bw_names))
+    h5f_path = h5f_path + '.h5'
+    
+    return h5f_path
 
 def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size):
     n_channels = 4**distal_order + len(bw_files)

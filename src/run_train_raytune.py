@@ -19,6 +19,13 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
 
+#=============
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.allow_tf32 = True
+#=============
+
 from functools import partial
 import ray
 from ray import tune
@@ -47,16 +54,12 @@ def parse_arguments(parser):
     parser.add_argument('--test_data', type=str, default='merge.95win.A.pos.101bp.19cols.test.30k.bed.gz',
                         help='path for testing data')
     
-    parser.add_argument('--train_data_h5f', type=str, default='', help='path for training data in HDF5 format')
-    
-    parser.add_argument('--test_data_h5f', type=str, default='', help='path for testing data in HDF5 format')
-    
     parser.add_argument('--ref_genome', type=str, default='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa',
                         help='reference genome')
     
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
     
-    parser.add_argument('--seq_only', default=False, action='store_true')
+    parser.add_argument('--seq_only', default=False, action='store_true', help='use only genomic sequence and ignore bigWig tracks')
     
     parser.add_argument('--n_class', type=int, default='4', help='number of mutation classes')
     
@@ -132,9 +135,6 @@ def main():
     
     print(' '.join(sys.argv)) # print the command line
     train_file = args.train_data
-    test_file = args.test_data   
-    train_h5f_path = args.train_data_h5f
-    test_h5f_path = args.test_data_h5f   
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
@@ -260,19 +260,6 @@ def main():
     if ray.is_initialized():
         ray.shutdown() 
 
-def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
-    """Get the H5 file path name based on input data"""
-    
-    h5f_path = bed_file + '.distal_' + str(distal_radius)
-    if(distal_order >1):
-        h5f_path = h5f_path + '_' + str(distal_order)
-    if len(bw_names) > 0:
-        h5f_path = h5f_path + '.' + '.'.join(list(bw_names))
-    h5f_path = h5f_path + '.h5'
-    
-    return h5f_path
-
-
 def train(config, args, checkpoint_dir=None):
     """
     Training funtion.
@@ -285,9 +272,6 @@ def train(config, args, checkpoint_dir=None):
 
     # Get parameters from the command line
     train_file = args.train_data
-    test_file = args.test_data   
-    train_h5f_path = args.train_data_h5f
-    test_h5f_path = args.test_data_h5f   
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
@@ -406,14 +390,10 @@ def train(config, args, checkpoint_dir=None):
 
     # Initiating weights of the models;
     model.apply(weights_init)
-
-    # Loss function
-    if label_smoothing:
-        criterion = LabelSmoothingCrossEntropy(epsilon=0.1) # Deprecated
-        print('using LabelSmoothingCrossEntropy ...')
-    else:
-        criterion = torch.nn.CrossEntropyLoss(reduction='sum')
-
+    
+    # Set loss function
+    criterion = torch.nn.CrossEntropyLoss(reduction='sum')
+    
     # Set Optimizer
     if config['optim'] == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
@@ -428,10 +408,8 @@ def train(config, args, checkpoint_dir=None):
         print('Error: unsupported optimization method', config['optim'])
         sys.exit()
 
-    if MultiStepLR:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 6], gamma=config['LR_gamma'])
-    else:
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
+
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
 
     print('optimizer:', optimizer)
     print('scheduler:', scheduler)
@@ -450,18 +428,10 @@ def train(config, args, checkpoint_dir=None):
             distal_x = distal_x.to(device)
             y  = y.to(device)
 
-            if not mixup:   
-                # Forward Pass
-                preds = model.forward((cont_x, cat_x), distal_x)
-                loss = criterion(preds, y.long().squeeze())
-            else:
-                cat_x, cont_x, distal_x, y_a, y_b, lam = mixup_data(cat_x, cont_x, distal_x, y.long().squeeze(), alpha=0.2)
-                
-                #print('cat_x, cont_x, distal_x:', cat_x.shape, cont_x.shape, distal_x.shape)
-                preds = model.forward((cont_x, cat_x), distal_x)
-                
-                loss_func = mixup_criterion(y_a, y_b, lam)
-                loss = loss_func(criterion, preds)
+
+            # Forward Pass
+            preds = model.forward((cont_x, cat_x), distal_x)
+            loss = criterion(preds, y.long().squeeze())
                    
             optimizer.zero_grad()
             loss.backward()
