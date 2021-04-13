@@ -26,19 +26,15 @@ from preprocessing import *
 from evaluation import *
 from pynvml import *
 
-#=============
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.allow_tf32 = True
-#=============
-
 
 def parse_arguments(parser):
     """
     Parse parameters from the command line
-    """
-    
+    """ 
     parser.add_argument('--test_data', type=str, default='',
                         help='file path for testing data')
     

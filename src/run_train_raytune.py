@@ -19,12 +19,10 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
 
-#=============
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.allow_tf32 = True
-#=============
 
 from functools import partial
 import ray
