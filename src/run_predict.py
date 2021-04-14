@@ -227,7 +227,7 @@ def main():
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
     pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end', 'strand']], test_pred_df), axis=1)
     pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] +  prob_names
-    pred_df.to_csv(pred_file, sep='\t', index=False)
+    pred_df.to_csv(pred_file, sep='\t', float_format='%.4g', index=False)
     
     # Calculate regional correlations for a few window sizes
     for win_size in [10000, 50000, 200000]:
