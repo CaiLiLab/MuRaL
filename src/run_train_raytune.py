@@ -482,8 +482,8 @@ def train(config, args, checkpoint_dir=None):
                 
                 score += np.sum([(1-corr)**2 for corr in corr_3mer]) + np.sum([(1-corr)**2 for corr in corr_5mer])
            
-            print('corr_3mer:', corr_3mer)
-            print('corr_5mer:', corr_5mer)
+            #print('corr_3mer:', corr_3mer)
+            #print('corr_5mer:', corr_5mer)
             print('regional score:', score, n_regions)
             
             # Output genomic positions and predicted probabilities
