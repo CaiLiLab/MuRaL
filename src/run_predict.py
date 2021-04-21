@@ -139,12 +139,12 @@ def main():
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
-    n_cont = 0
+    #n_cont = 0
     try:
         bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
         bw_files = list(bw_list[0])
         bw_names = list(bw_list[1])
-        n_cont = len(bw_names)
+        #n_cont = len(bw_names)
     except pd.errors.EmptyDataError:
         print('Warnings: no bigWig files provided')
 
@@ -154,6 +154,7 @@ def main():
     # Prepare testing data 
     dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
     data_local_test = dataset_test.data_local
+    n_cont = len(dataset_test.cont_cols)
     
     test_size = len(dataset_test)
 
