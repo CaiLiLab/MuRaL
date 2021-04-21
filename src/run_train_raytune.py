@@ -309,7 +309,7 @@ def train(config, args, checkpoint_dir=None):
     train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
+    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
     
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols

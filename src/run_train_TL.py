@@ -169,7 +169,7 @@ def main():
         test_h5f_path = test_h5f_path + '.h5'   
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
+    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
     data_local = dataset.data_local
     
     train_size = len(dataset)
@@ -184,7 +184,7 @@ def main():
     emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
 
     # Prepare testing data 
-    dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
+    dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
     data_local_test = dataset_test.data_local
     
     test_size = len(dataset_test)
