@@ -309,7 +309,7 @@ def train(config, args, checkpoint_dir=None):
     train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
+    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
     
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
@@ -476,14 +476,25 @@ def train(config, args, checkpoint_dir=None):
             corr_3mer = []
             corr_5mer = []
             
+            region_avg = []
             for i in range(n_regions):
                 corr_3mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 3, n_class)    
                 corr_5mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 5, n_class)
                 
                 score += np.sum([(1-corr)**2 for corr in corr_3mer]) + np.sum([(1-corr)**2 for corr in corr_5mer])
-           
-            print('corr_3mer:', corr_3mer)
-            print('corr_5mer:', corr_5mer)
+                
+                avg_prob = calc_avg_prob(valid_data_and_prob.iloc[region_size*i:region_size*(i+1)], n_class)
+                region_avg.append(avg_prob)
+                #print("avg_prob:", avg_prob, i)
+            
+            region_avg = pd.DataFrame(region_avg)
+            corr_list = []
+            for i in range(n_class):
+                corr_list.append(region_avg[i].corr(region_avg[i + n_class]))
+            
+            print('corr_list:', corr_list)
+            #print('corr_3mer:', corr_3mer)
+            #print('corr_5mer:', corr_5mer)
             print('regional score:', score, n_regions)
             
             # Output genomic positions and predicted probabilities

@@ -1,0 +1,22 @@
+name: mural
+channels:
+  - pytorch
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8.5
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.1
+  - prettytable
+  - pip:
+    - pybedtools
+    - pysam==0.15.1
+    - janggu[tf2_gpu]
+    - ray[tune]
+    - dirichletcal
+    - jax
+    - jaxlib
+    - autograd

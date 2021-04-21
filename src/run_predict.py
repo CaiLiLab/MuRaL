@@ -22,7 +22,7 @@ import datetime
 from nn_models import *
 from nn_utils import *
 
-from preprocessing import *
+from preprocessing2 import *
 from evaluation import *
 from pynvml import *
 
@@ -44,6 +44,10 @@ def parse_arguments(parser):
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
     
     parser.add_argument('--seq_only', default=False, action='store_true',  help='use only genomic sequence and ignore bigWig tracks')
+    
+    parser.add_argument('--without_h5', default=False, action='store_true',  help='do not generate H5 file, meaning using more RAM memory')
+    
+    parser.add_argument('--cpu_only', default=False, action='store_true',  help='only use CPU computing')
     
     parser.add_argument('--n_class', type=int, default=4, help='number of mutation classes')
     
@@ -95,7 +99,11 @@ def main():
     pred_batch_size = args.pred_batch_size
     
     # Output file path
-    pred_file = args.pred_file   
+    pred_file = args.pred_file
+    
+    # Whether to generate H5 file for distal data
+    without_h5 = args.without_h5
+    cpu_only = args.cpu_only
 
     # Get saved model-related files
     model_path = args.model_path
@@ -139,12 +147,11 @@ def main():
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
-    n_cont = 0
+    
     try:
         bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
         bw_files = list(bw_list[0])
         bw_names = list(bw_list[1])
-        n_cont = len(bw_names)
     except pd.errors.EmptyDataError:
         print('Warnings: no bigWig files provided')
 
@@ -152,27 +159,36 @@ def main():
     test_h5f_path = get_h5f_path(test_file, bw_names, distal_radius, distal_order)
 
     # Prepare testing data 
-    dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
+    if without_h5:
+        dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, seq_only)
+    else:
+        dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1, seq_only)
     data_local_test = dataset_test.data_local
+    n_cont = len(dataset_test.cont_cols)
     
     test_size = len(dataset_test)
 
+    sys.stdout.flush()
+    
     # Dataloader for testing data
     dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)
 
-    # Find a GPU with enough memory
-    nvmlInit()
-    cuda_id = '0'
-    for i in range(nvmlDeviceGetCount()):
-        h = nvmlDeviceGetHandleByIndex(i)
-        info = nvmlDeviceGetMemoryInfo(h)
-        if info.free > 1.5*(2**30): # Reserve 1.5GB
-            cuda_id = str(i)
-            break
-        
-    print("CUDA: ", torch.cuda.is_available())
-    print("using  ", "cuda:"+cuda_id)
-    device = torch.device("cuda:"+cuda_id if torch.cuda.is_available() else "cpu")
+    if cpu_only:
+        device = torch.device('cpu')
+    else:
+        # Find a GPU with enough memory
+        nvmlInit()
+        cuda_id = '0'
+        for i in range(nvmlDeviceGetCount()):
+            h = nvmlDeviceGetHandleByIndex(i)
+            info = nvmlDeviceGetMemoryInfo(h)
+            if info.free > 1.5*(2**30): # Reserve 1.5GB
+                cuda_id = str(i)
+                break
+
+        print('CUDA: ', torch.cuda.is_available())
+        print('using'  , 'cuda:'+cuda_id)
+        device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
     
     # Choose the network model
     if model_no == 0:

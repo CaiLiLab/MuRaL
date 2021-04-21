@@ -178,6 +178,18 @@ def corr_calc_sub(data, window, prob_names):
     
     return corr_list
 
+def calc_avg_prob(df, n_class):
+    
+    avg_list = []
+    for i in range(n_class):
+        avg_list.append(sum(list(df['mut_type'] == i)) / df.shape[0])
+
+    for i in range(n_class):
+        avg_list.append(df['prob'+str(i)].mean())
+        
+    return avg_list
+        
+                        
 class ECELoss(nn.Module):
     """
     Compute ECE (Expected Calibration Error)
@@ -272,8 +284,8 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     print('calibr.weights_:', calibr.weights_)
     
     nll_criterion = nn.CrossEntropyLoss(reduction='mean').to(device)
-    ece_criterion = ECELoss(n_bins=25).to(device)
-    c_ece_criterion = ClasswiseECELoss(n_bins=25).to(device)
+    ece_criterion = ECELoss(n_bins=50).to(device)
+    c_ece_criterion = ClasswiseECELoss(n_bins=50).to(device)
 
     # Generate pseudo-logits
     logits0 = torch.log(torch.from_numpy(y_prob)).to(device)
@@ -288,7 +300,7 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     ece = ece_criterion(logits, labels).item()
     c_ece0 = c_ece_criterion(logits0, labels).item()
     c_ece = c_ece_criterion(logits, labels).item()
-    print('Before ' + calibr_name + ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll0, ece0, c_ece0))
-    print('After ' + calibr_name +  ' scaling - NLL: %.5f, ECE: %.5f, CwECE: %.5f,' % (nll, ece, c_ece))
+    print('Before ' + calibr_name + ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f,' % (nll0, ece0, c_ece0))
+    print('After ' + calibr_name +  ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f,' % (nll, ece, c_ece))
     
     return calibr, nll
