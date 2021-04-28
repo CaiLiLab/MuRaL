@@ -47,11 +47,17 @@ def parse_arguments(parser):
                         help='reference genome')
 
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
+
+    parser.add_argument('--seq_only', default=False, action='store_true',  help='use only genomic sequence and ignore bigWig tracks')
     
-    parser.add_argument('--n_class', type=int, default=2, help='number of mutation classes')
+    parser.add_argument('--n_class', type=int, default=4, help='number of mutation classes')
     
     parser.add_argument('--local_radius', type=int, default=5, help='radius of local sequences to be considered')
     parser.add_argument('--local_order', type=int, default=1, help='order of local sequences to be considered')
+    
+    parser.add_argument('--local_hidden1_size', type=int, default=150, nargs='+', help='size of 1st hidden layer for local data')
+    
+    parser.add_argument('--local_hidden2_size', type=int, default=80, nargs='+', help='size of 2nd hidden layer for local data')
         
     parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
     
@@ -91,6 +97,8 @@ def parse_arguments(parser):
     
     parser.add_argument('--calibrator_path', type=str, default='', help='calibrator path')
     
+    parser.add_argument('--model_config_path', type=str, default='', help='model config path')
+    
     args = parser.parse_args()
 
     return args
@@ -107,6 +115,8 @@ def main():
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
+    local_hidden1_size = args.local_hidden1_size
+    local_hidden2_size = args.local_hidden2_size
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     emb_dropout = args.emb_dropout
@@ -116,7 +126,9 @@ def main():
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
     distal_fc_dropout = args.distal_fc_dropout
-    model_no = args.model_no   
+    n_class = args.n_class
+    model_no = args.model_no
+    seq_only = args.seq_only
     pred_file = args.pred_file   
     
     learning_rate = args.learning_rate   
@@ -129,8 +141,30 @@ def main():
     
     model_path = args.model_path
     calibrator_path = args.calibrator_path
+    model_config_path = args.model_config_path
+
+    # Load model config (hyperparameters)
+    if model_config_path != '':
+        with open(model_config_path, 'rb') as fconfig:
+            config = pickle.load(fconfig)
+            
+            local_radius = config['local_radius']
+            local_order = config['local_order']
+            local_hidden1_size = config['local_hidden1_size']
+            local_hidden2_size = config['local_hidden2_size']
+            distal_radius = config['distal_radius']
+            distal_order = 1 # reserved for future improvement
+            CNN_kernel_size = config['CNN_kernel_size']  
+            CNN_out_channels = config['CNN_out_channels']
+            emb_dropout = config['emb_dropout']
+            local_dropout = config['local_dropout']
+            distal_fc_dropout = config['distal_fc_dropout']
+            emb_dims = config['emb_dims']
+
+            n_class = config['n_class']
+            model_no = config['model_no']
+            seq_only = config['seq_only']
     
-    n_class = args.n_class
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
@@ -151,22 +185,10 @@ def main():
         n_cont = len(bw_names)
     except pd.errors.EmptyDataError:
         print('Warnings: no bigWig files provided')
-    
-    if len(train_h5f_path) == 0:
-        train_h5f_path = train_file + '.distal_' + str(distal_radius)
-        if(distal_order >1):
-            train_h5f_path = train_h5f_path + '_' + str(distal_order)
-        if len(bw_names) > 0:
-            train_h5f_path = train_h5f_path + '.' + '.'.join(list(bw_names))
-        train_h5f_path = train_h5f_path + '.h5'
-    
-    if len(test_h5f_path) == 0:
-        test_h5f_path = test_file + '.distal_' + str(distal_radius)
-        if(distal_order >1):
-            test_h5f_path = test_h5f_path + '_' + str(distal_order)
-        if len(bw_names) > 0:
-            test_h5f_path = test_h5f_path + '.' + '.'.join(list(bw_names))
-        test_h5f_path = test_h5f_path + '.h5'   
+
+    train_h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order)
+
+    test_h5f_path = get_h5f_path(test_file, bw_names, distal_radius, distal_order)
     
     # Prepare the datasets for trainging
     dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, train_h5f_path)
@@ -177,11 +199,13 @@ def main():
     # Dataloader for training
     dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=2)
 
-    # Number of categorical features
-    cat_dims = dataset.cat_dims
 
-    #Embedding dimensions for categorical features
-    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
+    if model_config_path == '':
+        # Number of categorical features
+        cat_dims = dataset.cat_dims
+
+        #Embedding dimensions for categorical features
+        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims]  
 
     # Prepare testing data 
     dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1)
@@ -208,13 +232,13 @@ def main():
     
     # Choose the network model
     if model_no == 0:
-        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=0.2, lin_layer_dropouts=[0.15, 0.15], n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 1:
         model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     elif model_no == 2:
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[150, 80], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
 
     else:
         print('Error: no model selected!')
@@ -227,9 +251,7 @@ def main():
 
     model_state = torch.load(model_path, map_location=device)
     model.load_state_dict(model_state)
-    #model2.load_state_dict(torch.load(model2_path, map_location=device))
 
-    #criterion = torch.nn.NLLLoss()
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     
     if train_all:

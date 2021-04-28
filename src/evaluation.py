@@ -259,6 +259,27 @@ class ClasswiseECELoss(nn.Module):
         sce = torch.mean(per_class_sce)
         return sce
 
+class BrierScore(nn.Module):
+    """implementation of Brier score using nn.Module (not used)"""
+    def __init__(self):
+        super(BrierScore, self).__init__()
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+        target_one_hot = torch.FloatTensor(input.shape).to(target.get_device())
+        target_one_hot.zero_()
+        target_one_hot.scatter_(1, target, 1)
+
+        pt = F.softmax(input, dim=1)
+        squared_diff = (target_one_hot - pt) ** 2
+
+        loss = torch.sum(squared_diff) / float(input.shape[0])
+        return loss
+    
 def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     """
     Fit the calibrator
@@ -286,6 +307,7 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     nll_criterion = nn.CrossEntropyLoss(reduction='mean').to(device)
     ece_criterion = ECELoss(n_bins=50).to(device)
     c_ece_criterion = ClasswiseECELoss(n_bins=50).to(device)
+    brier_criterion = BrierScore().to(device)
 
     # Generate pseudo-logits
     logits0 = torch.log(torch.from_numpy(y_prob)).to(device)
@@ -300,7 +322,12 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     ece = ece_criterion(logits, labels).item()
     c_ece0 = c_ece_criterion(logits0, labels).item()
     c_ece = c_ece_criterion(logits, labels).item()
-    print('Before ' + calibr_name + ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f,' % (nll0, ece0, c_ece0))
-    print('After ' + calibr_name +  ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f,' % (nll, ece, c_ece))
+    
+    brier0 = brier_criterion(logits0, labels).item()
+    brier = brier_criterion(logits, labels).item()
+    
+    print('Before ' + calibr_name + ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f, Brier: %.8f' % (nll0, ece0, c_ece0, brier0))
+    print('After ' + calibr_name +  ' scaling - NLL: %.8f, ECE: %.8f, CwECE: %.8f, Brier: %.8f' % (nll, ece, c_ece, brier))
+
     
     return calibr, nll

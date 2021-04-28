@@ -342,7 +342,7 @@ def prepare_dataset(bed_regions, ref_genome, bw_files, bw_names, local_radius=5,
     
     #dataset_distal = DistalDataset([distal_seq, y])
     
-    # Combine local Dataset and distal Dataset
+    # Combine local  and distal data into a Dataset
     dataset = CombinedDataset(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, distal_data=distal_seq)
     
     return dataset
