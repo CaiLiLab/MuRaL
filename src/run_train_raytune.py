@@ -33,6 +33,7 @@ from ray.tune.schedulers import ASHAScheduler
 import os
 import time
 import datetime
+import random
 
 from nn_models import *
 from nn_utils import *
@@ -72,6 +73,8 @@ def parse_arguments(parser):
     parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
     
     parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
+    
+    parser.add_argument('--split_seed', type=int, default=-1, help='order of distal sequences to be considered')
     
     #parser.add_argument('--emb_4th_root', default=False, action='store_true')
     
@@ -162,6 +165,10 @@ def main():
     resume_ray = args.resume_ray
     ray_ncpus = args.ray_ncpus
     ray_ngpus = args.ray_ngpus
+    
+    if args.split_seed < 0:
+        args.split_seed = random.randint(0, 10000)
+    print('args.split_seed:', args.split_seed)
     
     
     # Read bigWig file names
@@ -290,7 +297,8 @@ def train(config, args, checkpoint_dir=None):
     n_class = args.n_class  
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
-    seq_only = args.seq_only 
+    seq_only = args.seq_only
+    split_seed = args.split_seed
     
     bw_paths = args.bw_paths
     bw_files = []
@@ -309,7 +317,7 @@ def train(config, args, checkpoint_dir=None):
     train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
     
     # Prepare the datasets for trainging
-    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, seq_only=seq_only)
+    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, h5_chunk_size=1, seq_only=seq_only)
     
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
@@ -332,7 +340,7 @@ def train(config, args, checkpoint_dir=None):
     train_size = len(dataset) - valid_size
     print('train_size, valid_size:', train_size, valid_size)
     
-    dataset_train, dataset_valid = random_split(dataset, [train_size, valid_size])
+    dataset_train, dataset_valid = random_split(dataset, [train_size, valid_size], torch.Generator().manual_seed(split_seed))
     dataset_valid.indices.sort()
     #data_local_valid = dataset_valid.data_local
     
@@ -458,6 +466,8 @@ def train(config, args, checkpoint_dir=None):
             #fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
             #vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
             #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
+            
+            print("valid_data_and_prob.iloc[0:10]", valid_data_and_prob.iloc[0:10])
             
             # Compare observed/predicted 3/5/7mer mutation frequencies
             print('3mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 3, n_class))
