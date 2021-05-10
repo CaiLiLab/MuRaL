@@ -1,4 +1,4 @@
-import os, os.path
+import os
 import sys
 
 from janggu.data import Bioseq, Cover
@@ -45,8 +45,10 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
     if os.path.exists(h5f_path):
         try:
             with h5py.File(h5f_path, 'r') as hf:
-                # Check whether the existing H5 file is complete
-                if len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                bed_path = bed_regions.fn
+                
+                # Check whether the existing H5 file is latest and complete
+                if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
                     write_h5f = False
         except OSError:
             print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
@@ -114,8 +116,9 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
         # NOTE: use np.int64 because nn.Embedding needs a Long type
         local_seq_cat2 = local_seq2.iseq4idx(list(range(local_seq2.shape[0]))).astype(np.int64)
         
-        # NOTE: replace k-mers with 'N' with a large number
-        local_seq_cat2= np.where(local_seq_cat2>=0, local_seq_cat2, 4**local_order) 
+        # NOTE: replace k-mers with 'N' with a large number; the padding numbers at the two ends of the chromosomes are also large numbers
+        #local_seq_cat2= np.where(local_seq_cat2>=0, local_seq_cat2, 4**local_order)     
+        local_seq_cat2 = np.where(np.logical_and(local_seq_cat2>=0, local_seq_cat2<=4**local_order), local_seq_cat2, 4**local_order)
 
         # TO DO: some other categorical data may be added here
         
@@ -342,7 +345,7 @@ def prepare_dataset(bed_regions, ref_genome, bw_files, bw_names, local_radius=5,
     
     #dataset_distal = DistalDataset([distal_seq, y])
     
-    # Combine local Dataset and distal Dataset
+    # Combine local  and distal data into a Dataset
     dataset = CombinedDataset(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, distal_data=distal_seq)
     
     return dataset

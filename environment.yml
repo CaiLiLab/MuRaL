@@ -14,7 +14,7 @@ dependencies:
   - pip:
     - pybedtools
     - pysam==0.15.1
-    - janggu[tf2_gpu]
+    - janggu[tf2_gpu]==0.10.0
     - ray[tune]
     - dirichletcal
     - jax
