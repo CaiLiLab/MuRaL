@@ -74,7 +74,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
     
-    parser.add_argument('--split_seed', type=int, default=-1, help='order of distal sequences to be considered')
+    parser.add_argument('--split_seed', type=int, default=-1, help='seed for randomly splitting data into training and validation sets')
     
     #parser.add_argument('--emb_4th_root', default=False, action='store_true')
     
@@ -115,6 +115,8 @@ def parse_arguments(parser):
     parser.add_argument('--n_trials', type=int, default=3, help='number of trials for training')
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
+    
+    parser.add_argument('--ASHA_metric', type=str, default='score', help='metric for ASHA schedualing; the value can be "loss" or "score"')
     
     parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs used by Ray')
     
@@ -159,6 +161,7 @@ def main():
     grace_period = args.grace_period
     n_trials = args.n_trials
     experiment_name = args.experiment_name
+    ASHA_metric = args.ASHA_metric
     n_class = args.n_class  
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
@@ -228,7 +231,7 @@ def main():
     # Set the scheduler for parallel training 
     scheduler = ASHAScheduler(
     #metric='loss',
-    metric='score', # Use the custom score metric for model selection
+    metric=ASHA_metric, # Use a metric for model selection
     mode='min',
     max_t=epochs,
     grace_period=grace_period,
