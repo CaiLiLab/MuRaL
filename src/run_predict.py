@@ -38,7 +38,7 @@ def parse_arguments(parser):
     parser.add_argument('--test_data', type=str, default='',
                         help='file path for testing data')
     
-    parser.add_argument('--ref_genome', type=str, default='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa',
+    parser.add_argument('--ref_genome', type=str, default='',
                         help='reference genome')
     
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
