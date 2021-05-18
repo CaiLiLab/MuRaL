@@ -270,7 +270,7 @@ class BrierScore(nn.Module):
             input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
             input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
         target = target.view(-1,1)
-        target_one_hot = torch.FloatTensor(input.shape).to(target.get_device())
+        target_one_hot = torch.FloatTensor(input.shape).to(target.device)
         target_one_hot.zero_()
         target_one_hot.scatter_(1, target, 1)
 
