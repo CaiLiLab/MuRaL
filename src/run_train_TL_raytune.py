@@ -47,7 +47,7 @@ def parse_arguments(parser):
     parser.add_argument('--train_data_h5f', type=str, default='', help='path for training data in HDF5 format')
     
     
-    parser.add_argument('--ref_genome', type=str, default='/public/home/licai/DNMML/data/hg19/hg19_ucsc_ordered.fa',
+    parser.add_argument('--ref_genome', type=str, default='',
                         help='reference genome')
 
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
@@ -205,9 +205,10 @@ def main():
             distal_fc_dropout = config['distal_fc_dropout']
             emb_dims = config['emb_dims']
 
-            n_class = config['n_class']
-            model_no = config['model_no']
-            seq_only = config['seq_only']
+            args.n_class = config['n_class']
+            args.model_no = config['model_no']
+            
+            args.seq_only = config['seq_only']
     
     
     start_time = time.time()
@@ -275,6 +276,7 @@ def main():
         'transfer_learning': True,
         'train_all': train_all,
         'init_fc_with_pretrained': init_fc_with_pretrained,
+        'emb_dims':emb_dims,
     }
     
     # Set the scheduler for parallel training 

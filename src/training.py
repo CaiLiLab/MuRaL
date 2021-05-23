@@ -126,16 +126,17 @@ def train(config, args, checkpoint_dir=None):
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
-    
-    # Number of categorical features
-    #cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
-    cat_dims = dataset.cat_dims
-    
-    # Set embedding dimensions for categorical features
-    # According to https://stackoverflow.com/questions/48479915/what-is-the-preferred-ratio-between-the-vocabulary-size-and-embedding-dimension
-    emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims] 
-    config['emb_dims'] = emb_dims
+    if config['transfer_learning']:
+        emb_dims = config['emb_dims']
+    else:
+        # Number of categorical features
+        #cat_dims = [int(data_local[col].nunique()) for col in categorical_features]
+        cat_dims = dataset.cat_dims
 
+        # Set embedding dimensions for categorical features
+        # According to https://stackoverflow.com/questions/48479915/what-is-the-preferred-ratio-between-the-vocabulary-size-and-embedding-dimension
+        emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims] 
+        config['emb_dims'] = emb_dims
 
     # Choose the network model for training
     if model_no == 0:
