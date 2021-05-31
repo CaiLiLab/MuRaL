@@ -115,7 +115,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
     
-    parser.add_argument('--ASHA_metric', type=str, default='score', help='metric for ASHA schedualing; the value can be "loss" or "score"')
+    parser.add_argument('--ASHA_metric', type=str, default='loss', help='metric for ASHA schedualing; the value can be "loss" or "score"')
     
     parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs requested by Ray')
     

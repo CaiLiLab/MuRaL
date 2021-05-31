@@ -48,11 +48,8 @@ def parse_arguments(parser):
     Parse parameters from the command line
     """
 
-    parser.add_argument('--train_data', type=str, default='merge.95win.A.pos.101bp.19cols.train.30k.bed.gz',
+    parser.add_argument('--train_data', type=str, default='',
                         help='path for training data')
-    
-    parser.add_argument('--test_data', type=str, default='merge.95win.A.pos.101bp.19cols.test.30k.bed.gz',
-                        help='path for testing data')
     
     parser.add_argument('--ref_genome', type=str, default='',
                         help='reference genome')
@@ -117,7 +114,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
     
-    parser.add_argument('--ASHA_metric', type=str, default='score', help='metric for ASHA schedualing; the value can be "loss" or "score"')
+    parser.add_argument('--ASHA_metric', type=str, default='loss', help='metric for ASHA schedualing; the value can be "loss" or "score"')
     
     parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs requested by Ray')
     
@@ -177,7 +174,7 @@ def main():
     gpu_per_trial = args.gpu_per_trial
     
     if args.split_seed < 0:
-        args.split_seed = random.randint(0, 10000)
+        args.split_seed = random.randint(0, 1000000)
     print('args.split_seed:', args.split_seed)
     
     
