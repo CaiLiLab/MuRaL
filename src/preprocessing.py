@@ -97,6 +97,10 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
     # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=local_radius, order=1)    
     
+    # Check whether the data is correctly extracted
+    if np.unique(np.array(local_seq)[:,:,local_radius,:,:], axis=0).shape[0] != 1:
+        print('ERROR: The positions in input BED file have multiple nucleotides! The ref_genome or input BED file could be wrong.', file=sys.stderr)
+        sys.exit()
     # To get One-Hot encoded data, shape is [sample_size, 4*seq_len]
     #local_seq = np.array(local_seq).squeeze().reshape(local_seq.shape[0], -1)   
     

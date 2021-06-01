@@ -136,8 +136,8 @@ def train(config, args, checkpoint_dir=None):
         # Set embedding dimensions for categorical features
         # According to https://stackoverflow.com/questions/48479915/what-is-the-preferred-ratio-between-the-vocabulary-size-and-embedding-dimension
         emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims] 
-        config['emb_dims'] = emb_dims
-
+        config['emb_dims'] = emb_dims    
+        
     # Choose the network model for training
     if model_no == 0:
         # Local-only model
@@ -156,7 +156,7 @@ def train(config, args, checkpoint_dir=None):
         sys.exit() 
     
     # Count the parameters in the model
-    count_parameters(model)
+    total_params = count_parameters(model)
     print('model:')
     print(model)
     
@@ -332,4 +332,4 @@ def train(config, args, checkpoint_dir=None):
                     pickle.dump(config, fp)
 
 
-            tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score)
+            tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score, total_params=total_params)

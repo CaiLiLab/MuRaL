@@ -66,7 +66,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--local_hidden1_size', type=int, default=[150], nargs='+', help='size of 1st hidden layer for local data')
     
-    parser.add_argument('--local_hidden2_size', type=int, default=[80], nargs='+', help='size of 2nd hidden layer for local data')
+    parser.add_argument('--local_hidden2_size', type=int, default=[0], nargs='+', help='size of 2nd hidden layer for local data')
     
     parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
     
@@ -222,10 +222,11 @@ def main():
     
     # Configure the search space for relavant hyperparameters
     config = {
-        'local_radius': tune.grid_search(local_radius),
+        'local_radius': tune.choice(local_radius),
         'local_order': tune.choice(local_order),
         'local_hidden1_size': tune.choice(local_hidden1_size),
-        'local_hidden2_size': tune.choice(local_hidden2_size),
+        #'local_hidden2_size': tune.choice(local_hidden2_size),
+        'local_hidden2_size': tune.choice(local_hidden2_size) if local_hidden2_size[0]>0 else tune.sample_from(lambda spec: spec.config.local_hidden1_size//2), # default local_hidden2_size = local_hidden1_size//2
         'distal_radius': tune.choice(distal_radius),
         'emb_dropout': tune.choice(emb_dropout),
         'local_dropout': tune.choice(local_dropout),
@@ -242,6 +243,7 @@ def main():
         'transfer_learning': False,
     }
     
+
     # Set the scheduler for parallel training 
     scheduler = ASHAScheduler(
     #metric='loss',
@@ -252,7 +254,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
