@@ -17,7 +17,7 @@ from sklearn import metrics, calibration
 
 def to_np(tensor):
     """Convert Tensor to numpy arrays"""
-    if torch.cuda.is_available():
+    if tensor.is_cuda:
         return tensor.cpu().detach().numpy()
     else:
         return tensor.detach().numpy()
@@ -48,7 +48,9 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file is latest and complete
-                if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                #if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                # Check whether the existing H5 file (not following the link) is latest and complete
+                if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
                     write_h5f = False
         except OSError:
             print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
