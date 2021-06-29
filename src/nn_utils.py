@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import sys
 
 
 def weights_init(m):
@@ -50,5 +51,10 @@ def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
                 
             loss = criterion(preds, y.long().squeeze(1))
             total_loss += loss.item()
+            
+            if device == torch.device('cpu'):
+                if  np.random.uniform(0,1) < 0.0001:
+                    print('in the model_predict_m:', device)
+                    sys.stdout.flush()
 
     return pred_y, total_loss

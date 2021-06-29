@@ -71,6 +71,7 @@ def train(config, args, checkpoint_dir=None):
     seq_only = args.seq_only
     split_seed = args.split_seed
     gpu_per_trial = args.gpu_per_trial
+    save_valid_preds = args.save_valid_preds
     
     bw_paths = args.bw_paths
     bw_files = []
@@ -309,9 +310,9 @@ def train(config, args, checkpoint_dir=None):
             print('regional score:', score, n_regions)
             
             # Output genomic positions and predicted probabilities
-            chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end']].reset_index(drop=True)
+            chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end', 'strand']].reset_index(drop=True)
             valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
-            valid_pred_df.columns = ['chrom', 'start', 'end','mut_type'] + prob_names
+            valid_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
             
             print('valid_pred_df: ', valid_pred_df.head())
             
@@ -330,6 +331,7 @@ def train(config, args, checkpoint_dir=None):
                 
                 with open(path + '.config.pkl', 'wb') as fp:
                     pickle.dump(config, fp)
-
+                if save_valid_preds:
+                    valid_pred_df.to_csv(path + '.valid_preds.tsv.gz', sep='\t', float_format='%.4g', index=False)
 
             tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score, total_params=total_params)

@@ -237,11 +237,12 @@ class CombinedDatasetH5(Dataset):
 
 def prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
-    
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
-    
+ 
     # Generate H5 file for distal data
     generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size)
+    
+    # Prepare local data
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only:

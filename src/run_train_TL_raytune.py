@@ -126,6 +126,8 @@ def parse_arguments(parser):
     parser.add_argument('--gpu_per_trial', type=float, default=0.2, help='number of GPUs per trial')
     
     parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
+    
+    parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
 
     
     args = parser.parse_args()
@@ -158,6 +160,8 @@ def main():
     seq_only = args.seq_only
     pred_file = args.pred_file
     valid_ratio = args.valid_ratio
+    save_valid_preds = args.save_valid_preds
+
     
     ray_ncpus = args.ray_ncpus
     ray_ngpus = args.ray_ngpus
