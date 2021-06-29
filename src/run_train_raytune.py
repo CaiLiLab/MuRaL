@@ -66,7 +66,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--local_hidden1_size', type=int, default=[150], nargs='+', help='size of 1st hidden layer for local data')
     
-    parser.add_argument('--local_hidden2_size', type=int, default=[80], nargs='+', help='size of 2nd hidden layer for local data')
+    parser.add_argument('--local_hidden2_size', type=int, default=[0], nargs='+', help='size of 2nd hidden layer for local data')
     
     parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
     
@@ -76,9 +76,9 @@ def parse_arguments(parser):
     
     parser.add_argument('--batch_size', type=int, default=[128], nargs='+', help='size of mini batches')
     
-    parser.add_argument('--emb_dropout', type=float, default=[0.2], nargs='+', help='dropout rate for k-mer embedding')
+    parser.add_argument('--emb_dropout', type=float, default=[0.1], nargs='+', help='dropout rate for k-mer embedding')
     
-    parser.add_argument('--local_dropout', type=float, default=[0.15], nargs='+', help='dropout rate for local network')
+    parser.add_argument('--local_dropout', type=float, default=[0.1], nargs='+', help='dropout rate for local network')
     
     parser.add_argument('--CNN_kernel_size', type=int, default=[3], nargs='+', help='kernel size for CNN layers')
     
@@ -124,7 +124,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--gpu_per_trial', type=float, default=0.2, help='number of GPUs per trial')
         
-    parser.add_argument('--resume_ray', default=False, action='store_true', help='resume incomplete Ray experiment')
+    parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
     
     args = parser.parse_args()
 
@@ -167,7 +167,7 @@ def main():
     n_class = args.n_class  
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
-    resume_ray = args.resume_ray
+    save_valid_preds = args.save_valid_preds
     ray_ncpus = args.ray_ncpus
     ray_ngpus = args.ray_ngpus
     cpu_per_trial = args.cpu_per_trial
@@ -222,10 +222,11 @@ def main():
     
     # Configure the search space for relavant hyperparameters
     config = {
-        'local_radius': tune.grid_search(local_radius),
+        'local_radius': tune.choice(local_radius),
         'local_order': tune.choice(local_order),
         'local_hidden1_size': tune.choice(local_hidden1_size),
-        'local_hidden2_size': tune.choice(local_hidden2_size),
+        #'local_hidden2_size': tune.choice(local_hidden2_size),
+        'local_hidden2_size': tune.choice(local_hidden2_size) if local_hidden2_size[0]>0 else tune.sample_from(lambda spec: spec.config.local_hidden1_size//2), # default local_hidden2_size = local_hidden1_size//2
         'distal_radius': tune.choice(distal_radius),
         'emb_dropout': tune.choice(emb_dropout),
         'local_dropout': tune.choice(local_dropout),
@@ -242,6 +243,7 @@ def main():
         'transfer_learning': False,
     }
     
+
     # Set the scheduler for parallel training 
     scheduler = ASHAScheduler(
     #metric='loss',
@@ -252,7 +254,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -267,16 +269,16 @@ def main():
     local_dir='./ray_results',
     scheduler=scheduler,
     progress_reporter=reporter,
-    resume=resume_ray)
+    resume=False)
     
     # Print the best trial at the ende
     #best_trial = result.get_best_trial('loss', 'min', 'last')
-    best_trial = result.get_best_trial('loss', 'min', 'last-5-avg')
-    print('Best trial config: {}'.format(best_trial.config))
-    print('Best trial final validation loss: {}'.format(best_trial.last_result['loss'])) 
+    #best_trial = result.get_best_trial('loss', 'min', 'last-5-avg')
+    #print('Best trial config: {}'.format(best_trial.config))
+    #print('Best trial final validation loss: {}'.format(best_trial.last_result['loss'])) 
     
-    best_checkpoint = result.get_best_checkpoint(best_trial, metric='loss', mode='min')
-    print('best_checkpoint:', best_checkpoint)
+    #best_checkpoint = result.get_best_checkpoint(best_trial, metric='loss', mode='min')
+    #print('best_checkpoint:', best_checkpoint)
     
     # Shutdown Ray
     if ray.is_initialized():

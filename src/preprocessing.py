@@ -17,7 +17,7 @@ from sklearn import metrics, calibration
 
 def to_np(tensor):
     """Convert Tensor to numpy arrays"""
-    if torch.cuda.is_available():
+    if tensor.is_cuda:
         return tensor.cpu().detach().numpy()
     else:
         return tensor.detach().numpy()
@@ -48,7 +48,9 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file is latest and complete
-                if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                #if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                # Check whether the existing H5 file (not following the link) is latest and complete
+                if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
                     write_h5f = False
         except OSError:
             print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
@@ -97,6 +99,10 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
     # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=local_radius, order=1)    
     
+    # Check whether the data is correctly extracted
+    if np.unique(np.array(local_seq)[:,:,local_radius,:,:], axis=0).shape[0] != 1:
+        print('ERROR: The positions in input BED file have multiple nucleotides! The ref_genome or input BED file could be wrong.', file=sys.stderr)
+        sys.exit()
     # To get One-Hot encoded data, shape is [sample_size, 4*seq_len]
     #local_seq = np.array(local_seq).squeeze().reshape(local_seq.shape[0], -1)   
     
@@ -231,11 +237,12 @@ class CombinedDatasetH5(Dataset):
 
 def prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
-    
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
-    
+ 
     # Generate H5 file for distal data
     generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size)
+    
+    # Prepare local data
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only:

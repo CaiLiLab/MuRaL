@@ -170,9 +170,6 @@ def main():
 
     sys.stdout.flush()
     
-    # Dataloader for testing data
-    dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)
-
     if cpu_only:
         device = torch.device('cpu')
     else:
@@ -213,7 +210,13 @@ def main():
     
     # Set prob names for mutation types
     prob_names = ['prob'+str(i) for i in range(n_class)]
-    
+
+    # Dataloader for testing data    
+    if cpu_only:
+        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=0)
+    else:
+        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)   
+
     # Do the prediction
     pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
     
@@ -232,6 +235,8 @@ def main():
             calibr = pickle.load(fcal)         
             prob_cal = calibr.predict_proba(y_prob.to_numpy())  
             y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
+    
+    print('Mean Loss:', test_total_loss/test_size)
     
     # Combine data and do k-mer evaluation
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)         
