@@ -122,7 +122,7 @@ def train(config, args, checkpoint_dir=None):
     #data_local_valid = dataset_valid.data_local
     
     # Dataloader for training
-    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=2, pin_memory=True) #shuffle=False for HybridLoss
+    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=1, pin_memory=True) #shuffle=False for HybridLoss
 
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
