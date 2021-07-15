@@ -46,14 +46,12 @@ from torch.utils.tensorboard import SummaryWriter
 def parse_arguments(parser):
     """
     Parse parameters from the command line
-    """
-
-    parser.add_argument('--train_data', type=str, default='',
-                        help='path for training data')
+    """   
+    parser.add_argument('--ref_genome', type=str, default='', help='reference genome')
     
-    parser.add_argument('--ref_genome', type=str, default='',
-                        help='reference genome')
+    parser.add_argument('--train_data', type=str, default='', help='path for training data')
     
+    parser.add_argument('--validation_data', type=str, default='', help='path for validation data')    
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
     
     parser.add_argument('--seq_only', default=False, action='store_true', help='use only genomic sequence and ignore bigWig tracks')
@@ -142,6 +140,7 @@ def main():
     
     print(' '.join(sys.argv)) # print the command line
     train_file = args.train_data
+    valid_file = args.validation_data
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
@@ -206,6 +205,12 @@ def main():
     for d_radius in distal_radius:
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+    
+    if valid_file != '':
+        valid_bed = BedTool(valid_file)
+        for d_radius in distal_radius:
+            valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
+            generate_h5f(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():

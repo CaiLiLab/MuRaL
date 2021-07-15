@@ -139,6 +139,7 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
+    sys.stdout.flush()
     
     # Read BED files
     test_bed = BedTool(test_file)
