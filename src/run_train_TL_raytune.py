@@ -128,7 +128,8 @@ def parse_arguments(parser):
     parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
     
     parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
-
+    
+    parser.add_argument('--rerun_failed', default=False, action='store_true', help='Rerun failed trials')
     
     args = parser.parse_args()
 
@@ -161,6 +162,7 @@ def main():
     pred_file = args.pred_file
     valid_ratio = args.valid_ratio
     save_valid_preds = args.save_valid_preds
+    rerun_failed = args.rerun_failed
 
     
     ray_ncpus = args.ray_ncpus
@@ -228,6 +230,11 @@ def main():
         print('Ray is using GPU device', 'cuda:'+cuda_id)
     else:
         print('Ray is using only CPUs ...')
+    
+    if rerun_failed:
+        resume_flag = 'ERRORED_ONLY'
+    else:
+        resume_flag = False
     
     # Allocate CPU/GPU resources for this Ray job
     ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
@@ -308,7 +315,7 @@ def main():
     local_dir='./ray_results',
     scheduler=scheduler,
     progress_reporter=reporter,
-    resume=False)   
+    resume=resume_flag)   
     
     
 if __name__ == "__main__":

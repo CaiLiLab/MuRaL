@@ -52,10 +52,10 @@ def main():
     
     fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='FullDiri')
     
-    #valid_y = valid_data_and_prob['mut_type'].to_numpy().squeeze()
-            
-            # Train the calibrator using the validataion data
-    #fdiri_cal, fdiri_nll = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
+    #fvect_cal, fvect_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='VectS')
+    
+    #ftemp_cal, ftemp_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='TempS')
+
 
 if __name__ == '__main__':
     main()

@@ -139,6 +139,7 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
+    sys.stdout.flush()
     
     # Read BED files
     test_bed = BedTool(test_file)
@@ -236,7 +237,7 @@ def main():
             prob_cal = calibr.predict_proba(y_prob.to_numpy())  
             y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
     
-    print('Mean Loss:', test_total_loss/test_size)
+    print('Mean Loss, Total Loss, Test Size:', test_total_loss/test_size, test_total_loss, test_size)
     
     # Combine data and do k-mer evaluation
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)         

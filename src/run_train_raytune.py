@@ -46,14 +46,12 @@ from torch.utils.tensorboard import SummaryWriter
 def parse_arguments(parser):
     """
     Parse parameters from the command line
-    """
-
-    parser.add_argument('--train_data', type=str, default='',
-                        help='path for training data')
+    """   
+    parser.add_argument('--ref_genome', type=str, default='', help='reference genome')
     
-    parser.add_argument('--ref_genome', type=str, default='',
-                        help='reference genome')
+    parser.add_argument('--train_data', type=str, default='', help='path for training data')
     
+    parser.add_argument('--validation_data', type=str, default='', help='path for validation data')    
     parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
     
     parser.add_argument('--seq_only', default=False, action='store_true', help='use only genomic sequence and ignore bigWig tracks')
@@ -122,9 +120,11 @@ def parse_arguments(parser):
     
     parser.add_argument('--cpu_per_trial', type=int, default=3, help='number of CPUs per trial')
     
-    parser.add_argument('--gpu_per_trial', type=float, default=0.2, help='number of GPUs per trial')
+    parser.add_argument('--gpu_per_trial', type=float, default=0.19, help='number of GPUs per trial')
         
     parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
+    
+    parser.add_argument('--rerun_failed', default=False, action='store_true', help='Rerun failed trials')
     
     args = parser.parse_args()
 
@@ -140,6 +140,7 @@ def main():
     
     print(' '.join(sys.argv)) # print the command line
     train_file = args.train_data
+    valid_file = args.validation_data
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
@@ -168,6 +169,7 @@ def main():
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
     save_valid_preds = args.save_valid_preds
+    rerun_failed = args.rerun_failed
     ray_ncpus = args.ray_ncpus
     ray_ngpus = args.ray_ngpus
     cpu_per_trial = args.cpu_per_trial
@@ -204,6 +206,12 @@ def main():
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
+    if valid_file != '':
+        valid_bed = BedTool(valid_file)
+        for d_radius in distal_radius:
+            valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
+            generate_h5f(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+    
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
             print('Error: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)
@@ -214,6 +222,11 @@ def main():
         print('Ray is using GPU device', 'cuda:'+cuda_id)
     else:
         print('Ray is using only CPUs ...')
+    
+    if rerun_failed:
+        resume_flag = 'ERRORED_ONLY'
+    else:
+        resume_flag = False
     
     # Allocate CPU/GPU resources for this Ray job
     ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
@@ -254,7 +267,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'total_params', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'after_min_loss',  'score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -268,8 +281,9 @@ def main():
     num_samples=n_trials,
     local_dir='./ray_results',
     scheduler=scheduler,
+    stop={'after_min_loss':3},
     progress_reporter=reporter,
-    resume=False)
+    resume=resume_flag)
     
     # Print the best trial at the ende
     #best_trial = result.get_best_trial('loss', 'min', 'last')
