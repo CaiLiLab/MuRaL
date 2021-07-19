@@ -72,6 +72,7 @@ def train(config, args, checkpoint_dir=None):
     seq_only = args.seq_only
     split_seed = args.split_seed
     gpu_per_trial = args.gpu_per_trial
+    cpu_per_trial = args.cpu_per_trial
     save_valid_preds = args.save_valid_preds
     
     bw_paths = args.bw_paths
@@ -143,8 +144,8 @@ def train(config, args, checkpoint_dir=None):
     
     print('train_size, valid_size:', train_size, valid_size)
     # Dataloader for training
-    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=2, pin_memory=True) #shuffle=False for HybridLoss
-
+    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
@@ -244,6 +245,9 @@ def train(config, args, checkpoint_dir=None):
 
     prob_names = ['prob'+str(i) for i in range(n_class)]
     
+    min_loss = 0
+    min_loss_epoch = 0
+    after_min_loss = 0
     # Training loop
     for epoch in range(epochs):
 
@@ -361,5 +365,13 @@ def train(config, args, checkpoint_dir=None):
                     pickle.dump(config, fp)
                 if save_valid_preds:
                     valid_pred_df.to_csv(path + '.valid_preds.tsv.gz', sep='\t', float_format='%.4g', index=False)
-
-            tune.report(loss=valid_total_loss/valid_size, fdiri_loss=fdiri_nll, score=score, total_params=total_params)
+            
+            current_loss = valid_total_loss/valid_size
+            if epoch == 0 or current_loss < min_loss:
+                min_loss = current_loss
+                min_loss_epoch = epoch
+                after_min_loss = 0
+            else:
+                after_min_loss = epoch - min_loss_epoch
+                
+            tune.report(loss=current_loss, fdiri_loss=fdiri_nll, after_min_loss=after_min_loss, score=score, total_params=total_params)

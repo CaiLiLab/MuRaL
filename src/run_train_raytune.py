@@ -267,7 +267,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'score', 'total_params', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'after_min_loss',  'score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -281,6 +281,7 @@ def main():
     num_samples=n_trials,
     local_dir='./ray_results',
     scheduler=scheduler,
+    stop={'after_min_loss':3},
     progress_reporter=reporter,
     resume=resume_flag)
     
