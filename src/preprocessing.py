@@ -73,9 +73,10 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
                 # Extract sequence from the genome, which is in one-hot encoding format
                 seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
                 
+                #print('seqs.shape 1:', seqs.shape)
                 # Get the correct shape (batch_size, channels, seq_len) for pytorch
                 seqs = np.array(seqs).squeeze().transpose(0,2,1)
-
+                
                 # Handle distal bigWig data, return base-wise values
                 if len(bw_files) > 0:
                     bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
@@ -86,7 +87,6 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
 
                     # Concatenate the sequence data and the bigWig data
                     seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                
                 # Write the numpy array into the H5 file
                 hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
                 hf['distal_X'][-seqs.shape[0]:] = seqs
@@ -99,7 +99,7 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
     # Use janggu Bioseq to read the data
     local_seq = Bioseq.create_from_refgenome(name='local', refgenome=ref_genome, roi=bed_regions, flank=local_radius, order=1)    
     
-    # Check whether the data is correctly extracted
+    # Check whether the data is correctly extracted (e.g. not all sites are A/T; incorrect padding in the beginning of a chromosome)
     if np.unique(np.array(local_seq)[:,:,local_radius,:,:], axis=0).shape[0] != 1:
         print('ERROR: The positions in input BED file have multiple nucleotides! The ref_genome or input BED file could be wrong.', file=sys.stderr)
         sys.exit()
