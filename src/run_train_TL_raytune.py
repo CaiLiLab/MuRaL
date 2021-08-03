@@ -43,9 +43,8 @@ def parse_arguments(parser):
     """
     parser.add_argument('--train_data', type=str, default='',
                         help='path for training data')
-    
-    parser.add_argument('--train_data_h5f', type=str, default='', help='path for training data in HDF5 format')
-    
+
+    parser.add_argument('--validation_data', type=str, default='', help='path for validation data')  
     
     parser.add_argument('--ref_genome', type=str, default='',
                         help='reference genome')
@@ -61,7 +60,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--local_hidden1_size', type=int, default=150, help='size of 1st hidden layer for local data')
     
-    parser.add_argument('--local_hidden2_size', type=int, default=80, help='size of 2nd hidden layer for local data')
+    parser.add_argument('--local_hidden2_size', type=int, default=75, help='size of 2nd hidden layer for local data')
         
     parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
     
@@ -85,7 +84,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
 
-    parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of validation data relative to the whole training data')
+    parser.add_argument('--valid_ratio', type=float, default=0.1, help='the ratio of validation data relative to the whole training data')
     
     parser.add_argument('--split_seed', type=int, default=-1, help='seed for randomly splitting data into training and validation sets')
     
@@ -123,7 +122,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--cpu_per_trial', type=int, default=3, help='number of CPUs per trial')
     
-    parser.add_argument('--gpu_per_trial', type=float, default=0.2, help='number of GPUs per trial')
+    parser.add_argument('--gpu_per_trial', type=float, default=0.19, help='number of GPUs per trial')
     
     parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
     
@@ -141,7 +140,7 @@ def main():
     print(' '.join(sys.argv))
     
     train_file = args.train_data
-    train_h5f_path = args.train_data_h5f
+    valid_file = args.validation_data
     ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
@@ -264,6 +263,11 @@ def main():
     h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order)
     generate_h5f(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
     
+    if valid_file != '':
+        valid_bed = BedTool(valid_file)
+        valid_h5f_path = get_h5f_path(valid_file, bw_names, distal_radius, distal_order)
+        generate_h5f(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
+    
     sys.stdout.flush()
     
     # Configure the search space for relavant hyperparameters
@@ -300,7 +304,7 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'transfer_learning', 'train_all', 'init_fc_with_pretrained', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma'], metric_columns=['loss', 'fdiri_loss', 'score', 'total_params', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'transfer_learning', 'train_all', 'init_fc_with_pretrained', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma'], metric_columns=['loss', 'fdiri_loss', 'after_min_loss','score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
@@ -314,6 +318,7 @@ def main():
     num_samples=n_trials,
     local_dir='./ray_results',
     scheduler=scheduler,
+    stop={'after_min_loss':3},
     progress_reporter=reporter,
     resume=resume_flag)   
     

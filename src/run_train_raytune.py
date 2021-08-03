@@ -93,7 +93,7 @@ def parse_arguments(parser):
     
     parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
     
-    parser.add_argument('--valid_ratio', type=float, default=0.2, help='the ratio of validation data relative to the whole training data')
+    parser.add_argument('--valid_ratio', type=float, default=0.1, help='the ratio of validation data relative to the whole training data')
     
     parser.add_argument('--split_seed', type=int, default=-1, help='seed for randomly splitting data into training and validation sets')
     
