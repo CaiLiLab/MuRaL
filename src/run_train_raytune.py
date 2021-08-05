@@ -99,11 +99,11 @@ def parse_arguments(parser):
     
     parser.add_argument('--learning_rate', type=float, default=[0.005], nargs='+', help='learning rate for training')
     
-    parser.add_argument('--weight_decay', type=float, default=[1e-5], nargs='+', help='weight decay (regularization) for training')
+    parser.add_argument('--weight_decay', type=float, default=[5e-5], nargs='+', help='weight decay (regularization) for training')
     
-    parser.add_argument('--LR_gamma', type=float, default=[0.5], nargs='+', help='gamma for learning rate change during training')
+    parser.add_argument('--LR_gamma', type=float, default=[0.5], nargs='+', help='gamma for learning rate change after each epoch')
     
-    parser.add_argument('--epochs', type=int, default=10, help='number of epochs for training')
+    parser.add_argument('--epochs', type=int, default=10, help='maximum number of epochs for each trial')
     
     parser.add_argument('--grace_period', type=int, default=5, help='grace_period for early stopping')
     

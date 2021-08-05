@@ -237,6 +237,7 @@ def main():
     
     # Allocate CPU/GPU resources for this Ray job
     ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
+    #ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0", _temp_dir="~/tmp/ray")
     
     # Prepare min/max for the loguniform samplers if one value is provided
     if len(learning_rate) == 1:
@@ -321,7 +322,12 @@ def main():
     stop={'after_min_loss':3},
     progress_reporter=reporter,
     resume=resume_flag)   
-    
+
+    # Shutdown Ray
+    if ray.is_initialized():
+        ray.shutdown() 
+
+    print('Total time used: %s seconds' % (time.time() - start_time))
     
 if __name__ == "__main__":
     main()
