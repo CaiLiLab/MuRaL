@@ -249,13 +249,17 @@ def main():
     bw_files = []
     bw_names = []
     n_cont = 0
-    try:
-        bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
-        bw_files = list(bw_list[0])
-        bw_names = list(bw_list[1])
-        n_cont = len(bw_names)
-    except pd.errors.EmptyDataError:
-        print('Warnings: no bigWig files provided')
+    
+    if bw_paths:
+        try:
+            bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
+            bw_files = list(bw_list[0])
+            bw_names = list(bw_list[1])
+            n_cont = len(bw_names)
+        except pd.errors.EmptyDataError:
+            print('Warnings: no bigWig files provided in', bw_paths)
+    else:
+        print('NOTE: no bigWig files provided.')
     # Read the train datapoints
     train_bed = BedTool(train_file)
     
