@@ -16,6 +16,8 @@ def parse_arguments(parser):
     parser.add_argument('--input_file', type=str, default='',
                         help='path for input data')
     
+    parser.add_argument('--calibrator', type=str, default='FullDiri', help='calibrator')
+    
     parser.add_argument('--cpu_only', default=False, action='store_true',  help='only use CPU computing')
     args = parser.parse_args()
 
@@ -29,6 +31,7 @@ def main():
     
     print(' '.join(sys.argv)) # print the command line
     input_file = args.input_file
+    calibrator = args.calibrator
     
     df = pd.read_csv(input_file, header=None, sep='\t')
     
@@ -50,7 +53,13 @@ def main():
         print('using'  , 'cuda:'+cuda_id)
         device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
     
-    fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='FullDiri')
+    fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name=calibrator)
+    
+    #fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='FullDiri1')
+    
+    #fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='FullDiri2')
+    
+    #fdiri_cal, fdiri_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='FullDiriODIR')
     
     #fvect_cal, fvect_nll = calibrate_prob(df.iloc[:, 1:5].to_numpy(), df[0].to_numpy(), device, calibr_name='VectS')
     

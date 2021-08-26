@@ -205,6 +205,9 @@ def main():
     # Load the saved model object
     model_state = torch.load(model_path, map_location=device)
     model.load_state_dict(model_state)
+    
+    del model_state
+    torch.cuda.empty_cache() 
 
     # Loss function
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')

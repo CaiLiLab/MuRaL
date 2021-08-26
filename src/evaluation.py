@@ -17,6 +17,7 @@ simplefilter(action='ignore', category=FutureWarning)
 from dirichletcal.calib.vectorscaling import VectorScaling
 from dirichletcal.calib.tempscaling import TemperatureScaling
 from dirichletcal.calib.fulldirichlet import FullDirichletCalibrator
+from sklearn.multiclass import OneVsRestClassifier
 
 def count_parameters(model):
     """Count parameters in a network model"""
@@ -291,18 +292,34 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     elif calibr_name == 'TempS':
         calibr = TemperatureScaling(logit_constant=0.0)
     elif calibr_name == 'FullDiri':
-        calibr = FullDirichletCalibrator()       
+        #calibr = FullDirichletCalibrator(optimizer='fmin_l_bfgs_b')
+        calibr = FullDirichletCalibrator()
     elif calibr_name == 'FullDiriODIR':
         l2_odir = 1e-2
-        calibr = FullDirichletCalibrator(reg_lambda=l2_odir, reg_mu=l2_odir, reg_norm=False)
+        calibr = FullDirichletCalibrator(reg_lambda=l2_odir, reg_mu=l2_odir)
+    elif calibr_name == 'FullDiri1':
+        calibr = FullDirichletCalibrator(reg_norm=True)
+    elif calibr_name == 'FullDiri2':
+        calibr = FullDirichletCalibrator(ref_row=False)
     
     # Fit the calibrator
     calibr.fit(y_prob, y)
     prob_cal = calibr.predict_proba(y_prob)
     print('y_prob.head():', y_prob[0:6,])
+    print('y:', y[0:6])
     print('prob_cal:', prob_cal[0:6, ])
     print('calibr.coef_: ', calibr.coef_)
     print('calibr.weights_:', calibr.weights_)
+    print("prob_cal.min:", prob_cal.min(axis=0))
+    print("prob_cal.max:", prob_cal.max(axis=0))
+    print("CV:", prob_cal.std(axis=0)/prob_cal.mean(axis=0))
+    
+    #######
+    #OvR = OneVsRestClassifier(FullDirichletCalibrator()).fit(y_prob, y)
+    #prob_cal1 = OvR.predict_proba(y_prob)
+    #print('prob_cal1:', prob_cal1[0:6, ])
+    #######
+    
     
     nll_criterion = nn.CrossEntropyLoss(reduction='mean').to(device)
     ece_criterion = ECELoss(n_bins=50).to(device)
