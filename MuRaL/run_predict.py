@@ -19,11 +19,11 @@ import os
 import time
 import datetime
 
-from nn_models import *
-from nn_utils import *
+from MuRaL.nn_models import *
+from MuRaL.nn_utils import *
 
-from preprocessing import *
-from evaluation import *
+from MuRaL.preprocessing import *
+from MuRaL.evaluation import *
 from pynvml import *
 
 torch.backends.cuda.matmul.allow_tf32 = True

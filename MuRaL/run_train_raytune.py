@@ -35,13 +35,13 @@ import time
 import datetime
 import random
 
-from nn_models import *
-from nn_utils import *
-from preprocessing import *
-from evaluation import *
-from training import *
+from MuRaL.nn_models import *
+from MuRaL.nn_utils import *
+from MuRaL.preprocessing import *
+from MuRaL.evaluation import *
+from MuRaL.training import *
 
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 
 def parse_arguments(parser):
     """

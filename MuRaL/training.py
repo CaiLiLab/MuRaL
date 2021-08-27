@@ -31,10 +31,10 @@ import time
 import datetime
 import random
 
-from nn_models import *
-from nn_utils import *
-from preprocessing import *
-from evaluation import *
+from MuRaL.nn_models import *
+from MuRaL.nn_utils import *
+from MuRaL.preprocessing import *
+from MuRaL.evaluation import *
 
 def train(config, args, checkpoint_dir=None):
     """
@@ -78,12 +78,16 @@ def train(config, args, checkpoint_dir=None):
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
-    try:
-        bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
-        bw_files = list(bw_list[0])
-        bw_names = list(bw_list[1])
-    except pd.errors.EmptyDataError:
-        print('Warnings: no bigWig files provided')
+    
+    if bw_paths:
+        try:
+            bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
+            bw_files = list(bw_list[0])
+            bw_names = list(bw_list[1])
+        except pd.errors.EmptyDataError:
+            print('Warnings: no bigWig files provided in', bw_paths)
+    else:
+        print('NOTE: no bigWig files provided.')
 
     # Read BED files
     train_bed = BedTool(train_file)

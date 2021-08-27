@@ -13,8 +13,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn import metrics, calibration
 from scipy.special import lambertw
 
-from nn_utils import *
-from evaluation import *
+from MuRaL.nn_utils import *
+from MuRaL.evaluation import *
 
 class FeedForwardNN(nn.Module):
     """Feedforward only model with local data"""

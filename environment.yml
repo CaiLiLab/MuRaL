@@ -1,4 +1,3 @@
-name: mural
 channels:
   - pytorch
   - bioconda
@@ -6,15 +5,17 @@ channels:
   - defaults
 dependencies:
   - python=3.8.5
+  - pip
   - pytorch
   - torchvision
   - torchaudio
   - cudatoolkit=11.1
+  - pybigwig=0.3.17
   - prettytable
   - pip:
     - pybedtools
     - pysam==0.15.1
-    - janggu[tf2_gpu]==0.10.0
+    - janggu[tf2]==0.10.0
     - ray[tune]
     - dirichletcal
     - jax
