@@ -41,7 +41,7 @@ def parse_arguments(parser):
     parser.add_argument('--ref_genome', type=str, default='',
                         help='reference genome')
     
-    parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
+    parser.add_argument('--bw_paths', type=str, default=None, help='path for the list of BigWig files for non-sequence features')
     
     parser.add_argument('--seq_only', default=False, action='store_true',  help='use only genomic sequence and ignore bigWig tracks')
     
@@ -149,12 +149,15 @@ def main():
     bw_files = []
     bw_names = []
     
-    try:
-        bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
-        bw_files = list(bw_list[0])
-        bw_names = list(bw_list[1])
-    except pd.errors.EmptyDataError:
-        print('Warnings: no bigWig files provided')
+    if bw_paths:
+        try:
+            bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
+            bw_files = list(bw_list[0])
+            bw_names = list(bw_list[1])
+        except pd.errors.EmptyDataError:
+            print('Warnings: no bigWig files provided in', bw_paths)
+    else:
+        print('NOTE: no bigWig files provided.')
 
     # Get the H5 file path for testing data
     test_h5f_path = get_h5f_path(test_file, bw_names, distal_radius, distal_order)
