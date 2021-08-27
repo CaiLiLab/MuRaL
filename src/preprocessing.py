@@ -58,6 +58,10 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
     # If the H5 file is unavailable or im complete, generate the file
     if write_h5f:            
         with h5py.File(h5f_path, 'w') as hf:
+            
+            print('Generating HDF5 file:', h5f_path)
+            sys.stdout.flush()
+            
             # Total seq len
             seq_len =  distal_radius*2+1-(distal_order-1)
             

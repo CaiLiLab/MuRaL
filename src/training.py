@@ -194,8 +194,14 @@ def train(config, args, checkpoint_dir=None):
     '''
     
     if config['transfer_learning']:
-        model_state = torch.load(args.model_path, map_location=device)
+        #model_state = torch.load(args.model_path, map_location=device)
+        model_state = torch.load(args.model_path, map_location='cpu')
+        model = model.to(torch.device('cpu'))# if loaded into GPU, it will double the GPU memory!
         model.load_state_dict(model_state)
+        model = model.to(device)
+        
+        del model_state
+        torch.cuda.empty_cache() 
 
         criterion = torch.nn.CrossEntropyLoss(reduction='sum')
 
@@ -375,3 +381,5 @@ def train(config, args, checkpoint_dir=None):
                 after_min_loss = epoch - min_loss_epoch
                 
             tune.report(loss=current_loss, fdiri_loss=fdiri_nll, after_min_loss=after_min_loss, score=score, total_params=total_params)
+            
+            torch.cuda.empty_cache() 
