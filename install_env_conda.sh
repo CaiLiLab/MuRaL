@@ -5,5 +5,7 @@ conda env create -n test -f environment.yml
 
 conda activate mural
 
+pip install -e .
+
 #conda deactivate
 #conda env remove -n test

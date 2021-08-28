@@ -126,7 +126,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--rerun_failed', default=False, action='store_true', help='Rerun failed trials')
     
-    args = parser.parse_args()
+    if len(sys.argv) == 1:
+        parser.parse_args(['--help'])
+    else:
+        args = parser.parse_args()
 
     return args
 def main():

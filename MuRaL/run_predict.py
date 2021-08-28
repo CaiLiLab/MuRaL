@@ -81,7 +81,10 @@ def parse_arguments(parser):
     
     parser.add_argument('--model_config_path', type=str, default='', help='model config path')
     
-    args = parser.parse_args()
+    if len(sys.argv) == 1:
+        parser.parse_args(['--help'])
+    else:
+        args = parser.parse_args()
 
     return args
 

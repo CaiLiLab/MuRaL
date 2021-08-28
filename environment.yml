@@ -12,6 +12,7 @@ dependencies:
   - cudatoolkit=11.1
   - pybigwig=0.3.17
   - prettytable
+  - pynvml
   - pip:
     - pybedtools
     - pysam==0.15.1
