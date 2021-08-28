@@ -3,14 +3,8 @@
 import re
 
 from setuptools import setup, find_packages
-from setuptools.command.sdist import sdist as _sdist
-from setuptools.command.install import install as _install
-
-VERSION_PY = """
-# This file is originally generated from Git information by running 'setup.py
-# version'. Distribution tarballs contain a pre-generated copy of this file.
-__version__ = '%s'
-"""
+#from setuptools.command.sdist import sdist as _sdist
+#from setuptools.command.install import install as _install
 
 
 def get_version():
