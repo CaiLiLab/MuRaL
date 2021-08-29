@@ -141,10 +141,10 @@ def main():
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv))
-    
-    train_file = args.train_data
-    valid_file = args.validation_data
-    ref_genome= args.ref_genome
+    # Ray requires absolute paths
+    train_file  = args.train_data = os.path.abspath(args.train_data) 
+    valid_file = args.validation_data = os.path.abspath(args.validation_data)
+    ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
     local_radius = args.local_radius
     local_order = args.local_order
     local_hidden1_size = args.local_hidden1_size

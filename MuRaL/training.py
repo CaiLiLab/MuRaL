@@ -47,7 +47,7 @@ def train(config, args, checkpoint_dir=None):
     """
 
     # Get parameters from the command line
-    train_file = args.train_data
+    train_file = args.train_data # Ray requires absolute paths
     valid_file = args.validation_data
     ref_genome= args.ref_genome
     local_radius = args.local_radius
@@ -110,7 +110,7 @@ def train(config, args, checkpoint_dir=None):
     #print('n_cont: ', n_cont)
     
     ################
-    if valid_file != '':
+    if valid_file:
         print('using given validation file:', valid_file)
         valid_bed = BedTool(valid_file)
         valid_h5f_path = get_h5f_path(valid_file, bw_names, config['distal_radius'], distal_order)
@@ -134,7 +134,7 @@ def train(config, args, checkpoint_dir=None):
     #train_size = len(dataset) - valid_size
     #print('train_size, valid_size:', train_size, valid_size)
     
-    if valid_file == '':
+    if not valid_file:
         valid_size = int(len(dataset)*valid_ratio)
         train_size = len(dataset) - valid_size
     
@@ -294,7 +294,7 @@ def train(config, args, checkpoint_dir=None):
 
             valid_y_prob = pd.DataFrame(data=to_np(F.softmax(valid_pred_y, dim=1)), columns=prob_names)
             
-            if valid_file == '':
+            if not valid_file:
                 valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)
             else:
                 valid_data_and_prob = pd.concat([data_local_valid, valid_y_prob], axis=1)
@@ -348,7 +348,7 @@ def train(config, args, checkpoint_dir=None):
             print('regional score:', score, n_regions)
             
             # Output genomic positions and predicted probabilities
-            if valid_file == '':
+            if not valid_file:
                 chr_pos = train_bed.to_dataframe().loc[dataset_valid.indices,['chrom', 'start', 'end', 'strand']].reset_index(drop=True)
             else:
                 chr_pos = valid_bed.to_dataframe()[['chrom', 'start', 'end', 'strand']]

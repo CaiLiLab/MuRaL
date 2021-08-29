@@ -41,90 +41,190 @@ from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 from MuRaL.training import *
 
+import textwrap
 #from torch.utils.tensorboard import SummaryWriter
 
 def parse_arguments(parser):
     """
     Parse parameters from the command line
     """   
-    parser.add_argument('--ref_genome', type=str, default='', help='reference genome')
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
     
-    parser.add_argument('--train_data', type=str, default='', help='path for training data')
+    required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
+                          required=True, help=textwrap.dedent("""
+                          File path of the reference genome in FASTA format.""").strip())
     
-    parser.add_argument('--validation_data', type=str, default='', help='path for validation data')    
-    parser.add_argument('--bw_paths', type=str, default=None, help='path for the list of BigWig files for non-sequence features')
+    required.add_argument('--train_data', type=str, metavar='FILE', default='',  
+                          required=True, help= textwrap.dedent("""
+                          File path of training data in a sorted BED format. If the options
+                          --validation_data and --valid_ratio not specified, 10%% of the
+                          sites sampled from the training BED will be used as the
+                          validation data.""").strip())
     
-    parser.add_argument('--seq_only', default=False, action='store_true', help='use only genomic sequence and ignore bigWig tracks')
+    optional.add_argument('--validation_data', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for validation data. If this option is set,
+                          the value of --valid_ratio will be ignored.""").strip()) 
     
-    parser.add_argument('--n_class', type=int, default='4', help='number of mutation classes')
+    optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for a list of BigWig files for non-sequence 
+                          features such as the coverage track. Default: None.""").strip())
     
-    parser.add_argument('--local_radius', type=int, default=[5], nargs='+', help='radius of local sequences to be considered')
+    optional.add_argument('--seq_only', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, use only genomic sequences for the model and ignore
+                          bigWig tracks. Default: False.""").strip())
     
-    parser.add_argument('--local_order', type=int, default=[1], nargs='+', help='order of local sequences to be considered')
+    optional.add_argument('--n_class', type=int, metavar='INT', default='4',  
+                          help=textwrap.dedent("""
+                          Number of mutation classes (or types), including the 
+                          non-mutated class. Default: 4.""").strip())
     
-    parser.add_argument('--local_hidden1_size', type=int, default=[150], nargs='+', help='size of 1st hidden layer for local data')
+    optional.add_argument('--local_radius', type=int, metavar='INT', default=[5], nargs='+',
+                          help=textwrap.dedent("""
+                          Radius of the local sequence to be considered in the 
+                          model. Length of the local sequence = local_radius*2+1 bp.
+                          If multiple space-separated values are provided, one value
+                          will be randomly chosen for each trial.""" ).strip())
     
-    parser.add_argument('--local_hidden2_size', type=int, default=[0], nargs='+', help='size of 2nd hidden layer for local data')
+    optional.add_argument('--local_order', type=int, metavar='INT', default=[1], nargs='+', 
+                          help=textwrap.dedent("""
+                          Length of k-mer in the embedding layer.""").strip())
     
-    parser.add_argument('--distal_radius', type=int, default=[50], nargs='+', help='radius of distal sequences to be considered')
+    optional.add_argument('--local_hidden1_size', type=int, metavar='INT', default=[150], nargs='+', 
+                          help=textwrap.dedent("""
+                          Size of 1st hidden layer for local module.""").strip())
     
-    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
+    optional.add_argument('--local_hidden2_size', type=int, metavar='INT', default=[0], nargs='+',
+                          help=textwrap.dedent("""
+                          Size of 2nd hidden layer for local module.""" ).strip())
     
-    #parser.add_argument('--emb_4th_root', default=False, action='store_true')
+    optional.add_argument('--distal_radius', type=int, metavar='INT', default=[50], nargs='+', 
+                          help=textwrap.dedent("""
+                          Radius of the expanded sequence to be considered in the model. 
+                          Length of the expanded sequence = distal_radius*2+1 bp.
+                          """ ).strip())
     
-    parser.add_argument('--batch_size', type=int, default=[128], nargs='+', help='size of mini batches')
-    
-    parser.add_argument('--emb_dropout', type=float, default=[0.1], nargs='+', help='dropout rate for k-mer embedding')
-    
-    parser.add_argument('--local_dropout', type=float, default=[0.1], nargs='+', help='dropout rate for local network')
-    
-    parser.add_argument('--CNN_kernel_size', type=int, default=[3], nargs='+', help='kernel size for CNN layers')
-    
-    parser.add_argument('--CNN_out_channels', type=int, default=[32], nargs='+', help='number of output channels for CNN layers')
-    
-    parser.add_argument('--distal_fc_dropout', type=float, default=[0.25], nargs='+', help='dropout rate for distal fc layer')
-    
-    
-    parser.add_argument('--model_no', type=int, default=2, help='which NN model to be used')
-    
-    #parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
-    
-    parser.add_argument('--optim', type=str, default=['Adam'], nargs='+', help='Optimization method')
-    
-    parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
-    
-    parser.add_argument('--valid_ratio', type=float, default=0.1, help='the ratio of validation data relative to the whole training data')
-    
-    parser.add_argument('--split_seed', type=int, default=-1, help='seed for randomly splitting data into training and validation sets')
-    
-    parser.add_argument('--learning_rate', type=float, default=[0.005], nargs='+', help='learning rate for training')
-    
-    parser.add_argument('--weight_decay', type=float, default=[1e-5], nargs='+', help='weight decay (regularization) for training')
-    
-    parser.add_argument('--LR_gamma', type=float, default=[0.5], nargs='+', help='gamma for learning rate change during training')
-    
-    parser.add_argument('--epochs', type=int, default=10, help='number of epochs for training')
-    
-    parser.add_argument('--grace_period', type=int, default=5, help='grace_period for early stopping')
-    
-    
-    parser.add_argument('--n_trials', type=int, default=3, help='number of trials for training')
-    
-    parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
-    
-    parser.add_argument('--ASHA_metric', type=str, default='loss', help='metric for ASHA schedualing; the value can be "loss" or "score"')
-    
-    parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs requested by Ray')
-    
-    parser.add_argument('--ray_ngpus', type=int, default=1, help='number of GPUs requested by Ray')
-    
-    parser.add_argument('--cpu_per_trial', type=int, default=3, help='number of CPUs per trial')
-    
-    parser.add_argument('--gpu_per_trial', type=float, default=0.19, help='number of GPUs per trial')
+    optional.add_argument('--distal_order', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Order of distal sequences to be considered. Kept for 
+                          future development.""" ).strip())
         
-    parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
+    optional.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
+                          help=textwrap.dedent("""
+                          Size of mini batches for training.
+                          """ ).strip())
     
-    parser.add_argument('--rerun_failed', default=False, action='store_true', help='Rerun failed trials')
+    optional.add_argument('--emb_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
+                          help=textwrap.dedent("""
+                          Dropout rate for inputs of the k-mer embedding layer""" ).strip())
+    
+    optional.add_argument('--local_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
+                          help=textwrap.dedent("""
+                          Dropout rate for inputs of local hidden layers.""" ).strip())
+    
+    optional.add_argument('--CNN_kernel_size', type=int, metavar='INT', default=[3], nargs='+', 
+                          help=textwrap.dedent("""
+                          Kernel size for CNN layers in the expanded module.""" ).strip())
+    
+    optional.add_argument('--CNN_out_channels', type=int, metavar='INT', default=[32], nargs='+', 
+                          help=textwrap.dedent("""
+                          Number of output channels for CNN layers.""" ).strip())
+    
+    optional.add_argument('--distal_fc_dropout', type=float, metavar='FLOAT', default=[0.25], nargs='+', 
+                          help=textwrap.dedent("""
+                          Dropout rate for the FC layer of the expanded module.""" ).strip())
+    
+    
+    optional.add_argument('--model_no', type=int, metavar='INT', default=2, 
+                          help=textwrap.dedent("""
+                          Which network architecture to be used: 
+                          0, local-only model;
+                          1, expanded-only model;
+                          2, local + expanded model.""" ).strip())
+    
+                          
+    optional.add_argument('--optim', type=str, metavar='STRING', default=['Adam'], nargs='+', 
+                          help=textwrap.dedent("""
+                          Name of optimization method for learning.
+                          """ ).strip())
+    
+    optional.add_argument('--cuda_id', type=str, metavar='STRING', default='0', 
+                          help=textwrap.dedent("""
+                          Which GPU device to be used.""" ).strip())
+    
+    optional.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
+                          help=textwrap.dedent("""
+                          Ratio of validation data relative to the whole training data.
+                          """ ).strip())
+    
+    optional.add_argument('--split_seed', type=int, metavar='INT', default=-1, 
+                          help=textwrap.dedent("""
+                          Seed for randomly splitting data into training and validation sets.
+                          """ ).strip())
+    
+    optional.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.005], nargs='+', 
+                          help=textwrap.dedent("""
+                          Learning rate for network training, a parameter for the optimization
+                          method.""" ).strip())
+    
+    optional.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
+                          help=textwrap.dedent("""
+                          'weight_decay' parameter (regularization) for the optimization 
+                          method.""" ).strip())
+    
+    optional.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
+                          help=textwrap.dedent("""
+                          'gamma' parameter for the learning rate scheduler.""" ).strip())
+    
+    optional.add_argument('--epochs', type=int, metavar='INT', default=10, 
+                          help=textwrap.dedent("""
+                          Maximum number of epochs for each trial.""" ).strip())
+    
+    optional.add_argument('--grace_period', type=int, metavar='INT', default=5, 
+                          help=textwrap.dedent("""
+                          'grace_period' parameter for early stopping.""" ).strip())
+    
+    
+    optional.add_argument('--n_trials', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Number of trials for this training job.""" ).strip())
+    
+    optional.add_argument('--experiment_name', type=str, metavar='STRING', default='my_experiment',
+                          help=textwrap.dedent("""
+                          Ray-Tune experiment name.""" ).strip())
+    
+    optional.add_argument('--ASHA_metric', type=str, metavar='STRING', default='loss', 
+                          help=textwrap.dedent("""
+                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.""" ).strip())
+    
+    optional.add_argument('--ray_ncpus', type=int, metavar='INT', default=6, 
+                          help=textwrap.dedent("""
+                          Number of CPUs requested by Ray-Tune. """ ).strip())
+    
+    optional.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Number of GPUs requested by Ray-Tune.""" ).strip())
+    
+    optional.add_argument('--cpu_per_trial', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Number of CPUs used per trial.""" ).strip())
+    
+    optional.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.19, 
+                          help=textwrap.dedent("""
+                          Number of GPUs used per trial""" ).strip())
+        
+    optional.add_argument('--save_valid_preds', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Save prediction results for validation data in the checkpoint folders.""" ).strip())
+    
+    optional.add_argument('--rerun_failed', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Rerun failed trials""" ).strip())
+    
+    parser._action_groups.append(optional)
     
     if len(sys.argv) == 1:
         parser.parse_args(['--help'])
@@ -135,16 +235,111 @@ def parse_arguments(parser):
 def main():
     
     #parse the command line
-    parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
+    #parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+    #parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     description="""
+    Overview
+    --------
+    
+    This tool trains MuRaL models with training and validation mutation data
+    and exports training results under the "./ray_results/" folder.
+    
+    * Input data
+    MuRaL requires input training and validation data files to be in BED format
+    (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). 
+    Some example lines of the input BED file are shown below.
+    chr1	2333436	2333437	.	0	+
+    chr1	2333446	2333447	.	2	-
+    chr1	2333468	2333469	.	1	-
+    chr1	2333510	2333511	.	3	-
+    chr1	2333812	2333813	.	0	-
+    
+    In the BED-formatted lines above, the 5th column is used to represent mutation
+    status: usually, '0' means the non-mutated status and other numbers means 
+    specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can
+    specify a arbitrary order for a group of mutation types with incremental 
+    numbers starting from 1, but make sure that the same order is consistently 
+    used in training, validation and testing datasets. 
+    
+    Importantly, the training and validation BED file MUST be SORTED by chromosome
+    coordinates. You can sort BED files by 'bedtools sort' or 'sort -k1,1 -k2,2n'.
+    
+    * Output data
+    The checkpointed model files during training are saved under folders named like 
+        ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+            - model
+            - model.config.pkl
+            - model.fdiri_cal.pkl
+    
+    In the above folder, the 'model' file contains the learned model parameters. 
+    The 'model.config.pkl' file contains configured hyperparameters of the model.
+    The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model 
+    learned with validation data, which can be used for calibrating predicted 
+    mutation rates. These files will be used in downstream analyses such as
+    model prediction and transfer learning.
+    
+    Command line examples
+    ---------------------
+    
+    1. The following command will train a model by running two trials, using data in
+    'train.sorted.bed' for training. The training results will be saved under the
+    folder './ray_results/example1/'. Default values will be used for other
+    unspecified arguments. Note that, by default, 10% of the sites sampled from 
+    'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
+    
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
+    
+    2. The following command will use data in 'train.sorted.bed' as training
+    data and a separate 'validation.sorted.bed' as validation data. The option
+    '--local_radius 10' means that length of the local sequence used for training
+    is 10*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded 
+    sequence used for training is 100*2+1 = 201 bp. 
+    
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --validation_data validation.sorted.bed --n_trials 2 --local_radius 10 \\ 
+        --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
+    
+    3. If you don't have (or don't want to use) GPU resources, you can set options
+    '--ray_ngpus 0 --gpu_per_trial 0' as below. Be aware that if training dataset 
+    is large or the model is parameter-rich, CPU-only computing could take a very 
+    long time!
+    
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --n_trials 2 --ray_ngpus 0 --gpu_per_trial 0 --experiment_name example3 \\ 
+        > test3.out 2> test3.err
+    
+    Notes
+    -----
+    1. The training and validation BED file MUST be SORTED by chromosome 
+    coordinates. You can sort BED files by running 'bedtools sort' or 
+    'sort -k1,1 -k2,2n'.
+    
+    2. By default, this tool generates a HDF5 file for each input BED
+    file (training or validation file) based on the value of '--distal_radius' 
+    and the tracks in '--bw_paths' if the corresponding HDF5 file doesn't 
+    exist or is corrupted. Only one job is allowed to write to an HDF5 file,
+    so don't run multiple jobs involving a same BED file when its HDF5 file 
+    isn't generated yet. Otherwise, it may cause file permission errors.
+    
+    3. If it takes long to finish the job, you can check the information exported 
+    to stdout (or redirected file) for the progress during running.
+    
+    """)
+    
     args = parse_arguments(parser)
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
     
     print(' '.join(sys.argv)) # print the command line
-    train_file = args.train_data
+    # Ray requires absolute paths
+    train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data
-    ref_genome= args.ref_genome
+    if valid_file: 
+        args.validation_data = os.path.abspath(args.validation_data)     
+    ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
     local_radius = args.local_radius
     local_order = args.local_order
     local_hidden1_size = args.local_hidden1_size
@@ -212,7 +407,7 @@ def main():
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
-    if valid_file != '':
+    if valid_file:
         valid_bed = BedTool(valid_file)
         for d_radius in distal_radius:
             valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
