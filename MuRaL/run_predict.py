@@ -5,6 +5,7 @@ from pybedtools import BedTool
 
 import sys
 import argparse
+import textwrap
 from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
@@ -35,51 +36,73 @@ def parse_arguments(parser):
     """
     Parse parameters from the command line
     """ 
-    parser.add_argument('--test_data', type=str, default='',
-                        help='file path for testing data')
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
     
-    parser.add_argument('--ref_genome', type=str, default='',
-                        help='reference genome')
+    required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
+                          required=True, help=textwrap.dedent("""
+                          File path of the reference genome in FASTA format.""").strip())
     
-    parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
+    required.add_argument('--test_data', type=str, metavar='FILE', required=True,
+                          help= textwrap.dedent("""
+                          File path of test data to do prediction, in BED format.""").strip())
     
-    parser.add_argument('--seq_only', default=False, action='store_true',  help='use only genomic sequence and ignore bigWig tracks')
-    
-    parser.add_argument('--without_h5', default=False, action='store_true',  help='do not generate H5 file, meaning using more RAM memory')
-    
-    parser.add_argument('--cpu_only', default=False, action='store_true',  help='only use CPU computing')
-    
-    parser.add_argument('--n_class', type=int, default=4, help='number of mutation classes')
-    
-    parser.add_argument('--local_radius', type=int, default=5, help='radius of local sequences to be considered')
-    
-    parser.add_argument('--local_order', type=int, default=1, help='order of local sequences to be considered')
-    
-    parser.add_argument('--local_hidden1_size', type=int, default=150, nargs='+', help='size of 1st hidden layer for local data')
-    
-    parser.add_argument('--local_hidden2_size', type=int, default=80, nargs='+', help='size of 2nd hidden layer for local data')
-    
-    parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
-    
-    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
+    required.add_argument('--model_path', type=str, metavar='FILE', required=True,
+                          help=textwrap.dedent("""
+                          File path of the trained model.
+                          """ ).strip())
         
-    parser.add_argument('--pred_batch_size', type=int, default=16, help='size of mini batches for test data')
-    
-    parser.add_argument('--CNN_kernel_size', type=int, default=3, help='kernel size for CNN layers')
-    
-    parser.add_argument('--CNN_out_channels', type=int, default=32, help='number of output channels for CNN layers')
-    
-    parser.add_argument('--distal_fc_dropout', type=float, default=0.25,  help='dropout rate for distal fc layer')
-    
-    parser.add_argument('--model_no', type=int, default=2, help='which NN model to be used')
-    
-    parser.add_argument('--pred_file', type=str, default='pred.tsv', help='output file for saving predictions')
-            
-    parser.add_argument('--model_path', type=str, default='', help='model path')
+    required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
+                          help=textwrap.dedent("""
+                          File path for the paired configurations of the trained model.
+                          """ ).strip()) 
+
+    optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv', help=textwrap.dedent("""
+                          Name of the output file for prediction results.
+                          Default: 'pred.tsv'.
+                          """ ).strip())
         
-    parser.add_argument('--calibrator_path', type=str, default='', help='calibrator path')
+    optional.add_argument('--calibrator_path', type=str, metavar='FILE', default='',help=textwrap.dedent("""
+                          File path for the paired calibrator of the trained model.
+                          """ ).strip())
     
-    parser.add_argument('--model_config_path', type=str, default='', help='model config path')
+    optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for a list of BigWig files for non-sequence 
+                          features such as the coverage track. Default: None.""").strip())
+    
+    optional.add_argument('--seq_only', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, use only genomic sequences for prediction and ignore
+                          bigWig tracks. Default: False.""").strip())
+    
+    optional.add_argument('--without_h5', default=False, action='store_true',  
+                          help=textwrap.dedent("""
+                          Do not generate HDF5 file the BED file. If the file is large, 
+                          this could take much GPU/CPU memory . Default: False.
+                          """).strip())
+    
+    
+    optional.add_argument('--cpu_only', default=False, action='store_true',  
+                          help=textwrap.dedent("""
+                          Only use CPU computing. Default: False.
+                          """).strip())
+        
+    optional.add_argument('--pred_batch_size', metavar='INT', default=16, 
+                          help=textwrap.dedent("""
+                          Size of mini batches for prediction. Default: 16.
+                          """ ).strip())
+
+    optional.add_argument('--model_no', type=int, metavar='INT', default=2, 
+                          help=textwrap.dedent("""
+                          Which network architecture to be used: 
+                          0 - 'local-only' model;
+                          1 - 'expanded-only' model;
+                          2 - 'local + expanded' model. 
+                          Default: 2.
+                          """ ).strip())
+    
+    parser._action_groups.append(optional)
     
     if len(sys.argv) == 1:
         parser.parse_args(['--help'])
@@ -89,7 +112,16 @@ def parse_arguments(parser):
     return args
 
 def main():
-    parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     description="""
+    Overview
+    --------
+    
+    This tool uses a trained MuRaL model to do prediction for the sites in the input BED file.
+    
+    """)
+    
+    
     args = parse_arguments(parser)
     
     # Print command line

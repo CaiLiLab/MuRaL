@@ -65,7 +65,8 @@ def parse_arguments(parser):
     optional.add_argument('--validation_data', type=str, metavar='FILE', default=None,
                           help=textwrap.dedent("""
                           File path for validation data. If this option is set,
-                          the value of --valid_ratio will be ignored.""").strip()) 
+                          the value of --valid_ratio will be ignored. Default: None.
+                          """).strip()) 
     
     optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
                           help=textwrap.dedent("""
@@ -86,143 +87,175 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           Radius of the local sequence to be considered in the 
                           model. Length of the local sequence = local_radius*2+1 bp.
-                          If multiple space-separated values are provided, one value
-                          will be randomly chosen for each trial.""" ).strip())
+                          Default: 5.""" ).strip())
     
-    optional.add_argument('--local_order', type=int, metavar='INT', default=[1], nargs='+', 
+    optional.add_argument('--local_order', type=int, metavar='INT', default=[3], nargs='+', 
                           help=textwrap.dedent("""
-                          Length of k-mer in the embedding layer.""").strip())
+                          Length of k-mer in the embedding layer. Default: 3.""").strip())
     
     optional.add_argument('--local_hidden1_size', type=int, metavar='INT', default=[150], nargs='+', 
                           help=textwrap.dedent("""
-                          Size of 1st hidden layer for local module.""").strip())
+                          Size of 1st hidden layer for local module. Default: 150.
+                          """).strip())
     
     optional.add_argument('--local_hidden2_size', type=int, metavar='INT', default=[0], nargs='+',
                           help=textwrap.dedent("""
-                          Size of 2nd hidden layer for local module.""" ).strip())
+                          Size of 2nd hidden layer for local module. 
+                          Default: local_hidden1_size//2 .
+                          """ ).strip())
     
     optional.add_argument('--distal_radius', type=int, metavar='INT', default=[50], nargs='+', 
                           help=textwrap.dedent("""
                           Radius of the expanded sequence to be considered in the model. 
                           Length of the expanded sequence = distal_radius*2+1 bp.
+                          Default: 50. 
                           """ ).strip())
     
     optional.add_argument('--distal_order', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
                           Order of distal sequences to be considered. Kept for 
-                          future development.""" ).strip())
+                          future development. Default: 1. """ ).strip())
         
     optional.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
                           help=textwrap.dedent("""
-                          Size of mini batches for training.
+                          Size of mini batches for training. Default: 128.
                           """ ).strip())
     
     optional.add_argument('--emb_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
                           help=textwrap.dedent("""
-                          Dropout rate for inputs of the k-mer embedding layer""" ).strip())
+                          Dropout rate for inputs of the k-mer embedding layer.
+                          Default: 0.1.""" ).strip())
     
     optional.add_argument('--local_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
                           help=textwrap.dedent("""
-                          Dropout rate for inputs of local hidden layers.""" ).strip())
+                          Dropout rate for inputs of local hidden layers.  Default: 0.1.""" ).strip())
     
     optional.add_argument('--CNN_kernel_size', type=int, metavar='INT', default=[3], nargs='+', 
                           help=textwrap.dedent("""
-                          Kernel size for CNN layers in the expanded module.""" ).strip())
+                          Kernel size for CNN layers in the expanded module. Default: 3.
+                          """ ).strip())
     
     optional.add_argument('--CNN_out_channels', type=int, metavar='INT', default=[32], nargs='+', 
                           help=textwrap.dedent("""
-                          Number of output channels for CNN layers.""" ).strip())
+                          Number of output channels for CNN layers. Default: 32.
+                          """ ).strip())
     
     optional.add_argument('--distal_fc_dropout', type=float, metavar='FLOAT', default=[0.25], nargs='+', 
                           help=textwrap.dedent("""
-                          Dropout rate for the FC layer of the expanded module.""" ).strip())
+                          Dropout rate for the FC layer of the expanded module.
+                          Default: 0.25.
+                           """ ).strip())
     
     
     optional.add_argument('--model_no', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
                           Which network architecture to be used: 
-                          0, local-only model;
-                          1, expanded-only model;
-                          2, local + expanded model.""" ).strip())
+                          0 - 'local-only' model;
+                          1 - 'expanded-only' model;
+                          2 - 'local + expanded' model. 
+                          Default: 2.
+                          """ ).strip())
     
                           
     optional.add_argument('--optim', type=str, metavar='STRING', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
                           Name of optimization method for learning.
+                          Default: 'Adam'.
                           """ ).strip())
     
     optional.add_argument('--cuda_id', type=str, metavar='STRING', default='0', 
                           help=textwrap.dedent("""
-                          Which GPU device to be used.""" ).strip())
+                          Which GPU device to be used. Default: '0'. 
+                          """ ).strip())
     
     optional.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
                           Ratio of validation data relative to the whole training data.
+                          Default: 0.1. 
                           """ ).strip())
     
     optional.add_argument('--split_seed', type=int, metavar='INT', default=-1, 
                           help=textwrap.dedent("""
-                          Seed for randomly splitting data into training and validation sets.
+                          Seed for randomly splitting data into training and validation
+                          sets. Default: a random number generated by the job.
                           """ ).strip())
     
     optional.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.005], nargs='+', 
                           help=textwrap.dedent("""
-                          Learning rate for network training, a parameter for the optimization
-                          method.""" ).strip())
+                          Learning rate for network training, a parameter for the 
+                          optimization method.  Default: 0.005.
+                          """ ).strip())
     
     optional.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
                           help=textwrap.dedent("""
                           'weight_decay' parameter (regularization) for the optimization 
-                          method.""" ).strip())
+                          method.  Default: 1e-5. 
+                          """ ).strip())
     
     optional.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
                           help=textwrap.dedent("""
-                          'gamma' parameter for the learning rate scheduler.""" ).strip())
+                          'gamma' parameter for the learning rate scheduler.
+                           Default: 0.5.
+                           """ ).strip())
     
     optional.add_argument('--epochs', type=int, metavar='INT', default=10, 
                           help=textwrap.dedent("""
-                          Maximum number of epochs for each trial.""" ).strip())
+                          Maximum number of epochs for each trial.  Default: 10.
+                          """ ).strip())
     
     optional.add_argument('--grace_period', type=int, metavar='INT', default=5, 
                           help=textwrap.dedent("""
-                          'grace_period' parameter for early stopping.""" ).strip())
+                          'grace_period' parameter for early stopping. 
+                           Default: 5.
+                           """ ).strip())
     
     
     optional.add_argument('--n_trials', type=int, metavar='INT', default=3, 
                           help=textwrap.dedent("""
-                          Number of trials for this training job.""" ).strip())
+                          Number of trials for this training job.  Default: 3.
+                          """ ).strip())
     
     optional.add_argument('--experiment_name', type=str, metavar='STRING', default='my_experiment',
                           help=textwrap.dedent("""
-                          Ray-Tune experiment name.""" ).strip())
+                          Ray-Tune experiment name.  Default: 'my_experiment'.
+                          """ ).strip())
     
     optional.add_argument('--ASHA_metric', type=str, metavar='STRING', default='loss', 
                           help=textwrap.dedent("""
-                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.""" ).strip())
+                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.
+                          Default: 'loss'.
+                          """ ).strip())
     
     optional.add_argument('--ray_ncpus', type=int, metavar='INT', default=6, 
                           help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. """ ).strip())
+                          Number of CPUs requested by Ray-Tune. Default: 6.
+                          """ ).strip())
     
     optional.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
-                          Number of GPUs requested by Ray-Tune.""" ).strip())
+                          Number of GPUs requested by Ray-Tune. Default: 1.
+                          """ ).strip())
     
     optional.add_argument('--cpu_per_trial', type=int, metavar='INT', default=3, 
                           help=textwrap.dedent("""
-                          Number of CPUs used per trial.""" ).strip())
+                          Number of CPUs used per trial. Default: 3.
+                          """ ).strip())
     
     optional.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.19, 
                           help=textwrap.dedent("""
-                          Number of GPUs used per trial""" ).strip())
+                          Number of GPUs used per trial. Default: 0.19.
+                          """ ).strip())
         
     optional.add_argument('--save_valid_preds', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Save prediction results for validation data in the checkpoint folders.""" ).strip())
+                          Save prediction results for validation data in the checkpoint
+                          folders. Default: False.
+                          """ ).strip())
     
     optional.add_argument('--rerun_failed', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Rerun failed trials""" ).strip())
+                          Rerun errored or incomplete trials. Default: False.
+                          """ ).strip())
     
     parser._action_groups.append(optional)
     
@@ -380,6 +413,9 @@ def main():
     
     # Read bigWig file names
     bw_paths = args.bw_paths
+    if bw_paths:
+       args.bw_paths =  os.path.abspath(args.bw_paths)
+    
     bw_files = []
     bw_names = []
     
@@ -485,15 +521,6 @@ def main():
     stop={'after_min_loss':3},
     progress_reporter=reporter,
     resume=resume_flag)
-    
-    # Print the best trial at the ende
-    #best_trial = result.get_best_trial('loss', 'min', 'last')
-    #best_trial = result.get_best_trial('loss', 'min', 'last-5-avg')
-    #print('Best trial config: {}'.format(best_trial.config))
-    #print('Best trial final validation loss: {}'.format(best_trial.last_result['loss'])) 
-    
-    #best_checkpoint = result.get_best_checkpoint(best_trial, metric='loss', mode='min')
-    #print('best_checkpoint:', best_checkpoint)
     
     # Shutdown Ray
     if ray.is_initialized():

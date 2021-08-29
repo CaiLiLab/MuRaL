@@ -5,6 +5,7 @@ from pybedtools import BedTool
 
 import sys
 import argparse
+import textwrap
 
 import torch
 import torch.nn as nn
@@ -41,95 +42,234 @@ def parse_arguments(parser):
     """
     Parse parameters from the command line
     """
-    parser.add_argument('--train_data', type=str, default='',
-                        help='path for training data')
-
-    parser.add_argument('--validation_data', type=str, default='', help='path for validation data')  
-    
-    parser.add_argument('--ref_genome', type=str, default='',
-                        help='reference genome')
-
-    parser.add_argument('--bw_paths', type=str, default='', help='path for the list of BigWig files for non-sequence features')
-
-    parser.add_argument('--seq_only', default=False, action='store_true',  help='use only genomic sequence and ignore bigWig tracks')
-    
-    parser.add_argument('--n_class', type=int, default=4, help='number of mutation classes')
-    
-    parser.add_argument('--local_radius', type=int, default=5, help='radius of local sequences to be considered')
-    parser.add_argument('--local_order', type=int, default=1, help='order of local sequences to be considered')
-    
-    parser.add_argument('--local_hidden1_size', type=int, default=150, help='size of 1st hidden layer for local data')
-    
-    parser.add_argument('--local_hidden2_size', type=int, default=75, help='size of 2nd hidden layer for local data')
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
         
-    parser.add_argument('--distal_radius', type=int, default=50, help='radius of distal sequences to be considered')
-    
-    parser.add_argument('--distal_order', type=int, default=1, help='order of distal sequences to be considered')
-        
-    parser.add_argument('--emb_dropout', type=float, default=0.2, help='dropout rate for k-mer embedding')
-    
-    parser.add_argument('--local_dropout', type=float, default=0.15,help='dropout rate for local network')
-    
-    parser.add_argument('--batch_size', type=int, default=128, help='size of mini batches')
-    
-    parser.add_argument('--pred_batch_size', type=int, default=16, help='size of mini batches for test data')
-    
-    parser.add_argument('--CNN_kernel_size', type=int, default=3, help='kernel size for CNN layers')
-    
-    parser.add_argument('--CNN_out_channels', type=int, default=32, help='number of output channels for CNN layers')
-    
-    parser.add_argument('--distal_fc_dropout', type=float, default=0.25, help='dropout rate for distal fc layer')
-    
-    parser.add_argument('--model_no', type=int, default=2, help='which NN model to be used')
-    
-    parser.add_argument('--pred_file', type=str, default='pred.tsv', help='Output file for saving predictions')
 
-    parser.add_argument('--valid_ratio', type=float, default=0.1, help='the ratio of validation data relative to the whole training data')
-    
-    parser.add_argument('--split_seed', type=int, default=-1, help='seed for randomly splitting data into training and validation sets')
-    
-    parser.add_argument('--learning_rate', type=float, default=0.005, nargs='+', help='learning rate for training')
-    
-    parser.add_argument('--weight_decay', type=float, default=1e-5, nargs='+', help='weight decay (L2 regularization) for training')
-    
-    parser.add_argument('--LR_gamma', type=float, default=0.5, nargs='+', help='gamma for learning rate change during training')
-    
-    parser.add_argument('--optim', type=str, default=['Adam'], nargs='+', help='Optimization method')
-        
-    parser.add_argument('--epochs', type=int, default=10, help='numbe of epochs for training')
-        
-    parser.add_argument('--train_all', default=False, action='store_true')
-    
-    parser.add_argument('--init_fc_with_pretrained', default=False, action='store_true')
 
-    parser.add_argument('--model_path', type=str, default='', help='model path')
+    required.add_argument('--model_path', type=str, metavar='FILE', required=True,
+                          help=textwrap.dedent("""
+                          File path of the trained model.
+                          """ ).strip())  
     
-    parser.add_argument('--calibrator_path', type=str, default='', help='calibrator path')
     
-    parser.add_argument('--model_config_path', type=str, default='', help='model config path')
+    required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
+                          required=True, help=textwrap.dedent("""
+                          File path of the reference genome in FASTA format.""").strip())
+    
+    required.add_argument('--train_data', type=str, metavar='FILE', default='',  
+                          required=True, help= textwrap.dedent("""
+                          File path of training data in a sorted BED format. If the options
+                          --validation_data and --valid_ratio not specified, 10%% of the
+                          sites sampled from the training BED will be used as the
+                          validation data.""").strip())
+    
+    optional.add_argument('--model_config_path', type=str, metavar='FILE', 
+                          help=textwrap.dedent("""
+                          File path for the paired configurations of the trained model.
+                          """ ).strip())
+    
+    optional.add_argument('--train_all', default=False, action='store_true')
+    
+    optional.add_argument('--init_fc_with_pretrained', default=False, action='store_true')  
+    
+    optional.add_argument('--validation_data', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for validation data. If this option is set,
+                          the value of --valid_ratio will be ignored. Default: None.
+                          """).strip()) 
+    
+    optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for a list of BigWig files for non-sequence 
+                          features such as the coverage track. Default: None.""").strip())
+    
+    optional.add_argument('--seq_only', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, use only genomic sequences for the model and ignore
+                          bigWig tracks. Default: False.""").strip())
+    
+    optional.add_argument('--n_class', type=int, metavar='INT', default='4',  
+                          help=textwrap.dedent("""
+                          Number of mutation classes (or types), including the 
+                          non-mutated class. Default: 4.""").strip())
+    
+    optional.add_argument('--local_radius', type=int, metavar='INT', default=5, 
+                          help=textwrap.dedent("""
+                          Radius of the local sequence to be considered in the 
+                          model. Length of the local sequence = local_radius*2+1 bp.
+                          Default: 5.""" ).strip())
+    
+    optional.add_argument('--local_order', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Length of k-mer in the embedding layer. Default: 3.""").strip())
+    
+    optional.add_argument('--local_hidden1_size', type=int, metavar='INT', default=150,
+                          help=textwrap.dedent("""
+                          Size of 1st hidden layer for local module. Default: 150.
+                          """).strip())
+    
+    optional.add_argument('--local_hidden2_size', type=int, metavar='INT', default=0,
+                          help=textwrap.dedent("""
+                          Size of 2nd hidden layer for local module. 
+                          Default: local_hidden1_size//2 .
+                          """ ).strip())
+    
+    optional.add_argument('--distal_radius', type=int, metavar='INT', default=50,
+                          help=textwrap.dedent("""
+                          Radius of the expanded sequence to be considered in the model. 
+                          Length of the expanded sequence = distal_radius*2+1 bp.
+                          Default: 50. 
+                          """ ).strip())
+    
+    optional.add_argument('--distal_order', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Order of distal sequences to be considered. Kept for 
+                          future development. Default: 1. """ ).strip())
+        
+    optional.add_argument('--batch_size', type=int, metavar='INT', default=128, 
+                          help=textwrap.dedent("""
+                          Size of mini batches for training. Default: 128.
+                          """ ).strip())
+    
+    optional.add_argument('--emb_dropout', type=float, metavar='FLOAT', default=0.1, 
+                          help=textwrap.dedent("""
+                          Dropout rate for inputs of the k-mer embedding layer.
+                          Default: 0.1.""" ).strip())
+    
+    optional.add_argument('--local_dropout', type=float, metavar='FLOAT', default=0.1, 
+                          help=textwrap.dedent("""
+                          Dropout rate for inputs of local hidden layers.  Default: 0.1.""" ).strip())
+    
+    optional.add_argument('--CNN_kernel_size', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Kernel size for CNN layers in the expanded module. Default: 3.
+                          """ ).strip())
+    
+    optional.add_argument('--CNN_out_channels', type=int, metavar='INT', default=32, 
+                          help=textwrap.dedent("""
+                          Number of output channels for CNN layers. Default: 32.
+                          """ ).strip())
+    
+    optional.add_argument('--distal_fc_dropout', type=float, metavar='FLOAT', default=0.25, 
+                          help=textwrap.dedent("""
+                          Dropout rate for the FC layer of the expanded module.
+                          Default: 0.25.
+                           """ ).strip())
+    
+    
+    optional.add_argument('--model_no', type=int, metavar='INT', default=2, 
+                          help=textwrap.dedent("""
+                          Which network architecture to be used: 
+                          0 - 'local-only' model;
+                          1 - 'expanded-only' model;
+                          2 - 'local + expanded' model. 
+                          Default: 2.
+                          """ ).strip())
+    
+                          
+    optional.add_argument('--optim', type=str, metavar='STRING', default=['Adam'], nargs='+', 
+                          help=textwrap.dedent("""
+                          Name of optimization method for learning.
+                          Default: 'Adam'.
+                          """ ).strip())
+    
+    optional.add_argument('--cuda_id', type=str, metavar='STRING', default='0', 
+                          help=textwrap.dedent("""
+                          Which GPU device to be used. Default: '0'. 
+                          """ ).strip())
+    
+    optional.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
+                          help=textwrap.dedent("""
+                          Ratio of validation data relative to the whole training data.
+                          Default: 0.1. 
+                          """ ).strip())
+    
+    optional.add_argument('--split_seed', type=int, metavar='INT', default=-1, 
+                          help=textwrap.dedent("""
+                          Seed for randomly splitting data into training and validation
+                          sets. Default: a random number generated by the job.
+                          """ ).strip())
+    
+    optional.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.005], nargs='+', 
+                          help=textwrap.dedent("""
+                          Learning rate for network training, a parameter for the 
+                          optimization method.  Default: 0.005.
+                          """ ).strip())
+    
+    optional.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
+                          help=textwrap.dedent("""
+                          'weight_decay' parameter (regularization) for the optimization 
+                          method.  Default: 1e-5. 
+                          """ ).strip())
+    
+    optional.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
+                          help=textwrap.dedent("""
+                          'gamma' parameter for the learning rate scheduler.
+                           Default: 0.5.
+                           """ ).strip())
+    
+    optional.add_argument('--epochs', type=int, metavar='INT', default=10, 
+                          help=textwrap.dedent("""
+                          Maximum number of epochs for each trial.  Default: 10.
+                          """ ).strip())
+    
+    optional.add_argument('--grace_period', type=int, metavar='INT', default=5, 
+                          help=textwrap.dedent("""
+                          'grace_period' parameter for early stopping. 
+                           Default: 5.
+                           """ ).strip())
+    
+    
+    optional.add_argument('--n_trials', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Number of trials for this training job.  Default: 3.
+                          """ ).strip())
+    
+    optional.add_argument('--experiment_name', type=str, metavar='STRING', default='my_experiment',
+                          help=textwrap.dedent("""
+                          Ray-Tune experiment name.  Default: 'my_experiment'.
+                          """ ).strip())
+    
+    optional.add_argument('--ASHA_metric', type=str, metavar='STRING', default='loss', 
+                          help=textwrap.dedent("""
+                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.
+                          Default: 'loss'.
+                          """ ).strip())
+    
+    optional.add_argument('--ray_ncpus', type=int, metavar='INT', default=6, 
+                          help=textwrap.dedent("""
+                          Number of CPUs requested by Ray-Tune. Default: 6.
+                          """ ).strip())
+    
+    optional.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Number of GPUs requested by Ray-Tune. Default: 1.
+                          """ ).strip())
+    
+    optional.add_argument('--cpu_per_trial', type=int, metavar='INT', default=3, 
+                          help=textwrap.dedent("""
+                          Number of CPUs used per trial. Default: 3.
+                          """ ).strip())
+    
+    optional.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.19, 
+                          help=textwrap.dedent("""
+                          Number of GPUs used per trial. Default: 0.19.
+                          """ ).strip())
+        
+    optional.add_argument('--save_valid_preds', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Save prediction results for validation data in the checkpoint
+                          folders. Default: False.
+                          """ ).strip())
+    
+    optional.add_argument('--rerun_failed', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Rerun errored or incomplete trials. Default: False.
+                          """ ).strip())
 
-    parser.add_argument('--grace_period', type=int, default=5, help='grace_period for early stopping')
-    
-    parser.add_argument('--n_trials', type=int, default=3, help='number of trials for training')
-    
-    parser.add_argument('--experiment_name', type=str, default='my_experiment', help='Ray.Tune experiment name')
-    
-    parser.add_argument('--ASHA_metric', type=str, default='loss', help='metric for ASHA schedualing; the value can be "loss" or "score"')
-    
-    parser.add_argument('--ray_ncpus', type=int, default=6, help='number of CPUs requested by Ray')
-    
-    parser.add_argument('--ray_ngpus', type=int, default=1, help='number of GPUs requested by Ray')
-    
-    parser.add_argument('--cpu_per_trial', type=int, default=3, help='number of CPUs per trial')
-    
-    parser.add_argument('--gpu_per_trial', type=float, default=0.19, help='number of GPUs per trial')
-    
-    parser.add_argument('--cuda_id', type=str, default='0', help='the GPU to be used')
-    
-    parser.add_argument('--save_valid_preds', default=False, action='store_true', help='Save prediction results for validation data')
-    
-    parser.add_argument('--rerun_failed', default=False, action='store_true', help='Rerun failed trials')
-    
+    parser._action_groups.append(optional)
+
     if len(sys.argv) == 1:
         parser.parse_args(['--help'])
     else:
@@ -137,14 +277,23 @@ def parse_arguments(parser):
 
     return args
 def main():
-    parser = argparse.ArgumentParser(description='Mutation rate modeling using machine learning')
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     description="""
+    Overview
+    --------
+    
+    This tool uses parameters from a pre-trained model to do train transfer learning models.
+    The inputs include training and validation mutation data and the training results are saved
+    under the "./ray_results/" folder.
+    
+    """)
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv))
-    # Ray requires absolute paths
-    train_file  = args.train_data = os.path.abspath(args.train_data) 
-    valid_file = args.validation_data = os.path.abspath(args.validation_data)
-    ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
+    
+    train_file = args.train_data
+    valid_file = args.validation_data
+    ref_genome= args.ref_genome
     local_radius = args.local_radius
     local_order = args.local_order
     local_hidden1_size = args.local_hidden1_size
@@ -161,7 +310,7 @@ def main():
     n_class = args.n_class
     model_no = args.model_no
     seq_only = args.seq_only
-    pred_file = args.pred_file
+    #pred_file = args.pred_file
     valid_ratio = args.valid_ratio
     save_valid_preds = args.save_valid_preds
     rerun_failed = args.rerun_failed
@@ -188,7 +337,7 @@ def main():
     init_fc_with_pretrained = args.init_fc_with_pretrained
     
     model_path = args.model_path
-    calibrator_path = args.calibrator_path
+    #calibrator_path = args.calibrator_path
     model_config_path = args.model_config_path
 
     if args.split_seed < 0:
