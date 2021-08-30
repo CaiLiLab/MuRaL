@@ -278,17 +278,17 @@ def main():
     with open(model_config_path, 'rb') as fconfig:
         config = pickle.load(fconfig)
 
-        local_radius = config['local_radius']
-        local_order = config['local_order']
-        local_hidden1_size = config['local_hidden1_size']
-        local_hidden2_size = config['local_hidden2_size']
-        distal_radius = config['distal_radius']
-        distal_order = 1 # reserved for future improvement
-        CNN_kernel_size = config['CNN_kernel_size']  
-        CNN_out_channels = config['CNN_out_channels']
-        emb_dropout = config['emb_dropout']
-        local_dropout = config['local_dropout']
-        distal_fc_dropout = config['distal_fc_dropout']
+        local_radius = args.local_radius = config['local_radius']
+        local_order = args.local_order = config['local_order']
+        local_hidden1_size = args.local_hidden1_size = config['local_hidden1_size']
+        local_hidden2_size = args.local_hidden2_size = config['local_hidden2_size']
+        distal_radius = args.distal_radius = config['distal_radius']
+        distal_order = args.distal_order = 1 # reserved for future improvement
+        CNN_kernel_size = args.CNN_kernel_size = config['CNN_kernel_size']  
+        CNN_out_channels = args.CNN_out_channels = config['CNN_out_channels']
+        emb_dropout = args.emb_dropout = config['emb_dropout']
+        local_dropout = args.local_dropout = config['local_dropout']
+        distal_fc_dropout = args.distal_fc_dropout = config['distal_fc_dropout']
         emb_dims = config['emb_dims']
 
         args.n_class = config['n_class']
@@ -370,7 +370,7 @@ def main():
         'CNN_kernel_size': CNN_kernel_size,
         'CNN_out_channels': CNN_out_channels,
         'distal_fc_dropout': distal_fc_dropout,
-        'batch_size': batch_size,
+        'batch_size': tune.choice(batch_size),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
