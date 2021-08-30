@@ -22,9 +22,11 @@ import datetime
 
 from MuRaL.nn_models import *
 from MuRaL.nn_utils import *
-
 from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
+from MuRaL._version import __version__
+
+
 from pynvml import *
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -37,7 +39,8 @@ def parse_arguments(parser):
     Parse parameters from the command line
     """ 
     optional = parser._action_groups.pop()
-    required = parser.add_argument_group('required arguments')
+    required = parser.add_argument_group('Required arguments')
+    optional.title = 'Other arguments' 
     
     required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
                           required=True, help=textwrap.dedent("""
@@ -71,17 +74,11 @@ def parse_arguments(parser):
                           File path for a list of BigWig files for non-sequence 
                           features such as the coverage track. Default: None.""").strip())
     
-    optional.add_argument('--seq_only', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          If set, use only genomic sequences for prediction and ignore
-                          bigWig tracks. Default: False.""").strip())
-    
     optional.add_argument('--without_h5', default=False, action='store_true',  
                           help=textwrap.dedent("""
                           Do not generate HDF5 file the BED file. If the file is large, 
                           this could take much GPU/CPU memory . Default: False.
                           """).strip())
-    
     
     optional.add_argument('--cpu_only', default=False, action='store_true',  
                           help=textwrap.dedent("""
@@ -92,15 +89,9 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           Size of mini batches for prediction. Default: 16.
                           """ ).strip())
-
-    optional.add_argument('--model_no', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Which network architecture to be used: 
-                          0 - 'local-only' model;
-                          1 - 'expanded-only' model;
-                          2 - 'local + expanded' model. 
-                          Default: 2.
-                          """ ).strip())
+    
+    optional.add_argument('-v', '--version', action='version',
+                        version='%(prog)s {}'.format(__version__))
     
     parser._action_groups.append(optional)
     
@@ -184,12 +175,15 @@ def main():
     bw_files = []
     bw_names = []
     
-    try:
-        bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
-        bw_files = list(bw_list[0])
-        bw_names = list(bw_list[1])
-    except pd.errors.EmptyDataError:
-        print('Warnings: no bigWig files provided')
+    if bw_paths:
+        try:
+            bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
+            bw_files = list(bw_list[0])
+            bw_names = list(bw_list[1])
+        except pd.errors.EmptyDataError:
+            print('Warnings: no bigWig files provided in', bw_paths)
+    else:
+        print('NOTE: no bigWig files provided.')
 
     # Get the H5 file path for testing data
     test_h5f_path = get_h5f_path(test_file, bw_names, distal_radius, distal_order)
