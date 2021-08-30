@@ -35,13 +35,14 @@ If the installation is complete, three commands should be available from  the co
    * Input data
 MuRaL requires input training and validation data files to be in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of the input BED file are shown below.
 
->    chr1	2333436	2333437	.	0	+ \
->    chr1	2333446	2333447	.	2	- \
->    chr1	2333468	2333469	.	1	- \
->    chr1	2333510	2333511	.	3	- \
->    chr1	2333812	2333813	.	0	-   
-
-    In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can specify a arbitrary order for a group of mutation types with incremental numbers starting from 1, but make sure that the same order is consistently used in training, validation and testing datasets.
+```
+chr1	2333436	2333437	.	0	+ \
+chr1	2333446	2333447	.	2	- \
+chr1	2333468	2333469	.	1	- \
+chr1	2333510	2333511	.	3	- \
+chr1	2333812	2333813	.	0	-   
+```
+   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can specify a arbitrary order for a group of mutation types with incremental numbers starting from 1, but make sure that the same order is consistently used in training, validation and testing datasets.
     
 
 
