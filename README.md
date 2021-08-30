@@ -5,7 +5,7 @@ MuRaL depends on several other packages and we recommend using [Miniconda](https
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder.
 
-MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. though `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` in the code folder. You can find the information about CUDA compatibility from [here] (https://docs.nvidia.com/deploy/cuda-compatibility/)
+MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. though `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` in the code folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
 
 First, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in the files `environment.yml` (GPU computing) and `environment_cpu.yml` (CPU-only computing). 
 
@@ -31,18 +31,49 @@ If the installation is complete, three commands should be available from  the co
    * `mural_predict`: This tool is for predicting mutation rates of new sites using a trained model.
 
 ## 3. Examples
+### 3.1 Training
 `mural_train` trains MuRaL models with training and validation mutation data and exports training results under the "./ray_results/" folder.
-   * Input data
-MuRaL requires input training and validation data files to be in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of the input BED file are shown below.
+   * Input data \
+   MuRaL requires input training and validation data files to be in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of the input BED file are shown below.
 
 ```
-chr1	2333436	2333437	.	0	+ \
-chr1	2333446	2333447	.	2	- \
-chr1	2333468	2333469	.	1	- \
-chr1	2333510	2333511	.	3	- \
+chr1	2333436	2333437	.	0	+ 
+chr1	2333446	2333447	.	2	-
+chr1	2333468	2333469	.	1	-
+chr1	2333510	2333511	.	3	-
 chr1	2333812	2333813	.	0	-   
 ```
-   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can specify a arbitrary order for a group of mutation types with incremental numbers starting from 1, but make sure that the same order is consistently used in training, validation and testing datasets.
+
+    In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can specify a arbitrary order for a group of mutation types with incremental numbers starting from 1, but make sure that the same order is consistently used in training, validation and testing datasets. Importantly, the training and validation BED file MUST be SORTED by chromosome coordinates. You can sort BED files by `bedtools sort` or `sort -k1,1 -k2,2n`.
+
+   * Output data \
+   The checkpointed model files during training are saved under folders named like:
+```
+    ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+            - model
+            - model.config.pkl
+            - model.fdiri_cal.pkl
+```
+    In the above folder, the 'model' file contains the learned model parameters. The 'model.config.pkl' file contains configured hyperparameters of the model. The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model learned with validation data, which can be used for calibrating predicted mutation rates. These files can be used in downstream analyses such as model prediction and transfer learning.
+    
+   * Example 1 \
+   The following command will train a model by running two trials, using data in 'train.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
+```
+mural_train --ref_genome seq.fa --train_data train.sorted.bed \
+        --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
+```
+   * Example 2 \
+   The following command will use data in 'train.sorted.bed' as training data and a separate 'validation.sorted.bed' as validation data. The option '--local_radius 10' means that length of the local sequence used for training is 10*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded sequence used for training is 100*2+1 = 201 bp.
+```
+mural_train --ref_genome seq.fa --train_data train.sorted.bed \
+      --validation_data validation.sorted.bed --n_trials 2 --local_radius 10 \ 
+      --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
+```
+    
+
+
+   
+   
     
 
 
