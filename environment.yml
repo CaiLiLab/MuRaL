@@ -9,14 +9,14 @@ dependencies:
   - pytorch
   - torchvision
   - torchaudio
-  - cudatoolkit=11.1
+  - cudatoolkit
   - pybigwig=0.3.17
   - prettytable
   - pynvml
   - pip:
     - pybedtools
     - pysam==0.15.1
-    - janggu[tf2]==0.10.0
+    - janggu[tf2]>=0.10.0
     - ray[tune]
     - dirichletcal
     - jax

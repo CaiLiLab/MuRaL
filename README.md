@@ -6,31 +6,31 @@ The MuRaL network architecture has two major modules (shown below), one is for l
 <img src="./images/model_schematic.jpg" alt="model schematic" width="700"/>
 
 ## 2. Installation
-MuRaL depends on several other packages and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to create a virtual environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
+MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
 
-After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder.
+After installing Miniconda, download or clone the MuRaL source code from github and go into the **source code root folder**.
 
-MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. though `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` in the code folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
+MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. though `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
 
-First, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in the files `environment.yml` (GPU computing) and `environment_cpu.yml` (CPU-only computing). 
+Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). 
 
 Then run one of the following to create a conda environment:
 ```
 conda env create -n mural -f environment.yml # if your machine has GPUs
 # or 
-conda env create -n mural -f environment_cpu.yml # if your machine has GPUs
+conda env create -n mural -f environment_cpu.yml # if your machine has only CPUs
 ```
-If the command ends without errors, you will have a conda environment named 'mural' (or use another name). Use the following command to activate the virtual environment:
+If the command ends without errors, you will have a conda environment named 'mural' (or another name if you change the `-n mural` option). Use the following command to activate the conda environment:
 ```
 conda activate mural
 ```
-And install MuRaL using:
+And then install MuRaL by typing:
 ```
 python setup.py install
 ```
 
 If the installation is complete, three commands are available from the command line:
-   * `mural_train`: This tool is for training mutation rate models from the begining.
+   * `mural_train`: This tool is for training mutation rate models from the beginning.
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites using a trained model.
 
