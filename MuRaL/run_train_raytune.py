@@ -299,7 +299,7 @@ def main():
     In the BED-formatted lines above, the 5th column is used to represent mutation
     status: usually, '0' means the non-mutated status and other numbers means 
     specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can
-    specify a arbitrary order for a group of mutation types with incremental 
+    specify an arbitrary order for a group of mutation types with incremental 
     numbers starting from 1, but make sure that the same order is consistently 
     used in training, validation and testing datasets. 
     
@@ -357,10 +357,11 @@ def main():
     coordinates. You can sort BED files by running 'bedtools sort' or 
     'sort -k1,1 -k2,2n'.
     
-    2. By default, this tool generates a HDF5 file for each input BED
+    2. By default, this tool generates an HDF5 file for each input BED
     file (training or validation file) based on the value of '--distal_radius' 
     and the tracks in '--bw_paths', if the corresponding HDF5 file doesn't 
-    exist or is corrupted. Only one job is allowed to write to an HDF5 file,
+    exist or is corrupted. Make sure that you have write permission for the folder
+    containing the BED file(s). Only one job is allowed to write to an HDF5 file,
     so don't run multiple jobs involving a same BED file when its HDF5 file 
     isn't generated yet. Otherwise, it may cause file permission errors.
     
