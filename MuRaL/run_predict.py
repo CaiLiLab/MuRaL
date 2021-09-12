@@ -121,11 +121,11 @@ def main():
    
     * Output data 
     The output of `mural_predict` is a tab-separated file containing the 
-    chromosome positional information and the predicted probabilities for 
-    all possible mutation types. The 'prob0' column contains probalities for the 
+    sequence coordinates and the predicted probabilities for all possible 
+    mutation types. Usually, the 'prob0' column contains probalities for the 
     non-mutated class and other 'probX' columns for mutated classes. 
    
-    Some example lines of the prediction output file are shown below:
+    Some example lines of a prediction output file are shown below:
     chrom   start   end    strand mut_type  prob0   prob1   prob2   prob3
     chr1    10006   10007   -       0       0.9797  0.003134 0.01444 0.002724
     chr1    10007   10008   +       0       0.9849  0.005517 0.00707 0.002520

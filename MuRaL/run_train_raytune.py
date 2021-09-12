@@ -293,7 +293,7 @@ def main():
     
     Input training and validation data files must be in BED format
     (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). 
-    Some example lines of the input BED file are shown below.
+    Some example lines of an input BED file are shown below.
     chr1	2333436	2333437	.	0	+
     chr1	2333446	2333447	.	2	-
     chr1	2333468	2333469	.	1	-
@@ -302,16 +302,18 @@ def main():
     
     In the BED-formatted lines above, the 5th column is used to represent mutation
     status: usually, '0' means the non-mutated status and other numbers means 
-    specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can
+    specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G', '3' for 'A>T'). You can
     specify an arbitrary order for a group of mutation types with incremental 
-    numbers starting from 1, but make sure that the same order is consistently 
+    numbers starting from 0, but make sure that the same order is consistently 
     used in training, validation and testing datasets. 
     
     Importantly, the training and validation BED file MUST be SORTED by chromosome
     coordinates. You can sort BED files by 'bedtools sort' or 'sort -k1,1 -k2,2n'.
     
     * Output data
-    The checkpointed model files during training are saved under folders named like 
+    This tool saves the model information at each checkpoint, normally at the 
+    end of each training epoch of each trial. The checkpointed model files during 
+    training are saved under folders named like: 
         ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
             - model
             - model.config.pkl

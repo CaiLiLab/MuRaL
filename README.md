@@ -1,9 +1,9 @@
 <img src="./images/mural-logo.jpg" alt="MuRaL logo" width="300"/>
 
 ## 1. Overview
-**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to generate single-nucleotide mutation rates across the genome. 
+**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
 
-The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (<20bp from the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (up to 1kb from the focal nucleotide).
+The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1kb on each side of the focal nucleotide).
 
 <img src="./images/model_schematic.jpg" alt="model schematic" width="800"/>
 
@@ -12,7 +12,7 @@ MuRaL depends on several other packages, and we recommend using [Miniconda](http
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
 
-MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. though `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
+MuRaL supports training and prediction with or without CUDA GPUs. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
 
 Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). 
 
@@ -34,14 +34,14 @@ python setup.py install
 If the installation is complete, three commands are available from the command line:
    * `mural_train`: This tool is for training mutation rate models from the beginning.
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
-   * `mural_predict`: This tool is for predicting mutation rates of new sites using a trained model.
+   * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
 
 ## 3. Usage Examples
 ### 3.1 Model training
-`mural_train` trains MuRaL models with training and validation mutation data and exports training results under the "./ray_results/" folder.
+`mural_train` trains MuRaL models with training and validation mutation data, and exports training results under the "./ray_results/" folder.
    * Input data \
-   Input data files include the reference sequence file (FASTA format, required), a training data file (required) and a validation data file (optional). If the validation data file isn't provided,  a fraction of the sites from the training data file are used as validation data. \
-   Input training and validation data files must be in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of the input BED file are shown below.
+   Input data files include the reference sequence file (FASTA format, required), a training data file (required) and a validation data file (optional). If the validation data file isn't provided, a fraction of the sites sampled from the training data file are used as validation data. \
+   Input training and validation data files are in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of an input BED file are shown below.
 ```
 chr1	2333436	2333437	.	0	+ 
 chr1	2333446	2333447	.	2	-
@@ -49,10 +49,10 @@ chr1	2333468	2333469	.	1	-
 chr1	2333510	2333511	.	3	-
 chr1	2333812	2333813	.	0	- 
 ```
-   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for A>C, '2' for A>G, '3' for 'A>T'). You can specify an arbitrary order for a group of mutation types with incremental numbers starting from 1, but make sure that the same order is consistently used in training, validation and testing datasets. Importantly, the training and validation BED file MUST BE SORTED by chromosome coordinates. You can sort BED files by `bedtools sort` or `sort -k1,1 -k2,2n`.
+   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G', '3' for 'A>T'). You can specify an arbitrary order for a group of mutation types with incremental numbers starting from 0, but make sure that the same order is consistently used in training, validation and testing datasets. Importantly, the training and validation BED file MUST BE SORTED by chromosome coordinates. You can sort BED files by `bedtools sort` or `sort -k1,1 -k2,2n`.
 
    * Output data \
-   The checkpointed model files during training are saved under folders named like:
+    `mural_train` saves the model information at each checkpoint, normally at the end of each training epoch of each trial. The checkpointed model files during training are saved under folders named like:
 ```
     ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
             - model
@@ -62,7 +62,7 @@ chr1	2333812	2333813	.	0	-
    In the above folder, the 'model' file contains the learned model parameters. The 'model.config.pkl' file contains configured hyperparameters of the model. The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model learned with validation data, which can be used for calibrating predicted mutation rates. These files can be used in downstream analyses such as model prediction and transfer learning.
     
    * Example 1 \
-   The following command will train a model by running two trials, using data in 'train.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
+   The following command will train a model by running two trials, using data in 'train.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'train.sorted.bed' is used as validation data (i.e. '--valid_ratio 0.1').
 ```
 mural_train --ref_genome seq.fa --train_data train.sorted.bed \
         --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
@@ -80,8 +80,8 @@ mural_train --ref_genome seq.fa --train_data train.sorted.bed \
    * Input data \
    The required input files for prediction include the reference FASTA file, a BED-formated data file and a trained model. The BED file is organized in the same way as that for training. The 5th column can be set to '0' if no observed mutations for the sites in the prediction BED. The model-related files for input are 'model' and 'model.config.pkl', which are generated at the training step. The file 'model.fdiri_cal.pkl', which is for calibrating predicted mutation rates, is optional.
    * Output data \
-   The output of `mural_predict` is a tab-separated file containing the chromosome positional information and the predicted probabilities for all possible mutation types. The 'prob0' column contains probalities for the non-mutated class and other 'probX' columns for mutated classes. 
-   Some example lines of the prediction output file are shown below:
+   The output of `mural_predict` is a tab-separated file containing the sequence coordinates and the predicted probabilities for all possible mutation types. Usually, the 'prob0' column contains probalities for the non-mutated class and other 'probX' columns for mutated classes. 
+   Some example lines of a prediction output file are shown below:
 ```
 chrom   start   end    strand mut_type  prob0   prob1   prob2   prob3
 chr1    10006   10007   -       0       0.9797  0.003134 0.01444 0.002724
@@ -102,7 +102,7 @@ mural_predict --ref_genome seq.fa --test_data testing.bed.gz \
 ### 3.3 Transfer learning
 `mural_train_TL` trains MuRaL models like `mural_train` but initializes model parameters with learned weights from a pre-trained model. Its training results are also saved under the "./ray_results/" folder.
    * Input data \
-   The input files for `mural_train_TL` include the reference FASTA file (required), a training data file (required), a validation data file (optional), and model-related files of a trained model (required). The required model-related files are 'model' and 'model.config.pkl' files under a specific checkpoint folder, which are normally produced by `mural_train` or `mural_train_TL`. 
+   The input files for `mural_train_TL` include the reference FASTA file (required), a training data file (required), a validation data file (optional), and model-related files of a trained model (required). The required model-related files are 'model' and 'model.config.pkl' under a specific checkpoint folder, normally generated by `mural_train` or `mural_train_TL`. 
    * Output data \
    Output data has the same structure as that of `mural_train`.
 

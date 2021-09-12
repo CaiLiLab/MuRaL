@@ -224,14 +224,20 @@ def main():
     are saved under the "./ray_results/" folder.
     
     * Input data 
-    The input files include the reference FASTA file (required), a training data file (required), a validation data file (optional), and model-related files of a trained model (required). The required model-related files are 'model' and 'model.config.pkl' files under a specific checkpoint folder, which are normally produced by `mural_train` or `mural_train_TL`. 
+    The input files include the reference FASTA file (required), a training data file 
+    (required), a validation data file (optional), and model-related files of a trained 
+    model (required). The required model-related files are 'model' and 'model.config.pkl'
+    under a specific checkpoint folder, which are normally produced by `mural_train` 
+    or `mural_train_TL`. 
    
     * Output data 
     Output data has the same structure as that of `mural_train`.
 
     Command line examples
     ---------------------
-    1. The following command will train a transfer learning model using training data in 'train.sorted.bed', the validation data in 'validation.sorted.bed', and the model files under 'checkpoint_6/'.
+    1. The following command will train a transfer learning model using training data 
+    in 'train.sorted.bed', the validation data in 'validation.sorted.bed', and the model
+    files under 'checkpoint_6/'.
    
         mural_train_TL --ref_genome seq.fa --train_data train.sorted.bed \\
         --validation_data validation.sorted.bed --model_path checkpoint_6/model \\
