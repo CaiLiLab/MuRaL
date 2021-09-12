@@ -293,6 +293,7 @@ def main():
     
     Input training and validation data files must be in BED format
     (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). 
+    
     Some example lines of an input BED file are shown below.
     chr1	2333436	2333437	.	0	+
     chr1	2333446	2333447	.	2	-
