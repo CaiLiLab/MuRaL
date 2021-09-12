@@ -5,7 +5,7 @@
 
 The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (<20bp from the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (up to 1kb from the focal nucleotide).
 
-<img src="./images/model_schematic.jpg" alt="model schematic" width="700"/>
+<img src="./images/model_schematic.jpg" alt="model schematic" width="750"/>
 
 ## 2. Installation
 MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (version 3 or newer) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
