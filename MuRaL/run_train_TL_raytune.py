@@ -218,12 +218,25 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="""
     Overview
-    --------
-    
+    --------    
     This tool uses learned weights from a pre-trained MuRaL model to train new models. 
     The inputs include training and validation mutation data and the training results 
     are saved under the "./ray_results/" folder.
     
+    * Input data 
+    The input files include the reference FASTA file (required), a training data file (required), a validation data file (optional), and model-related files of a trained model (required). The required model-related files are 'model' and 'model.config.pkl' files under a specific checkpoint folder, which are normally produced by `mural_train` or `mural_train_TL`. 
+   
+    * Output data 
+    Output data has the same structure as that of `mural_train`.
+
+    Command line examples
+    ---------------------
+    1. The following command will train a transfer learning model using training data in 'train.sorted.bed', the validation data in 'validation.sorted.bed', and the model files under 'checkpoint_6/'.
+   
+        mural_train_TL --ref_genome seq.fa --train_data train.sorted.bed \\
+        --validation_data validation.sorted.bed --model_path checkpoint_6/model \\
+        --model_config_path checkpoint_6/model.config.pkl --train_all \\
+        --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
     """)
     args = parse_arguments(parser)
 

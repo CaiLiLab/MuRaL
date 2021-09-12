@@ -281,13 +281,17 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="""
     Overview
-    --------
-    
+    --------    
     This tool trains MuRaL models with training and validation mutation data
     and exports training results under the "./ray_results/" folder.
     
     * Input data
-    MuRaL requires input training and validation data files to be in BED format
+    Input data files include the reference sequence file (FASTA format, required), 
+    a training data file (required) and a validation data file (optional). If the 
+    validation data file isn't provided,  a fraction of the sites from the training 
+    data file are used as validation data.
+    
+    Input training and validation data files must be in BED format
     (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). 
     Some example lines of the input BED file are shown below.
     chr1	2333436	2333437	.	0	+
@@ -321,8 +325,7 @@ def main():
     model prediction and transfer learning.
     
     Command line examples
-    ---------------------
-    
+    --------------------- 
     1. The following command will train a model by running two trials, using data in
     'train.sorted.bed' for training. The training results will be saved under the
     folder './ray_results/example1/'. Default values will be used for other
@@ -366,8 +369,7 @@ def main():
     isn't generated yet. Otherwise, it may cause file permission errors.
     
     3. If it takes long to finish a job, you can check the information exported 
-    to stdout (or redirected file) for the progress during running.
-    
+    to stdout (or redirected file) for the progress during running. 
     """)
     
     args = parse_arguments(parser)
