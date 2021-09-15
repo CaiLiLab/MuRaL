@@ -427,7 +427,11 @@ def main():
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,
-    resume=resume_flag)   
+    resume=resume_flag)  
+    
+    # Shutdown Ray
+    if ray.is_initialized():
+        ray.shutdown() 
     
     
 if __name__ == "__main__":
