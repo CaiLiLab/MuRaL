@@ -3,16 +3,16 @@
 ## 1. Overview
 **MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
 
-The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1kb on each side of the focal nucleotide).
+The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
-<img src="./images/model_schematic.jpg" alt="model schematic" width="800"/>
+<img src="./images/model_schematic.jpg" alt="model schematic" width="830"/>
 
 ## 2. Installation
 MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (version 3 or newer) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
 
-MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take much longer time. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
+MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
 
 Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). Run one of the following commands to create a conda environment and install the dependencies (this may take >30 mins depending on your internet speed):
 ```
@@ -78,8 +78,8 @@ mural_train --ref_genome seq.fa --train_data train.sorted.bed \
    * Input data \
    The required input files for prediction include the reference FASTA file, a BED-formated data file and a trained model. The BED file is organized in the same way as that for training. The 5th column can be set to '0' if no observed mutations for the sites in the prediction BED. The model-related files for input are 'model' and 'model.config.pkl', which are generated at the training step. The file 'model.fdiri_cal.pkl', which is for calibrating predicted mutation rates, is optional.
    * Output data \
-   The output of `mural_predict` is a tab-separated file containing the sequence coordinates and the predicted probabilities for all possible mutation types. Usually, the 'prob0' column contains probalities for the non-mutated class and other 'probX' columns for mutated classes. 
-   Some example lines of a prediction output file are shown below:
+   The output of `mural_predict` is a tab-separated file containing the sequence coordinates (BED-formatted) and the predicted probabilities for all possible mutation types. Usually, the 'prob0' column contains probalities for the non-mutated class and other 'probX' columns for mutated classes. 
+   Some example lines of a prediction output file are shown below. 
 ```
 chrom   start   end    strand mut_type  prob0   prob1   prob2   prob3
 chr1    10006   10007   -       0       0.9797  0.003134 0.01444 0.002724

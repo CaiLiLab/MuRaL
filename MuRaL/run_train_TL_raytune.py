@@ -247,6 +247,8 @@ def main():
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv))
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
     
     train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data

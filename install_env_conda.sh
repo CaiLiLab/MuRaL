@@ -1,12 +1,9 @@
-git clone https://github.com/cailigd/MuRaL.git
+git clone git@github.com:CaiLiLab/MuRaL.git
 
-conda env create -n test -f environment.yml
-#conda env update --file environment.yml --prune
-conda env update --file environment.yml --prune
+conda env create -n mural -f environment.yml
+'conda env update --file environment.yml --prune
 
 conda activate mural
 
-pip install -e .
-
-#conda deactivate
+#pip install -e .
 #conda env remove -n test

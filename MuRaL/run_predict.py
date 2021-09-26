@@ -150,6 +150,8 @@ def main():
     
     # Print command line
     print(' '.join(sys.argv))
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
 
     # Set input file
     test_file = args.test_data   

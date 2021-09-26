@@ -228,7 +228,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
                           help=textwrap.dedent("""
-                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.
+                          Metric for ASHA schedualing: 'loss', 'fdiri_loss', or 'score'.
                           Default: 'loss'.
                           """ ).strip())
     
@@ -378,6 +378,9 @@ def main():
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv)) # print the command line
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
+    
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
 

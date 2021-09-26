@@ -14,13 +14,15 @@ def weights_init(m):
         nn.init.xavier_uniform_(m.weight)
         
         if m.bias is not None:
-            nn.init.normal_(m.bias)
+            #nn.init.normal_(m.bias)
+            nn.init.constant_(m.bias, 0)
         
     elif classname.find('Linear') != -1:
         nn.init.kaiming_normal_(m.weight)
             
         if m.bias is not None:
-            nn.init.normal_(m.bias)
+            #nn.init.normal_(m.bias)
+            nn.init.constant_(m.bias, 0)
         
     elif classname.find('LSTM') != -1 or classname.find('GRU') != -1:
         for layer_p in m._all_weights:
