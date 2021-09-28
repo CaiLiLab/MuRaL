@@ -527,6 +527,9 @@ def main():
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
     
+    def trial_dirname_string(trial):
+        return "{}_{}".format(trial.trainable_name, trial.trial_id)
+
     # Execute the training
     result = tune.run(
     trainable_id,
@@ -535,6 +538,7 @@ def main():
     config=config,
     num_samples=n_trials,
     local_dir='./ray_results',
+    trial_dirname_creator=trial_dirname_string,
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,

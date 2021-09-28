@@ -8,7 +8,7 @@ import sys
 
 
 def weights_init(m):
-    """Initialize layers"""
+    """Initialize network layers"""
     classname = m.__class__.__name__
     if classname.find('Conv1d') != -1 or classname.find('Conv2d') != -1:
         nn.init.xavier_uniform_(m.weight)
