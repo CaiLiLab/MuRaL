@@ -60,16 +60,16 @@ chr1	2333812	2333813	.	0	-
    In the above folder, the 'model' file contains the learned model parameters. The 'model.config.pkl' file contains configured hyperparameters of the model. The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model learned with validation data, which can be used for calibrating predicted mutation rates. These files can be used in downstream analyses such as model prediction and transfer learning.
     
    * Example 1 \
-   The following command will train a model by running two trials, using data in 'train.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'train.sorted.bed' is used as validation data (i.e. '--valid_ratio 0.1').
+   The following command will train a model by running two trials, using data in 'data/training.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'training.sorted.bed' is used as validation data (i.e. '--valid_ratio 0.1'). You can run this example under the 'examples/' folder in the package.
 ```
-mural_train --ref_genome seq.fa --train_data train.sorted.bed \
-        --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
+mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+        --experiment_name example1 > test1.out 2> test1.err
 ```
    * Example 2 \
-   The following command will use data in 'train.sorted.bed' as training data and a separate 'validation.sorted.bed' as validation data. The option '--local_radius 10' means that length of the local sequence used for training is 10\*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded sequence used for training is 100\*2+1 = 201 bp.
+   The following command will use data in 'data/training.sorted.bed' as training data and a separate 'data/validation.sorted.bed' as validation data. The option '--local_radius 10' means that length of the local sequence used for training is 10\*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded sequence used for training is 100\*2+1 = 201 bp. You can run this example under the 'examples/' folder in the package.
 ```
-mural_train --ref_genome seq.fa --train_data train.sorted.bed \
-        --validation_data validation.sorted.bed --n_trials 2 --local_radius 10 \
+mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+        --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 10 \
         --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
 ```
 
@@ -89,12 +89,12 @@ chr1    10012   10013   -       0       0.9711  0.004898 0.02029 0.003746
 ```
    
    * Example 3 \
-   The following command will predict mutation rates for all sites in 'testing.bed.gz' using model files under the 'checkpoint_6/' folder and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'.
+   The following command will predict mutation rates for all sites in 'data/testing.bed.gz' using model files under the 'models/checkpoint_6/' folder and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. You can run this example under the 'examples/' folder in the package.
 ```
-mural_predict --ref_genome seq.fa --test_data testing.bed.gz \
-        --model_path checkpoint_6/model --model_config_path checkpoint_6/model.config.pkl \
-        --calibrator_path checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
-        > test.out 2> test.err
+mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \
+        --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl \
+        --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
+        > test3.out 2> test3.err
 ```
 
 ### 3.3 Transfer learning
@@ -105,11 +105,11 @@ mural_predict --ref_genome seq.fa --test_data testing.bed.gz \
    Output data has the same structure as that of `mural_train`.
 
    * Example 4 \
-   The following command will train a transfer learning model using training data in 'train.sorted.bed', the validation data in 'validation.sorted.bed', and the model files under 'checkpoint_6/'.
+   The following command will train a transfer learning model using training data in 'data/training_TL.sorted.bed', the validation data in 'data/validation.sorted.bed', and the model files under 'models/checkpoint_6/'. You can run this example under the 'examples/' folder in the package.
 ```
-mural_train_TL --ref_genome seq.fa --train_data train.sorted.bed \
-        --validation_data validation.sorted.bed --model_path checkpoint_6/model \
-        --model_config_path checkpoint_6/model.config.pkl --train_all \
+mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed \
+        --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model \
+        --model_config_path models/checkpoint_6/model.config.pkl --train_all \
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 ```
    
