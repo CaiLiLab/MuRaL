@@ -139,11 +139,11 @@ def parse_arguments(parser):
                           Default: local_hidden1_size//2 .
                           """ ).strip())
     
-    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[50], nargs='+', 
+    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[200], nargs='+', 
                           help=textwrap.dedent("""
                           Radius of the expanded sequence to be considered in the model. 
                           Length of the expanded sequence = distal_radius*2+1 bp.
-                          Default: 50. 
+                          Values should be >=100. Default: 200. 
                           """ ).strip())
     
     model_args.add_argument('--distal_order', type=int, metavar='INT', default=1, 
@@ -210,9 +210,9 @@ def parse_arguments(parser):
                           Ray-Tune experiment name.  Default: 'my_experiment'.
                           """ ).strip()) 
     
-    raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=3, 
+    raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
-                          Number of trials for this training job.  Default: 3.
+                          Number of trials for this training job.  Default: 2.
                           """ ).strip())
     
     raytune_args.add_argument('--epochs', type=int, metavar='INT', default=10, 
@@ -228,7 +228,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
                           help=textwrap.dedent("""
-                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.
+                          Metric for ASHA schedualing: 'loss', 'fdiri_loss', or 'score'.
                           Default: 'loss'.
                           """ ).strip())
     
@@ -247,9 +247,9 @@ def parse_arguments(parser):
                           Number of CPUs used per trial. Default: 3.
                           """ ).strip())
     
-    raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.19, 
+    raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.15, 
                           help=textwrap.dedent("""
-                          Number of GPUs used per trial. Default: 0.19.
+                          Number of GPUs used per trial. Default: 0.15.
                           """ ).strip())
     
     raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default='0', 
@@ -378,6 +378,9 @@ def main():
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv)) # print the command line
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
+    
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
 
@@ -519,11 +522,14 @@ def main():
     reduction_factor=2)
     
     # Information to be shown in the progress table
-    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', ], metric_columns=['loss', 'fdiri_loss', 'after_min_loss',  'score', 'total_params', 'training_iteration'])
+    reporter = CLIReporter(parameter_columns=['local_radius', 'local_order', 'local_hidden1_size', 'local_hidden2_size', 'distal_radius', 'emb_dropout', 'local_dropout', 'CNN_kernel_size', 'CNN_out_channels', 'distal_fc_dropout', 'optim', 'learning_rate', 'weight_decay', 'LR_gamma', 'batch_size'], metric_columns=['loss', 'fdiri_loss', 'after_min_loss',  'score', 'total_params', 'training_iteration'])
     
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
     
+    def trial_dirname_string(trial):
+        return "{}_{}".format(trial.trainable_name, trial.trial_id)
+
     # Execute the training
     result = tune.run(
     trainable_id,
@@ -532,6 +538,7 @@ def main():
     config=config,
     num_samples=n_trials,
     local_dir='./ray_results',
+    trial_dirname_creator=trial_dirname_string,
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,

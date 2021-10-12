@@ -128,10 +128,10 @@ def parse_arguments(parser):
                           Default: 'Adam'.
                           """ ).strip())
  
-    learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.005], nargs='+', 
+    learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.0001], nargs='+', 
                           help=textwrap.dedent("""
                           Learning rate for parameter learning, an argument for the 
-                          optimization method.  Default: 0.005.
+                          optimization method.  Default: 0.0001.
                           """ ).strip())
     
     learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
@@ -151,9 +151,9 @@ def parse_arguments(parser):
                           Ray-Tune experiment name.  Default: 'my_experiment'.
                           """ ).strip()) 
     
-    raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=3, 
+    raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
-                          Number of trials for this training job.  Default: 3.
+                          Number of trials for this training job.  Default: 2.
                           """ ).strip())
     
     raytune_args.add_argument('--epochs', type=int, metavar='INT', default=10, 
@@ -247,6 +247,8 @@ def main():
     args = parse_arguments(parser)
 
     print(' '.join(sys.argv))
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
     
     train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data
@@ -284,7 +286,10 @@ def main():
     train_all = args.train_all
     init_fc_with_pretrained = args.init_fc_with_pretrained
     
-    model_path = args.model_path
+    #model_path = args.model_path
+    if args.model_path:
+        args.model_path =  os.path.abspath(args.model_path)
+    
     #calibrator_path = args.calibrator_path
     model_config_path = args.model_config_path
 
