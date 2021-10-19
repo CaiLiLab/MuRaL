@@ -3,8 +3,8 @@
 mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed --experiment_name example1 > test1.out 2> test1.err
 
 # Example 2 (training):
-# The following command will use data in 'train.sorted.bed' as training data and a separate 'validation.sorted.bed' as validation data. The option '--local_radius 10' means that length of the local sequence used for training is 10*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded sequence used for training is 100*2+1 = 201 bp. '--n_trials 3' means that three trials will be run.
-mural_train --ref_genome data/seq.fa --train_data data/train.sorted.bed --validation_data data/validation.sorted.bed  --local_radius 10 --distal_radius 100 --n_trials 3 --experiment_name example2 > test2.out 2> test2.err
+# The following command will use data in 'training.sorted.bed' as training data and a separate 'validation.sorted.bed' as validation data. The option '--local_radius 7' means that length of the local sequence used for training is 7*2+1 = 15 bp. '--distal_radius 200' means that length of the expanded sequence used for training is 200*2+1 = 401 bp. '--n_trials 3' means that three trials will be run.
+mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed --validation_data data/validation.sorted.bed  --local_radius 7 --distal_radius 200 --n_trials 3 --experiment_name example2 > test2.out 2> test2.err
 
 # Example 3 (prediction): 
 #The following command will predict mutation rates for all sites in 'data/testing.bed.gz' using model files under the 'checkpoint_6/' folder and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'.
