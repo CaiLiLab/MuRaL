@@ -3,7 +3,7 @@
 ## 1. Overview
 **MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
 
-The MuRaL network architecture has two major modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
+The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
 <img src="./images/model_schematic.jpg" alt="model schematic" width="830"/>
 
@@ -12,13 +12,15 @@ MuRaL depends on several other packages, and we recommend using [Miniconda](http
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
 
-MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/)
+MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/).
 
-Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). Run one of the following commands to create a conda environment and install the dependencies (this may take >30 mins depending on your internet speed):
+Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). Run one of the following commands to create a conda environment and install the dependencies (this may take >30 minutes depending on your internet speed):
 ```
-conda env create -n mural -f environment.yml # if your machine has GPUs
-# or 
-conda env create -n mural -f environment_cpu.yml # if your machine has only CPUs
+# if your machine has GPUs
+conda env create -n mural -f environment.yml 
+
+# if your machine has only CPUs
+conda env create -n mural -f environment_cpu.yml 
 ```
 If the command ends without errors, you will have a conda environment named 'mural' (or another name if you change the `-n mural` option above). Use the following command to activate the conda environment:
 ```
@@ -66,11 +68,11 @@ mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
         --experiment_name example1 > test1.out 2> test1.err
 ```
    * Example 2 \
-   The following command will use data in 'data/training.sorted.bed' as training data and a separate 'data/validation.sorted.bed' as validation data. The option '--local_radius 10' means that length of the local sequence used for training is 10\*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded sequence used for training is 100\*2+1 = 201 bp. You can run this example under the 'examples/' folder in the package.
+   The following command will use data in 'data/training.sorted.bed' as training data and a separate 'data/validation.sorted.bed' as validation data. The option '--local_radius 7' means that length of the local sequence used for training is 7\*2+1 = 15 bp. '--distal_radius 200' means that length of the expanded sequence used for training is 200\*2+1 = 401 bp. You can run this example under the 'examples/' folder in the package.
 ```
 mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
-        --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 10 \
-        --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
+        --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 7 \
+        --distal_radius 200 --experiment_name example2 > test2.out 2> test2.err
 ```
 
 ### 3.2 Model prediction
