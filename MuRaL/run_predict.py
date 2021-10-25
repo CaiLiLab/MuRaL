@@ -244,7 +244,7 @@ def main():
         for i in range(nvmlDeviceGetCount()):
             h = nvmlDeviceGetHandleByIndex(i)
             info = nvmlDeviceGetMemoryInfo(h)
-            if info.free > 1.5*(2**30): # Reserve 1.5GB
+            if info.free > 2.0*(2**30): # Reserve 2GB GPU memory
                 cuda_id = str(i)
                 break
 

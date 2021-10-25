@@ -232,9 +232,9 @@ def parse_arguments(parser):
                           Default: 'loss'.
                           """ ).strip())
     
-    raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=6, 
+    raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=4, 
                           help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. Default: 6.
+                          Number of CPUs requested by Ray-Tune. Default: 4.
                           """ ).strip())
     
     raytune_args.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
@@ -242,9 +242,9 @@ def parse_arguments(parser):
                           Number of GPUs requested by Ray-Tune. Default: 1.
                           """ ).strip())
     
-    raytune_args.add_argument('--cpu_per_trial', type=int, metavar='INT', default=3, 
+    raytune_args.add_argument('--cpu_per_trial', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
-                          Number of CPUs used per trial. Default: 3.
+                          Number of CPUs used per trial. Default: 2.
                           """ ).strip())
     
     raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.15, 
