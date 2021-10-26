@@ -121,8 +121,13 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 ```
    
-### 4. Precomputed mutation rate profiles of multiple species by MuRaL
-Predicted mutation rate profiles for genomes of  *Homo sapiens*, *Macaca mulatta*, *Arabidopsis thaliana* and *Drosophila melanogaster* are available at [here](https://www.doi.org/10.11922/sciencedb.01173).
+### 4. Trained model and predicted mutation rate profiles of multiple species by MuRaL
+Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster*** are provided in the 'models/' folder of the package. One can use these model files for prediction or transfer learning.
+ 
+Predicted single-nucleotide mutation rate profiles for these genomes are available at [here](https://www.doi.org/10.11922/sciencedb.01173).
 
-### 5. Contact
+### 5. Citation
+Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
+
+### 6. Contact
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.

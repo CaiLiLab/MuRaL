@@ -1,4 +1,4 @@
-This folder contains the best trained models with lowest validation losses for the Macaca mulatta genome. 500,000 mutated and 10,000,000 non-mutated sites were chosen for training each of A/T, non-CpG and CpG models.
+This folder contains the best trained models with lowest validation losses for the Macaca mulatta genome. 500,000 mutated and 10,000,000 non-mutated sites were chosen for training each of A/T, non-CpG and CpG models. No transfer learning was applied.
 
 hyperparameter settings for MuRaL:
 --local_radius	10
