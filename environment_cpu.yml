@@ -14,8 +14,8 @@ dependencies:
   - prettytable
   - pynvml
   - pip:
-    - pybedtools
     - pysam==0.15.1
+    - pybedtools
     - janggu[tf2]>=0.10.0
     - ray[tune]
     - dirichletcal
