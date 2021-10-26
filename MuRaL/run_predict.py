@@ -77,7 +77,7 @@ def parse_arguments(parser):
     optional.add_argument('--without_h5', default=False, action='store_true',  
                           help=textwrap.dedent("""
                           Do not generate HDF5 file the BED file. If the file is large, 
-                          this could take much GPU/CPU memory . Default: False.
+                          this could take much GPU/CPU memory. Default: False.
                           """).strip())
     
     optional.add_argument('--cpu_only', default=False, action='store_true',  

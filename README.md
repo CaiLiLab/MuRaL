@@ -19,8 +19,14 @@ Before installing MuRaL, use `conda` command from Miniconda to create an environ
 # if your machine has GPUs
 conda env create -n mural -f environment.yml 
 
+# if the above command is interupted because of internet issues or some dependencies 
+# in environment.yml are updated, run the following:
+conda env update -n mural -f environment.yml --prune
+
 # if your machine has only CPUs
 conda env create -n mural -f environment_cpu.yml 
+
+
 ```
 If the command ends without errors, you will have a conda environment named 'mural' (or another name if you change the `-n mural` option above). Use the following command to activate the conda environment:
 ```
@@ -31,7 +37,7 @@ And then install MuRaL by typing:
 python setup.py install
 ```
 
-If the installation is complete, three commands are available from the command line:
+If the installation is complete, the following three commands are available from the command line. Type a commnad with the '-h' option to see detailed help message. 
    * `mural_train`: This tool is for training mutation rate models from the beginning.
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
@@ -115,4 +121,8 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 ```
    
-   
+### 4. Precomputed mutation rate profiles of multiple species by MuRaL
+Predicted mutation rate profiles for genomes of  *Homo sapiens*, *Macaca mulatta*, *Arabidopsis thaliana* and *Drosophila melanogaster* are available at [here](https://www.doi.org/10.11922/sciencedb.01173).
+
+### 5. Contact
+For reporting issues or requests related to the package, please write to mural-project@outlook.com.
