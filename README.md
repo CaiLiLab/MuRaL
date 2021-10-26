@@ -127,7 +127,7 @@ Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***A
 Predicted single-nucleotide mutation rate profiles for these genomes are available at [here](https://www.doi.org/10.11922/sciencedb.01173).
 
 ### 5. Citation
-Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
+Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://www.biorxiv.org/content/10.1101/2021.10.25.465689v1)
 
 ### 6. Contact
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.
