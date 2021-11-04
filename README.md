@@ -1,9 +1,9 @@
 <img src="./images/mural-logo.jpg" alt="MuRaL logo" width="300"/>
 
-## Table of Contents
+## Table of contents
 1. [Overview](#Overview)
 2. [Installation](#Installation)
-3. [Usage Examples ](#Usage_Examples)
+3. [Usage examples ](#Usage_examples)
 4. [Pre-trained models and predicted mutation rate profiles](#Trained_models)
 5. [Citation](#Citation)
 6. [Contact](#Contact)
@@ -21,7 +21,7 @@ MuRaL depends on several other packages, and we recommend using [Miniconda](http
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
 
-MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. If your computing environment has CUDA GPUs, you may check the CUDA driver version (e.g. via `nvidia-smi`) and specify a compatible `cudatoolkit` version in the `environment.yml` file under the code root folder. You can find the information about CUDA compatibility from [here](https://docs.nvidia.com/deploy/cuda-compatibility/).
+MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. 
 
 Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). Run one of the following commands to create a conda environment and install the dependencies (this may take >30 minutes depending on your internet speed):
 ```
@@ -49,7 +49,7 @@ If the installation is complete, the following three commands are available from
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
 
-## 3. Usage Examples <a name="Usage_Examples"></a>
+## 3. Usage examples <a name="Usage_examples"></a>
 ### 3.1 Model training <a name="Model_training"></a>
 `mural_train` trains MuRaL models with training and validation mutation data, and exports training results under the "./ray_results/" folder.
    * Input data \
