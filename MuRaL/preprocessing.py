@@ -14,6 +14,7 @@ import numpy as np
 import h5py
 
 from sklearn import metrics, calibration
+from itertools import product
 
 def to_np(tensor):
     """Convert Tensor to numpy arrays"""
@@ -180,11 +181,14 @@ class CombinedDatasetH5(Dataset):
         # Store the local seq data and label for later use
         self.data_local = data[seq_cols+[output_col]]
         
-        # First, change labels to digits
-        label_encoders = {}
-        for cat_col in cat_cols:
-            label_encoders[cat_col] = LabelEncoder()
-            data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+        # First, change labels to digits (NOTE: the labels already digitalized)
+        #label_encoders = {}
+        #print("Not using LabelEncoder ...")
+        #for cat_col in cat_cols:
+            #label_encoders[cat_col] = LabelEncoder()
+            #data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+            #keywords = [''.join(i) for i in product(['A','C','G','T'], repeat = 3)]
+            #a = LabelEncoder().fit(keywords)
         
         # Sample size
         self.n = data.shape[0]
@@ -237,6 +241,15 @@ class CombinedDatasetH5(Dataset):
             #print('open h5f file:', self.h5f_path)     
         
         return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.distal_X[idx, 0:self.n_channels, :])
+    
+    def get_labels(self): 
+        return np.squeeze(self.y)
+    
+    def _get_labels(self, dataset, idx):
+        return dataset.__getitem__(idx)[1]
+    
+        #return np.squeeze(self.y)
+
 
 
 def prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
@@ -278,10 +291,10 @@ class CombinedDataset(Dataset):
         self.data_local = data[seq_cols+[output_col]]
         
         # First, change labels to digits
-        label_encoders = {}
-        for cat_col in cat_cols:
-            label_encoders[cat_col] = LabelEncoder()
-            data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+        #label_encoders = {}
+        #for cat_col in cat_cols:
+        #    label_encoders[cat_col] = LabelEncoder()
+        #    data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
         
         # Sample size
         self.n = data.shape[0]

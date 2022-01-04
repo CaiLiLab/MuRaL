@@ -36,6 +36,10 @@ from MuRaL.nn_utils import *
 from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 
+from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
+from torchsampler import ImbalancedDatasetSampler
+
+
 def train(config, args, checkpoint_dir=None):
     """
     Training funtion.
@@ -148,7 +152,8 @@ def train(config, args, checkpoint_dir=None):
     
     print('train_size, valid_size:', train_size, valid_size)
     # Dataloader for training
-    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    #dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
     
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
@@ -177,6 +182,15 @@ def train(config, args, checkpoint_dir=None):
         # Combined model
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
 
+    elif model_no == 3:
+        # Combined model
+        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+        
+    elif model_no == 4:
+        model = MuTransformer(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, nhead=4, dim_feedforward=32, trans_dropout=0.1, num_layers=4).to(device)
+
+    elif model_no == 5:
+        model = Network5(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class,  nhead=4, dim_feedforward=64, trans_dropout=0.1, num_layers=3, emb_padding_idx=4**config['local_order']).to(device)
     else:
         print('Error: no model selected!')
         sys.exit() 
@@ -232,6 +246,11 @@ def train(config, args, checkpoint_dir=None):
     
     # Set loss function
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
+    #criterion = PCSoftmaxCrossEntropyV1(lb_proportion=[0.952381, 0.0140095, 0.0198, 0.0138095], reduction='sum')
+    #print("using Focal Loss ...")
+    #criterion = FocalLoss(gamma=2, size_average=False)
+    #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="sigmoid", beta=0.999999, gamma=1)
+    #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="focal", beta=0.999999, gamma=1)
     
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -248,7 +267,8 @@ def train(config, args, checkpoint_dir=None):
         sys.exit()
 
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
+    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=config['LR_gamma'])
 
     print('optimizer:', optimizer)
     print('scheduler:', scheduler)
@@ -279,13 +299,15 @@ def train(config, args, checkpoint_dir=None):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            
+            scheduler.step()
         
         # Flush StdOut buffer
         sys.stdout.flush()
         
         print('optimizer learning rate:', optimizer.param_groups[0]['lr'])
         # Update learning rate
-        scheduler.step()
+        #scheduler.step()
         
         model.eval()
         with torch.no_grad():
@@ -314,11 +336,28 @@ def train(config, args, checkpoint_dir=None):
             print('5mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 5, n_class))
             print('7mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 7, n_class))
             
+            print ('Training Loss: ', total_loss/train_size)
+            
             print ('Validation Loss: ', valid_total_loss/valid_size)
-            print ('Validation Loss (after fdiri_cal): ', fdiri_nll) 
+            print ('Validation Loss (after fdiri_cal): ', fdiri_nll)
+            
+            ###########
+            prob_cal = fdiri_cal.predict_proba(valid_y_prob.to_numpy())  
+            y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
+    
+            # Combine data and do k-mer evaluation
+            valid_cal_data_and_prob = pd.concat([data_local_valid, y_prob], axis=1)         
+            print('3mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 3, n_class))
+            print('5mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 5, n_class))
+            print('7mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 7, n_class))
+            ############      
             
             # Calculate a custom score by looking obs/pred 3/5-mer correlations in binned windows
-            region_size = 10000
+            if valid_size > 10000 *10:
+                region_size = 10000
+            else:
+                region_size = valid_size // 10
+            
             n_regions = valid_size//region_size
             print('n_regions:', n_regions)
             
@@ -338,6 +377,7 @@ def train(config, args, checkpoint_dir=None):
                 #print("avg_prob:", avg_prob, i)
             
             region_avg = pd.DataFrame(region_avg)
+            #print('region_avg.head():', region_avg.head())
             corr_list = []
             for i in range(n_class):
                 corr_list.append(region_avg[i].corr(region_avg[i + n_class]))
@@ -355,6 +395,11 @@ def train(config, args, checkpoint_dir=None):
                 
             valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
             valid_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
+            ####
+            valid_cal_pred_df = pd.concat((chr_pos, valid_cal_data_and_prob[['mut_type'] + prob_names]), axis=1)
+            valid_cal_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
+            
+            ####
             
             print('valid_pred_df: ', valid_pred_df.head())
             
@@ -362,6 +407,9 @@ def train(config, args, checkpoint_dir=None):
             for win_size in [20000, 100000, 500000]:
                 corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
                 print('regional corr (validation):', str(win_size)+'bp', corr_win)
+                
+                corr_win_cal = corr_calc_sub(valid_cal_pred_df, win_size, prob_names)
+                print('regional corr (validation, after calibration):', str(win_size)+'bp', corr_win_cal)
             
             # Save model data for each checkpoint
             with tune.checkpoint_dir(epoch) as checkpoint_dir:
