@@ -173,7 +173,10 @@ def corr_calc_sub(data, window, prob_names):
     for i in range(n_class):  
         if sum(list(result['avg_obs'+str(i)] == 0) | (result['avg_obs'+str(i)] == 1))/result.shape[0] > 0.5:
             print('Warning: too many zeros/ones (>50%) in the obs windows of size', window, 'subtype', i)
-    
+        CV_obs = result['avg_obs'+str(i)].std()/result['avg_obs'+str(i)].mean()
+        CV_pred = result['avg_pred'+str(i)].std()/result['avg_pred'+str(i)].mean()
+        print('CV for ', str(window)+'bp:', CV_obs, CV_pred)
+        
         corr = result['avg_obs'+str(i)].corr(result['avg_pred'+str(i)])
         corr_list.append(corr)
     

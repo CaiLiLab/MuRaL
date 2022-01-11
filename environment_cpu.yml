@@ -14,10 +14,11 @@ dependencies:
   - prettytable
   - pynvml
   - pip:
+    - scikit-learn==0.24.2
     - pysam==0.15.1
     - pybedtools
     - janggu[tf2]>=0.10.0
-    - ray[tune]
+    - ray[tune]==1.1.0
     - dirichletcal
     - jax
     - jaxlib

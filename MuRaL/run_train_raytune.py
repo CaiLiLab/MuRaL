@@ -179,7 +179,12 @@ def parse_arguments(parser):
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
                           help=textwrap.dedent("""
                           Size of mini batches for model training. Default: 128.
-                          """ ).strip())    
+                          """ ).strip())
+    
+    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Use ImbalancedDatasetSampler for dataloader.
+                          """ ).strip())
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
@@ -193,10 +198,22 @@ def parse_arguments(parser):
                           optimization method.  Default: 0.005.
                           """ ).strip())
     
+    learn_args.add_argument('--lr_scheduler', type=str, metavar='STR', default=['StepLR'], nargs='+', 
+                          help=textwrap.dedent("""
+                          Learning rate scheduler.
+                          Default: 'StepLR'.
+                          """ ).strip())
+    
     learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
                           help=textwrap.dedent("""
                           'weight_decay' argument (regularization) for the optimization 
                           method.  Default: 1e-5. 
+                          """ ).strip())
+    
+    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=None, 
+                          help=textwrap.dedent("""
+                          'weight_decay' argument (regularization) for the optimization 
+                          method.  Default: Noe. 
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
@@ -404,10 +421,14 @@ def main():
     CNN_out_channels = args.CNN_out_channels
     distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
-    #pred_file = args.pred_file   
+    #pred_file = args.pred_file 
+    ImbSampler = args.ImbSampler
     optim = args.optim
+    lr_scheduler = args.lr_scheduler
     learning_rate = args.learning_rate   
-    weight_decay = args.weight_decay  
+    weight_decay = args.weight_decay
+    weight_decay_auto = args.weight_decay_auto
+        
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
     grace_period = args.grace_period
@@ -505,8 +526,10 @@ def main():
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
+        'lr_scheduler':tune.choice(lr_scheduler),
         'LR_gamma': tune.choice(LR_gamma),
         'weight_decay': tune.loguniform(weight_decay[0], weight_decay[1]),
+
         #'weight_decay': tune.choice(weight_decay),
         'transfer_learning': False,
     }

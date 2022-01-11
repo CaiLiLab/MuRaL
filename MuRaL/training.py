@@ -36,7 +36,7 @@ from MuRaL.nn_utils import *
 from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 
-from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
+#from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
 from torchsampler import ImbalancedDatasetSampler
 
 
@@ -58,7 +58,8 @@ def train(config, args, checkpoint_dir=None):
     local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
-    batch_size = args.batch_size 
+    batch_size = args.batch_size
+    ImbSampler = args.ImbSampler
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
@@ -67,7 +68,8 @@ def train(config, args, checkpoint_dir=None):
     #pred_file = args.pred_file   
     optim = args.optim
     learning_rate = args.learning_rate   
-    weight_decay = args.weight_decay  
+    weight_decay = args.weight_decay
+    weight_decay_auto = args.weight_decay_auto
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
     n_class = args.n_class  
@@ -152,8 +154,10 @@ def train(config, args, checkpoint_dir=None):
     
     print('train_size, valid_size:', train_size, valid_size)
     # Dataloader for training
-    #dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
-    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
+    if not ImbSampler:    
+        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    else:
+        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
     
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
@@ -246,11 +250,20 @@ def train(config, args, checkpoint_dir=None):
     
     # Set loss function
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
+    #weights = torch.tensor([0.00515898, 0.44976093, 0.23657462, 0.30850547]).to(device)
+    #weights = torch.tensor([0.00378079, 0.42361806, 0.11523816, 0.45736299]).to(device)
+    #criterion = torch.nn.CrossEntropyLoss(weight=weights, reduction='sum')
+    
     #criterion = PCSoftmaxCrossEntropyV1(lb_proportion=[0.952381, 0.0140095, 0.0198, 0.0138095], reduction='sum')
     #print("using Focal Loss ...")
     #criterion = FocalLoss(gamma=2, size_average=False)
     #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="sigmoid", beta=0.999999, gamma=1)
     #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="focal", beta=0.999999, gamma=1)
+    
+    if weight_decay_auto != None:
+        #print("rewriting config['weight_decay'] ...")
+        config['weight_decay'] = 1- weight_decay_auto **(config['batch_size']/(epochs*train_size))
+        print("rewriting config['weight_decay'], new weight_decay: ", config['weight_decay'])
     
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -268,7 +281,11 @@ def train(config, args, checkpoint_dir=None):
 
 
     #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=config['LR_gamma'])
+    if config['lr_scheduler'] == 'StepLR':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=config['LR_gamma'])
+    elif config['lr_scheduler'] == 'ROP':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min', factor=0.2, patience=1, threshold=0.0001, min_lr=1e-7)
+        print("using lr_scheduler.ReduceLROnPlateau ...")
 
     print('optimizer:', optimizer)
     print('scheduler:', scheduler)
@@ -300,7 +317,14 @@ def train(config, args, checkpoint_dir=None):
             optimizer.step()
             total_loss += loss.item()
             
-            scheduler.step()
+            if config['lr_scheduler'] != 'ROP':
+                scheduler.step()
+                
+                # avoid very small learning rates
+                if optimizer.param_groups[0]['lr'] < 1e-6:
+                    for g in optimizer.param_groups:
+                        g['lr'] = 1e-5
+                        #scheduler.step(1)
         
         # Flush StdOut buffer
         sys.stdout.flush()
@@ -433,5 +457,9 @@ def train(config, args, checkpoint_dir=None):
                 after_min_loss = epoch - min_loss_epoch
                 
             tune.report(loss=current_loss, fdiri_loss=fdiri_nll, after_min_loss=after_min_loss, score=score, total_params=total_params)
+            
+            #####
+            if config['lr_scheduler'] == 'ROP':
+                scheduler.step(current_loss)
             
             torch.cuda.empty_cache() 
