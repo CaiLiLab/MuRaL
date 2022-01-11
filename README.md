@@ -3,7 +3,7 @@
 ## Table of Contents
 1. [Overview](#Overview)
 2. [Installation](#Installation)
-3. [Usage Examples ](#Usage_Examples)
+3. [Usage examples ](#Usage_examples)
 4. [Pre-trained models and predicted mutation rate profiles](#Trained_models)
 5. [Citation](#Citation)
 6. [Contact](#Contact)
@@ -49,7 +49,9 @@ If the installation is complete, the following three commands are available from
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
 
-## 3. Usage Examples <a name="Usage_Examples"></a>
+We tested the MuRaL package extensively on a server with two Platinum 8173M CPUs (56 cores), one GeForce RTX 3090 GPU and the CentOS Linux 7 operating system. GPU Driver Version was 455.23.05 and CUDA Version was 11.1. Versions of other dependencies in the tested environments are provided in 'dependencies_tested_with_GPU.txt' (using GPU computing) and 'dependencies_tested_without_GPU.txt' (using CPU-only computing).
+
+## 3. Usage examples <a name="Usage_examples"></a>
 ### 3.1 Model training <a name="Model_training"></a>
 `mural_train` trains MuRaL models with training and validation mutation data, and exports training results under the "./ray_results/" folder.
    * Input data \
@@ -128,13 +130,13 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 ```
    
-### 4. Trained models and predicted mutation rate profiles of multiple species <a name="Trained_models"></a>
+## 4. Trained models and predicted mutation rate profiles of multiple species <a name="Trained_models"></a>
 Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster*** are provided in the 'models/' folder of the package. One can use these model files for prediction or transfer learning.
  
 Predicted single-nucleotide mutation rate profiles for these genomes are available at [ScienceDB](https://www.doi.org/10.11922/sciencedb.01173).
 
-### 5. Citation <a name="Citation"></a>
+## 5. Citation <a name="Citation"></a>
 Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
 
-### 6. Contact <a name="Contact"></a>
+## 6. Contact <a name="Contact"></a>
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.

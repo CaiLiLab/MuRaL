@@ -11,5 +11,5 @@ mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed --val
 mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz  > test3.out 2> test3.err
 
 # Example 4 (transfer learning):
-# The following command will train a transfer learning model using training data in 'data/train_TL.sorted.bed', the validation data in 'data/validation.sorted.bed', and the model files under 'models/checkpoint_6/'.
-mural_train_TL --ref_genome data/seq.fa --train_data data/train_TL.sorted.bed --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl --train_all  --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
+# The following command will train a transfer learning model using training data in 'data/training_TL.sorted.bed', the validation data in 'data/validation.sorted.bed', and the model files under 'models/checkpoint_6/'.
+mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl --train_all  --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
