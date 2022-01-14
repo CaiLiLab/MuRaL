@@ -93,7 +93,7 @@ mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
    * Input data \
    The required input files for prediction include the reference FASTA file, a BED-formated data file and a trained model. The BED file is organized in the same way as that for training. The 5th column can be set to '0' if no observed mutations for the sites in the prediction BED. The model-related files for input are 'model' and 'model.config.pkl', which are generated at the training step. The file 'model.fdiri_cal.pkl', which is for calibrating predicted mutation rates, is optional.
    * Output data \
-   The output of `mural_predict` is a tab-separated file containing the sequence coordinates (BED-formatted) and the predicted probabilities for all possible mutation types. Usually, the 'prob0' column contains probalities for the non-mutated class and other 'probX' columns for mutated classes. 
+   The output of `mural_predict` is a tab-separated file containing the sequence coordinates (BED-formatted) and the predicted probabilities for all possible mutation types. Usually, the 'prob0' column contains probabilities for the non-mutated class and other 'probX' columns for mutated classes. 
    Some example lines of a prediction output file are shown below. 
 ```
 chrom   start   end    strand mut_type  prob0   prob1   prob2   prob3

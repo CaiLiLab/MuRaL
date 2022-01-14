@@ -147,6 +147,8 @@ def train(config, args, checkpoint_dir=None):
         # Split the data into two parts - training data and validation data
         dataset_train, dataset_valid = random_split(dataset, [train_size, valid_size], torch.Generator().manual_seed(split_seed))
         dataset_valid.indices.sort()
+        #data_local_valid = dataset.data_local.iloc[dataset_valid.indices, :]
+        data_local_valid = data_local.iloc[dataset_valid.indices, ].reset_index(drop=True)
     else:
         dataset_train = dataset
         train_size = len(dataset_train)
@@ -282,7 +284,7 @@ def train(config, args, checkpoint_dir=None):
 
     #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
     if config['lr_scheduler'] == 'StepLR':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5000, gamma=config['LR_gamma'])
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=(5000*128)//config['batch_size'], gamma=config['LR_gamma'])
     elif config['lr_scheduler'] == 'ROP':
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min', factor=0.2, patience=1, threshold=0.0001, min_lr=1e-7)
         print("using lr_scheduler.ReduceLROnPlateau ...")
@@ -342,6 +344,7 @@ def train(config, args, checkpoint_dir=None):
             
             if not valid_file:
                 valid_data_and_prob = pd.concat([data_local.iloc[dataset_valid.indices, ].reset_index(drop=True), valid_y_prob], axis=1)
+                
             else:
                 valid_data_and_prob = pd.concat([data_local_valid, valid_y_prob], axis=1)
             

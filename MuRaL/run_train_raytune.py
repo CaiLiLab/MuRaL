@@ -213,7 +213,7 @@ def parse_arguments(parser):
     learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=None, 
                           help=textwrap.dedent("""
                           'weight_decay' argument (regularization) for the optimization 
-                          method.  Default: Noe. 
+                          method.  Default: None. 
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
