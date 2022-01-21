@@ -76,6 +76,7 @@ def train(config, args, checkpoint_dir=None):
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
     seq_only = args.seq_only
+    use_kp = args.use_kp
     split_seed = args.split_seed
     gpu_per_trial = args.gpu_per_trial
     cpu_per_trial = args.cpu_per_trial
@@ -98,11 +99,15 @@ def train(config, args, checkpoint_dir=None):
     # Read BED files
     train_bed = BedTool(train_file)
     
-    # Get the H5 file path
-    train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
-    
-    # Prepare the datasets for trainging
-    dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, h5_chunk_size=1, seq_only=seq_only)
+    if use_kp:
+        dataset = prepare_dataset_kp(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+        print('using Kipoi funnctions')
+    else:
+        # Get the H5 file path
+        train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
+
+        # Prepare the datasets for trainging
+        dataset = prepare_dataset_h5(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, h5_chunk_size=1, seq_only=seq_only)
     
     data_local = dataset.data_local
     categorical_features = dataset.cat_cols
@@ -197,6 +202,10 @@ def train(config, args, checkpoint_dir=None):
 
     elif model_no == 5:
         model = Network5(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class,  nhead=4, dim_feedforward=64, trans_dropout=0.1, num_layers=3, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 6:
+        model = Network6(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 7:
+        model = Network7(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
     else:
         print('Error: no model selected!')
         sys.exit() 

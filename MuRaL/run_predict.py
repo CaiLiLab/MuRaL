@@ -249,7 +249,8 @@ def main():
                 break
 
         print('CUDA: ', torch.cuda.is_available())
-        print('using'  , 'cuda:'+cuda_id)
+        if torch.cuda.is_available():
+            print('using'  , 'cuda:'+cuda_id)
         device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
     
     # Choose the network model

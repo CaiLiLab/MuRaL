@@ -99,6 +99,10 @@ def parse_arguments(parser):
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
     
+    data_args.add_argument('--use_kp', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
+    
     data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
                           help=textwrap.dedent("""
                           Save prediction results for validation data in the checkpoint
