@@ -70,13 +70,15 @@ def train(config, args, checkpoint_dir=None):
     learning_rate = args.learning_rate   
     weight_decay = args.weight_decay
     weight_decay_auto = args.weight_decay_auto
-    LR_gamma = args.LR_gamma  
+    LR_gamma = args.LR_gamma 
+    restart_lr = args.restart_lr
+    min_lr = args.min_lr
     epochs = args.epochs
     n_class = args.n_class  
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
     seq_only = args.seq_only
-    use_kp = args.use_kp
+    without_h5 = args.without_h5
     split_seed = args.split_seed
     gpu_per_trial = args.gpu_per_trial
     cpu_per_trial = args.cpu_per_trial
@@ -99,9 +101,11 @@ def train(config, args, checkpoint_dir=None):
     # Read BED files
     train_bed = BedTool(train_file)
     
-    if use_kp:
-        dataset = prepare_dataset_kp(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
-        print('using Kipoi funnctions')
+    if without_h5:
+        #dataset = prepare_dataset_kp(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+        #print('using Kipoi funnctions')
+        dataset = prepare_dataset_np(train_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+        print('using numpy/pandas for distal_seq ...')
     else:
         # Get the H5 file path
         train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
@@ -118,6 +122,8 @@ def train(config, args, checkpoint_dir=None):
     config['model_no'] = model_no
     #config['bw_paths'] = bw_paths
     config['seq_only'] = seq_only
+    config['restart_lr'] = restart_lr
+    config['min_lr'] = min_lr
     #print('n_cont: ', n_cont)
     
     ################
@@ -125,8 +131,10 @@ def train(config, args, checkpoint_dir=None):
         print('using given validation file:', valid_file)
         valid_bed = BedTool(valid_file)
         valid_h5f_path = get_h5f_path(valid_file, bw_names, config['distal_radius'], distal_order)
-        
-        dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, h5_chunk_size=1, seq_only=seq_only)
+        if without_h5:
+            dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+        else:
+            dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, h5_chunk_size=1, seq_only=seq_only)
         
         data_local_valid = dataset_valid.data_local
     ################
@@ -206,6 +214,12 @@ def train(config, args, checkpoint_dir=None):
         model = Network6(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
     elif model_no == 7:
         model = Network7(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 8:
+        model = Network8(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 9:
+        model = Network9(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 10:
+        model = Network10(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
     else:
         print('Error: no model selected!')
         sys.exit() 
@@ -294,6 +308,8 @@ def train(config, args, checkpoint_dir=None):
     #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['LR_gamma'])
     if config['lr_scheduler'] == 'StepLR':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=(5000*128)//config['batch_size'], gamma=config['LR_gamma'])
+    elif config['lr_scheduler'] == 'StepLR2':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=train_size//config['batch_size'], gamma=config['LR_gamma'])
     elif config['lr_scheduler'] == 'ROP':
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min', factor=0.2, patience=1, threshold=0.0001, min_lr=1e-7)
         print("using lr_scheduler.ReduceLROnPlateau ...")
@@ -332,9 +348,9 @@ def train(config, args, checkpoint_dir=None):
                 scheduler.step()
                 
                 # avoid very small learning rates
-                if optimizer.param_groups[0]['lr'] < 1e-6:
+                if optimizer.param_groups[0]['lr'] < config['min_lr']:
                     for g in optimizer.param_groups:
-                        g['lr'] = 1e-5
+                        g['lr'] = config['restart_lr']
                         #scheduler.step(1)
         
         # Flush StdOut buffer

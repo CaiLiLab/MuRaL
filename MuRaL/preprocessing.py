@@ -627,6 +627,138 @@ class CombinedDatasetKP(Dataset):
     
     def _get_labels(self, dataset, idx):
         return dataset.__getitem__(idx)[1]
+    
+
+class CombinedDatasetNP(Dataset):
+    """Combine local data and distal into Dataset, using Kipoi funcions"""
+    def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels):
+        """  
+        Args:
+            data: DataFrame containing local seq data and categorical data
+            seq_cols: names of local seq columns
+            cat_cols: names of categorical columns used for training
+            output_col: name of the label column
+            h5f_path: H5 file storing the distal data
+            n_channels: number of columns (channels) in distal data to be extracted
+        """
+        # Store the local seq data and label for later use
+        self.data_local = data[seq_cols+[output_col]]
+        
+        # First, change labels to digits (NOTE: the labels already digitalized)
+        #label_encoders = {}
+        #print("Not using LabelEncoder ...")
+        #for cat_col in cat_cols:
+        #    label_encoders[cat_col] = LabelEncoder()
+        #    data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
+            #keywords = [''.join(i) for i in product(['A','C','G','T'], repeat = 3)]
+            #a = LabelEncoder().fit(keywords)
+        
+        # Sample size
+        self.n = data.shape[0]
+        
+        # Output column
+        if output_col:
+            self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
+        else:
+            self.y = np.zeros((self.n, 1))
+        
+        # Names of categorical columns
+        self.cat_cols = cat_cols
+        
+        # Set biggest dimension for each categorical column
+        self.cat_dims = [np.max(data[col]) + 1 for col in cat_cols]
+        
+        # Find the continuous columns
+        self.cont_cols = [col for col in data.columns if col not in self.cat_cols + seq_cols + [output_col]]
+        
+        # Assign the continuous data to cont_X
+        if self.cont_cols:
+            self.cont_X = data[self.cont_cols].astype(np.float32).values
+        else:
+            self.cont_X = np.zeros((self.n, 1)) 
+        
+        # Assign the categorical data to cat_X
+        if len(self.cat_cols) > 0:
+            self.cat_X = data[cat_cols].astype(np.int64).values
+        else:
+            print("Error: no categorical data, something is wrong!", file=sys.stderr)
+            sys.exit()
+        
+        # For distal data
+        #self.h5f_path = h5f_path
+        self.distal_X = None
+        self.n_channels = n_channels
+        print('Number of channels to be used for distal data:', self.n_channels)
+        
+        self.distal_radius = distal_radius
+        self.seq_len = 2*distal_radius + 1 
+        
+        self.bed_regions = bed_regions
+        self.bed_pd = pd.read_csv(bed_regions.fn, sep='\t', header=None, memory_map=True)
+        self.bed_pd.columns = ['chrom', 'start', 'stop', 'name', 'score', 'strand']
+
+        self.one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
+                   'C':np.array([[0,1,0,0]], dtype=np.float32).T,
+                   'G':np.array([[0,0,1,0]], dtype=np.float32).T,
+                   'T':np.array([[0,0,0,1]], dtype=np.float32).T,
+                   'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+            
+        self.one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
+                   'C':np.array([[0,0,1,0]], dtype=np.float32).T,
+                   'G':np.array([[0,1,0,0]], dtype=np.float32).T,
+                   'T':np.array([[1,0,0,0]], dtype=np.float32).T,
+                   'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+            
+        self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
+        
+
+    def __len__(self):
+        """ Denote the total number of samples. """
+        return self.n
+
+    def __getitem__(self, idx):
+        """ Generate one sample of data. """
+
+        region = self.bed_pd.iloc[idx]
+        chrom, start, stop, strand = region.chrom, region.start, region.stop, region.strand
+        
+        #long_seq_record = self.records[chrom]
+
+        long_seq = str(self.records[chrom].seq)
+        long_seq_len = len(long_seq)
+
+        start1 = np.max([int(start)-self.distal_radius, 0])
+        stop1 = np.min([int(stop)+self.distal_radius, long_seq_len])
+        short_seq = long_seq[start1:stop1].upper()
+
+        if(len(short_seq) < self.seq_len):
+            #print('warning:', chrom, start1, stop1, long_seq_len)
+            if start1 == 0:
+                short_seq = (self.seq_len - len(short_seq))*'N' + short_seq
+                #print(short_seq)
+            else:
+                short_seq = short_seq + (self.seq_len - len(short_seq))*'N'
+                #print(short_seq)
+        #a = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
+        if strand == '+':
+            distal_seq = np.concatenate([self.one_hot_encoder[c] for c in short_seq], axis=1)
+        else:
+            #a = [one_hot_encoder_rc[c] for c in short_seq[::-1]]
+            #a.reverse()
+            distal_seq = np.concatenate([self.one_hot_encoder_rc[c] for c in short_seq[::-1]], axis=1)
+        if distal_seq.shape[1] != self.seq_len:
+            print('distal_seq.shape:', distal_seq.shape, chrom, start, stop)
+            print('short_seq:', short_seq)
+    #seqs = np.array(seqs)
+   
+        
+        return self.y[idx], self.cont_X[idx], self.cat_X[idx], distal_seq
+    
+    def get_labels(self): 
+        return np.squeeze(self.y)
+    
+    def _get_labels(self, dataset, idx):
+        return dataset.__getitem__(idx)[1]
 
 def prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
@@ -665,6 +797,25 @@ def prepare_dataset_kp(bed_regions, ref_genome, bw_files, bw_names, local_radius
     
     # Combine local data and distal into Dataset objects
     dataset = CombinedDatasetKP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels)
+    
+    #return dataset, data_local, categorical_features
+    return dataset
+
+def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
+    """Prepare the datasets for given regions, using H5 file"""
+    
+    # Prepare local data
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
+
+    # If seq_only flag was set, bigWig files will be ignored
+    if seq_only:
+        n_channels = 4**distal_order
+        print('NOTE: seq_only flag was set, so will not use any bigWig track!')
+    else:
+        n_channels = 4**distal_order + len(bw_files)
+    
+    # Combine local data and distal into Dataset objects
+    dataset = CombinedDatasetNP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels)
     
     #return dataset, data_local, categorical_features
     return dataset
@@ -793,7 +944,7 @@ def generate_h5f2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order
     if write_h5f:            
         with h5py.File(h5f_path, 'w') as hf:
             
-            print('Generating HDF5 file:', h5f_path)
+            print('Generating HDF5 file using numpy/pandas:', h5f_path)
             sys.stdout.flush()
             
             # Total seq len
@@ -845,7 +996,7 @@ def generate_h5f2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order
                     
                     if(len(short_seq) < seq_len):
                         #print('warning:', chrom, start1, stop1, long_seq_len)
-                        if start == 0:
+                        if start1 == 0:
                             short_seq = (seq_len - len(short_seq))*'N' + short_seq
                             #print(short_seq)
                         else:
@@ -862,7 +1013,17 @@ def generate_h5f2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order
                 
                 #print('seqs.shape:', seqs.shape)
                 #print('Time used for writing get_seqs: %s seconds' % (time.time() - start_time))
-                sys.stdout.flush() 
+                #sys.stdout.flush()
+                # Handle distal bigWig data, return base-wise values
+                if len(bw_files) > 0:
+                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
+                    #print('bw_distal.shape:', np.array(bw_distal).shape)
+                    
+                    #bw_distal should have the same seq len as that for distal_seq
+                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+
+                    # Concatenate the sequence data and the bigWig data
+                    seqs = np.concatenate((seqs, bw_distal), axis=1) 
                 
                 # Write the numpy array into the H5 file
                 hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)

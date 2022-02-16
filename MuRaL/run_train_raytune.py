@@ -99,7 +99,7 @@ def parse_arguments(parser):
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
     
-    data_args.add_argument('--use_kp', default=False, action='store_true', 
+    data_args.add_argument('--without_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
                           Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
     
@@ -218,6 +218,16 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           'weight_decay' argument (regularization) for the optimization 
                           method.  Default: None. 
+                          """ ).strip())
+    
+    learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-5, 
+                          help=textwrap.dedent("""
+                          restart learning rate
+                          """ ).strip())
+    
+    learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
+                          help=textwrap.dedent("""
+                          minimum learning rate
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
@@ -484,13 +494,15 @@ def main():
     # Generate H5 files for storing distal regions before training, one file for each possible distal radius
     for d_radius in distal_radius:
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
-        generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+        if not args.without_h5:
+            generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
     if valid_file:
         valid_bed = BedTool(valid_file)
         for d_radius in distal_radius:
             valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
-            generate_h5f(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+            if not args.without_h5:
+                generate_h5f(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
     
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
