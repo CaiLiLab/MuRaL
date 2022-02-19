@@ -6,10 +6,10 @@ channels:
 dependencies:
   - python=3.8.5
   - pip
+  - cudatoolkit
   - pytorch
   - torchvision
   - torchaudio
-  - cudatoolkit
   - pybigwig=0.3.17
   - prettytable
   - pynvml
