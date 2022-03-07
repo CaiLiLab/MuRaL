@@ -185,10 +185,10 @@ def parse_arguments(parser):
                           Size of mini batches for model training. Default: 128.
                           """ ).strip())
     
-    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Use ImbalancedDatasetSampler for dataloader.
-                          """ ).strip())
+    #learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
+    #                      help=textwrap.dedent("""
+    #                      Use ImbalancedDatasetSampler for dataloader.
+    #                      """ ).strip())
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
@@ -436,7 +436,7 @@ def main():
     distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
     #pred_file = args.pred_file 
-    ImbSampler = args.ImbSampler
+    #ImbSampler = args.ImbSampler
     optim = args.optim
     lr_scheduler = args.lr_scheduler
     learning_rate = args.learning_rate   

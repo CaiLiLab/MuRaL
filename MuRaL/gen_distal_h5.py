@@ -224,14 +224,13 @@ def main():
                 for i in  range(n_files):
                     h5f_path_i = re.sub('h5$', str(i+1)+'.h5', h5f_path)
                     hf['distal_X'+str(i+1)] = h5py.ExternalLink(h5f_path_i, 'distal_X')
+            with h5py.File(h5f_path, 'r') as hf:
                 data_size = 0
                 for key in hf.keys():
                     data_size += hf[key].shape[0]
                     print(key, hf[key].shape[0])
                 print('hf.keys():', hf.keys(), data_size)
-                    
-            #single_size = int(np.ceil(len(test_bed)/float(n_files)))
-            #h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+
             
     else:
         h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)

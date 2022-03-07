@@ -151,7 +151,7 @@ def get_digitalized_seq(seq_records, bed_regions, distal_radius):
 
     distal_seqs = []
     for region in bed_regions:
-        chrom, start, stop, strand = region.chrom, region.start, region.stop, region.strand
+        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
 
         #long_seq_record = self.records[chrom]
 
@@ -354,7 +354,8 @@ def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, dist
                 bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
 
                 # Concatenate the sequence data and the bigWig data
-                seqs = np.concatenate((seqs, bw_distal), axis=1)       
+                #seqs = np.concatenate((seqs, bw_distal), axis=1)
+                seqs = np.concatenate((seqs, bw_distal), axis=1).round(decimals=2)       
             # Write the numpy array into the H5 file
             hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
             hf['distal_X'][-seqs.shape[0]:] = seqs
@@ -942,7 +943,7 @@ class CombinedDatasetNP(Dataset):
         """ Generate one sample of data. """
 
         region = self.bed_pd.iloc[idx]
-        chrom, start, stop, strand = region.chrom, region.start, region.stop, region.strand
+        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
         
         #long_seq_record = self.records[chrom]
 
@@ -982,7 +983,7 @@ class CombinedDatasetNP(Dataset):
     def _get_labels(self, dataset, idx):
         return dataset.__getitem__(idx)[1]
 
-def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
+def prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
  
     # Generate H5 file for distal data

@@ -58,7 +58,7 @@ def freq_kmer_comp_multi(data_and_prob, k, n_class):
         obs_pred_freq = obs_pred_freq.groupby(mer_list).mean()
         
         # Calcuate correlations 
-        corr_list.append(obs_pred_freq['mut_type'].corr(obs_pred_freq[prob_list[i]]))
+        corr_list.append(obs_pred_freq['mut_type'].astype(float).corr(obs_pred_freq[prob_list[i]].astype(float)))
         
     return corr_list
 
@@ -74,7 +74,7 @@ def f3mer_comp_rand(df, n_rows):
         freq2 = df[['us1','ds1','mut_type']].sample(n = n_rows).groupby(['us1','ds1']).mean()
         #print(freq1, freq2)
         
-        corr = freq1['mut_type'].corr(freq2['mut_type'])
+        corr = freq1['mut_type'].astype(float).corr(freq2['mut_type'].astype(float))
         print('corr of 3mer freq1 and freq2:', corr)
         
         mean_corr += corr
@@ -92,7 +92,7 @@ def f5mer_comp_rand(df, n_rows):
         freq1 = df[['us2','us1','ds1','ds2','mut_type']].sample(n = n_rows).groupby(['us2','us1','ds1','ds2']).mean()
         freq2 = df[['us2','us1','ds1','ds2','mut_type']].sample(n = n_rows).groupby(['us2','us1','ds1','ds2']).mean()
         
-        corr = freq1['mut_type'].corr(freq2['mut_type'])
+        corr = freq1['mut_type'].astype(float).corr(freq2['mut_type'].astype(float))
         print('corr of 5mer freq1 and freq2:', corr)
         
         mean_corr += corr
@@ -110,7 +110,7 @@ def f7mer_comp_rand(df, n_rows):
         freq1 = df[['us3','us2','us1','ds1','ds2','ds3', 'mut_type']].sample(n = n_rows).groupby(['us3','us2','us1','ds1','ds2','ds3']).mean()
         freq2 = df[['us3','us2','us1','ds1','ds2','ds3','mut_type']].sample(n = n_rows).groupby(['us3','us2','us1','ds1','ds2','ds3']).mean()
         
-        corr = freq1['mut_type'].corr(freq2['mut_type'])
+        corr = freq1['mut_type'].astype(float).corr(freq2['mut_type'].astype(float))
         print('corr of 7mer freq1 and freq2:', corr)
         
         mean_corr += corr
@@ -177,7 +177,7 @@ def corr_calc_sub(data, window, prob_names):
         CV_pred = result['avg_pred'+str(i)].std()/result['avg_pred'+str(i)].mean()
         print('CV for ', str(window)+'bp:', CV_obs, CV_pred)
         
-        corr = result['avg_obs'+str(i)].corr(result['avg_pred'+str(i)])
+        corr = result['avg_obs'+str(i)].astype(float).corr(result['avg_pred'+str(i)]).astype(float)
         corr_list.append(corr)
     
     return corr_list

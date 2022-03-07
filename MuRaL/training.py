@@ -37,7 +37,7 @@ from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 
 #from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
-from torchsampler import ImbalancedDatasetSampler
+#from torchsampler import ImbalancedDatasetSampler
 
 
 def train(config, args, checkpoint_dir=None):
@@ -59,7 +59,7 @@ def train(config, args, checkpoint_dir=None):
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     batch_size = args.batch_size
-    ImbSampler = args.ImbSampler
+    #ImbSampler = args.ImbSampler
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
@@ -169,10 +169,10 @@ def train(config, args, checkpoint_dir=None):
     
     print('train_size, valid_size:', train_size, valid_size)
     # Dataloader for training
-    if not ImbSampler:    
-        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
-    else:
-        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
+    #if not ImbSampler:    
+    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    #else:
+    #    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
     
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
@@ -220,6 +220,14 @@ def train(config, args, checkpoint_dir=None):
         model = Network9(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
     elif model_no == 10:
         model = Network10(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 11:
+        model = Network11(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 12:
+        model = Network12(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 13:
+        model = Network13(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
+    elif model_no == 14:
+        model = Network14(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order']).to(device)
     else:
         print('Error: no model selected!')
         sys.exit() 
