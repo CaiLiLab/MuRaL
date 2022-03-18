@@ -495,14 +495,15 @@ def main():
     for d_radius in distal_radius:
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         if not args.without_h5:
-            generate_h5f(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=5)
+            #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
     
     if valid_file:
         valid_bed = BedTool(valid_file)
         for d_radius in distal_radius:
             valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
             if not args.without_h5:
-                generate_h5f(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_files, 1)
+                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=5)
     
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
@@ -573,7 +574,7 @@ def main():
     result = tune.run(
     trainable_id,
     name=experiment_name,
-    resources_per_trial={'cpu': cpu_per_trial, 'gpu': gpu_per_trial},
+    resources_per_trial={'cpu': 1, 'gpu': gpu_per_trial, 'extra_cpu':cpu_per_trial-1},
     config=config,
     num_samples=n_trials,
     local_dir='./ray_results',
@@ -581,7 +582,8 @@ def main():
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,
-    resume=resume_flag)
+    resume=resume_flag,
+    log_to_file=True)
     
     # Shutdown Ray
     if ray.is_initialized():

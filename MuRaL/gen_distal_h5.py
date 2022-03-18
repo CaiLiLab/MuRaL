@@ -79,9 +79,9 @@ def parse_arguments(parser):
                           Number of HDF5 files. Default: 1. """ ).strip())
     
 
-    optional.add_argument('--chunk_size', type=int, metavar='INT', default=5000, 
+    optional.add_argument('--chunk_size', type=int, metavar='INT', default=10000, 
                           help=textwrap.dedent("""
-                          Bioseq read chunk size. Default: 5000. """ ).strip())
+                          Bioseq read chunk size. Default: 10000. """ ).strip())
     
     optional.add_argument('--out_format', type=str, metavar='STR', default='h5',  
                           help=textwrap.dedent("""
@@ -152,8 +152,8 @@ def main():
         print("{0}: {1}".format(k,v))
 
     # Set input file
-    bed_file = args.bed_file   
-    ref_genome= args.ref_genome
+    bed_file = os.path.abspath(args.bed_file)
+    ref_genome= os.path.abspath(args.ref_genome)
     
     # Whether to generate H5 file for distal data
     out_format = args.out_format

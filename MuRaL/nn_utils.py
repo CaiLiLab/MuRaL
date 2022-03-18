@@ -32,7 +32,7 @@ def weights_init(m):
 
 def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
     """Do model prediction using dataloader"""
-    model = model.to(device)
+    model.to(device)
     model.eval()
     
     pred_y = torch.empty(0, n_class).to(device)        

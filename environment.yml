@@ -6,7 +6,8 @@ channels:
 dependencies:
   - python=3.8.5
   - pip
-  - cudatoolkit=11.6
+  - numpy=1.21.2
+  - cudatoolkit=11.1.1
   - pytorch
   - torchvision
   - torchaudio

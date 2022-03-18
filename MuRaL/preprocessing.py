@@ -139,12 +139,32 @@ def get_digitalized_seq(seq_records, bed_regions, distal_radius):
                'C':np.array([[0,1,0,0]], dtype=np.float32).T,
                'G':np.array([[0,0,1,0]], dtype=np.float32).T,
                'T':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'R':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #C,T
+               'M':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #G,T
+               'B':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
                'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
 
     one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
                'C':np.array([[0,0,1,0]], dtype=np.float32).T,
                'G':np.array([[0,1,0,0]], dtype=np.float32).T,
                'T':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'R':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #C,T
+               'M':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #G,T
+               'B':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
                'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
 
     #self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
@@ -201,9 +221,9 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file (not following the link) is latest and complete
-                if n_h5_files ==1 and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                if len(hf.keys()) ==1 and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
                     write_h5f = False
-                if n_h5_files > 1:
+                if len(hf.keys()) > 1:
                     h5_sample_size = sum([hf[key].shape[0] for key in hf.keys()])
                     if n_h5_files == len(hf.keys()) and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == h5_sample_size and n_channels == hf["distal_X1"].shape[1]:
                         write_h5f = False
@@ -921,16 +941,36 @@ class CombinedDatasetNP(Dataset):
         self.bed_pd.columns = ['chrom', 'start', 'stop', 'name', 'score', 'strand']
 
         self.one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
-                   'C':np.array([[0,1,0,0]], dtype=np.float32).T,
-                   'G':np.array([[0,0,1,0]], dtype=np.float32).T,
-                   'T':np.array([[0,0,0,1]], dtype=np.float32).T,
-                   'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
-            
+               'C':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'G':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'T':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'R':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #C,T
+               'M':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #G,T
+               'B':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+
         self.one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
-                   'C':np.array([[0,0,1,0]], dtype=np.float32).T,
-                   'G':np.array([[0,1,0,0]], dtype=np.float32).T,
-                   'T':np.array([[1,0,0,0]], dtype=np.float32).T,
-                   'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+               'C':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'G':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'T':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'R':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #C,T
+               'M':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #G,T
+               'B':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
             
         self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
         
@@ -1198,17 +1238,37 @@ def generate_h5f2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order
             # Note, the default dtype for create_dataset is numpy.float32
             hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=4, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len))
             
-            one_hot_encoder = {'A':np.array([[1,0,0,0]]).T,
-                   'C':np.array([[0,1,0,0]]).T,
-                   'G':np.array([[0,0,1,0]]).T,
-                   'T':np.array([[0,0,0,1]]).T,
-                   'N':np.array([[0.25,0.25,0.25,0.25]]).T}
-            
-            one_hot_encoder_rc = {'A':np.array([[0,0,0,1]]).T,
-                   'C':np.array([[0,0,1,0]]).T,
-                   'G':np.array([[0,1,0,0]]).T,
-                   'T':np.array([[1,0,0,0]]).T,
-                   'N':np.array([[0.25,0.25,0.25,0.25]]).T}
+            one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'C':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'G':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'T':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'R':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #C,T
+               'M':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #G,T
+               'B':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+
+            one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'C':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'G':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'T':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'R':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #C,T
+               'M':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #G,T
+               'B':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
             
             records = SeqIO.to_dict(SeqIO.parse(open(ref_genome), 'fasta'))
             
