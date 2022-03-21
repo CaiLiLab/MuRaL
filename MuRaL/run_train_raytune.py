@@ -196,7 +196,7 @@ def parse_arguments(parser):
                           Default: 'Adam'.
                           """ ).strip())
  
-    learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.005], nargs='+', 
+    learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.001], nargs='+', 
                           help=textwrap.dedent("""
                           Learning rate for parameter learning, an argument for the 
                           optimization method.  Default: 0.005.
@@ -214,7 +214,7 @@ def parse_arguments(parser):
                           method.  Default: 1e-5. 
                           """ ).strip())
     
-    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=None, 
+    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
                           'weight_decay' argument (regularization) for the optimization 
                           method.  Default: None. 
@@ -283,7 +283,7 @@ def parse_arguments(parser):
                           Number of GPUs used per trial. Default: 0.15.
                           """ ).strip())
     
-    raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default='0', 
+    raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default=None, 
                           help=textwrap.dedent("""
                           Which GPU device to be used. Default: '0'. 
                           """ ).strip())
@@ -506,6 +506,27 @@ def main():
             if not args.without_h5:
                 generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=5)
     
+    
+    ####
+    if cuda_id == None and ray_ngpus > 0:
+        from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+        # Find a GPU with enough memory
+        nvmlInit()
+        cuda_id = '0'
+        for i in range(nvmlDeviceGetCount()):
+            h = nvmlDeviceGetHandleByIndex(i)
+            info = nvmlDeviceGetMemoryInfo(h)
+            print('free GPU memory for '+'cuda:'+str(i), info.free/(2**30), 'GB')
+            if info.free > (ray_ncpus/cpu_per_trial)*(2.5*2**30): # Reserve 2.5GB GPU memory per trial
+                cuda_id = str(i)
+                break
+
+        print('CUDA: ', torch.cuda.is_available())
+        if torch.cuda.is_available():
+            print('using'  , 'cuda:'+cuda_id)
+        #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
+    ###
+    
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
             print('Error: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)
@@ -516,6 +537,7 @@ def main():
         print('Ray is using GPU device', 'cuda:'+cuda_id)
     else:
         print('Ray is using only CPUs ...')
+    
     
     if rerun_failed:
         resume_flag = 'ERRORED_ONLY'

@@ -13,9 +13,6 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 import h5py
-import zarr
-from numcodecs import Blosc
-from numcodecs import blosc
 import time
 
 from sklearn import metrics, calibration
@@ -55,21 +52,6 @@ def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
     h5f_path = h5f_path + '.h5'
     
     return h5f_path
-
-def get_zarr_path(bed_file, bw_names, distal_radius, distal_order):
-    """Get the H5 file path name based on input data"""
-    
-    zarr_path = bed_file + '.distal_' + str(distal_radius)
-    
-    if distal_order > 1:
-        zarr_path = zarr_path + '_' + str(distal_order)
-        
-    if len(bw_names) > 0:
-        zarr_path = zarr_path + '.' + '.'.join(list(bw_names))
-    
-    zarr_path = zarr_path + '.zarr'
-    
-    return zarr_path
 
 def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, chunk_size=50000):
     """Generate the H5 file for storing distal data"""
@@ -448,107 +430,6 @@ def get_seqs(ref_genome, bed_regions, distal_radius, start, size, end):
     return np.array(seqs).squeeze((1,3)).transpose(0,2,1)
 
 
-def generate_zarr(bed_regions, zarr_path, ref_genome, distal_radius, distal_order, bw_files, zarr_chunk_size):
-    """Generate the zarr file for storing distal data"""
-    n_channels = 4**distal_order + len(bw_files)
-    
-    write_zarr = True
-    if os.path.exists(zarr_path):
-        try:
-            zf = zarr.open(zarr_path, mode='r')
-            bed_path = bed_regions.fn
-                
-                # Check whether the existing zarr file is latest and complete
-                #if os.path.getmtime(bed_path) < os.path.getmtime(zarr_path) and len(bed_regions) == zf["distal_X"].shape[0] and n_channels == zf["distal_X"].shape[1]:
-                # Check whether the existing zarr file (not following the link) is latest and complete
-            if os.lstat(bed_path).st_mtime < os.lstat(zarr_path).st_mtime and len(bed_regions) == zf["distal_X"].shape[0] and n_channels == zf["distal_X"].shape[1]:
-                write_zarr = False
-        except OSError:
-            print('Warning: re-genenerating the zarr file, because the file is empty or imcomplete:', zarr_path)
-            
-    # If the zarr file is unavailable or im complete, generate the file
-    if write_zarr:  
-        # store = zarr.ZipStore(zarr_path+'.zip', mode='w')
-        # zarr.group(store=store).create_dataset(name='distal_X', shape=(100, 100))
-        #records = list(SeqIO.parse("/public2/home/dengsy/other_species/fly/dm3.fa", "fasta"))
-        #genome_seqs = list(SeqIO.parse(ref_genome, "fasta"))
-        
-        with zarr.ZipStore(zarr_path+'.zip', mode='w') as zipstore:
-        #with zarr.open(store=zarr_path, mode='w') as zf:
-            
-            print('Generating zarr file:', zarr_path)
-            blosc.use_threads = True
-            blosc.set_nthreads(4) 
-            print('Number of threads used:', blosc.get_nthreads())
-            sys.stdout.flush()
-            
-            # Total seq len
-            seq_len =  distal_radius*2+1-(distal_order-1)
-            
-            # Create distal_X dataset
-            # Note, the default dtype for create_dataset is numpy.float32
-            #compressor = Blosc(cname='zstd', clevel=3, shuffle=Blosc.BITSHUFFLE)
-            
-            compressor = Blosc(cname='zstd', clevel=2, shuffle=Blosc.BITSHUFFLE)
-            
-            #synchronizer = zarr.ProcessSynchronizer(zarr_path+'.sync')
-            synchronizer=zarr.ThreadSynchronizer()
-            ds = zarr.group(store=zipstore).create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compressor = compressor, chunks=(zarr_chunk_size,n_channels, seq_len), synchronizer=synchronizer) 
-            
-            # Write data in chunks
-            chunk_size = 50000
-            for start in range(0, len(bed_regions), chunk_size):
-                end = min(start+chunk_size, len(bed_regions))
-                
-                # Extract sequence from the genome, which is in one-hot encoding format
-                start_time = time.time()
-                
-                #seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, cache=False, verbose=False)
-
-                
-                #print('Time used for Bioseq.create_from_refgenome: %s seconds' % (time.time() - start_time))
-                #sys.stdout.flush()
-                
-                #seqs = np.array(seqs).squeeze().transpose(0,2,1)
-                ################
-                seqs = None
-                with Pool(processes=5) as pool:
-                    #pool_results = pool.map(partial(get_seqs, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, size=10000, end=end), list(range(start, end, 10000)))
-                    
-                    #L = pool.starmap(func, [(1, 1), (2, 1), (3, 1)])
-                    
-                    args = [(ref_genome, bed_regions, distal_radius, start_i, 10000, end) for start_i in list(range(start, end, 10000))]
-                    pool_results = pool.starmap(get_seqs, args)
-                    
-                    pool.close()
-                    pool.join()
-                    seqs = np.concatenate(pool_results, axis=0)
-                    
-                    #get_seqs(ref_genome, bed_regions, distal_radius, start, size, end)
-                ################
-                
-                # Handle distal bigWig data, return base-wise values
-                if len(bw_files) > 0:
-                    bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
-                    #print('bw_distal.shape:', np.array(bw_distal).shape)
-                    
-                    #bw_distal should have the same seq len as that for distal_seq
-                    bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                    # Concatenate the sequence data and the bigWig data
-                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                # Write the numpy array into the zarr file
-                #zf['distal_X'].resize((zf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-                print('Time used for Bioseq.create_from_refgenome and conversion: %s seconds' % (time.time() - start_time))
-                sys.stdout.flush()
-                
-                start_time = time.time()
-                ds.append(seqs)
-                print('Time used for writing zarr: %s seconds' % (time.time() - start_time))
-                
-                sys.stdout.flush()
-
-    return None
 
 
 def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only):
