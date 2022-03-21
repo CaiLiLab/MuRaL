@@ -221,18 +221,32 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file (not following the link) is latest and complete
-                if len(hf.keys()) ==1 and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
+                if len(hf.keys()) ==1 \
+                and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime \
+                and len(bed_regions) == hf["distal_X"].shape[0] \
+                and n_channels == hf["distal_X"].shape[1]:
                     write_h5f = False
+                
                 if len(hf.keys()) > 1:
-                    h5_sample_size = sum([hf[key].shape[0] for key in hf.keys()])
-                    if n_h5_files == len(hf.keys()) and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == h5_sample_size and n_channels == hf["distal_X1"].shape[1]:
-                        write_h5f = False
-                    
+                    try:
+                        h5_sample_size = sum([hf[key].shape[0] for key in hf.keys()])
+                        
+                        if n_h5_files == len(hf.keys()) \
+                        and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime \
+                        and len(bed_regions) == h5_sample_size \
+                        and n_channels == hf["distal_X1"].shape[1]:
+                            write_h5f = False
+                    except KeyError:
+                        print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
+                                       
         except OSError:
             print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
+
             
     # If the H5 file is unavailable or im complete, generate the file
     if write_h5f:            
+        print('Genenerating the H5 file:', h5f_path)
+        sys.stdout.flush()
         
         args = ['gen_distal_h5', 
                  '--ref_genome', ref_genome, 

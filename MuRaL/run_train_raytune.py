@@ -220,7 +220,7 @@ def parse_arguments(parser):
                           method.  Default: None. 
                           """ ).strip())
     
-    learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-5, 
+    learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
                           help=textwrap.dedent("""
                           restart learning rate
                           """ ).strip())
@@ -414,7 +414,8 @@ def main():
     
     start_time = time.time()
     print('Start time:', datetime.datetime.now())
-
+    sys.stdout.flush()
+    
     # Ray requires absolute paths
     train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data
