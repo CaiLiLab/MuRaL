@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
+from scipy.stats.stats import pearsonr
 
 # Import warnings filter
 from warnings import simplefilter
@@ -177,7 +178,9 @@ def corr_calc_sub(data, window, prob_names):
         CV_pred = result['avg_pred'+str(i)].std()/result['avg_pred'+str(i)].mean()
         print('CV for ', str(window)+'bp:', CV_obs, CV_pred)
         
-        corr = result['avg_obs'+str(i)].astype(float).corr(result['avg_pred'+str(i)]).astype(float)
+        #corr = result['avg_obs'+str(i)].astype(float).corr(result['avg_pred'+str(i)]).astype(float)
+        #from scipy.stats.stats import pearsonr   
+        corr = pearsonr(result['avg_obs'+str(i)], result['avg_pred'+str(i)])[0]
         corr_list.append(corr)
     
     return corr_list

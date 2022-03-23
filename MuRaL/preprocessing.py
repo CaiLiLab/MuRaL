@@ -18,11 +18,11 @@ import time
 from sklearn import metrics, calibration
 from itertools import product
 
-from kipoiseq.extractors import FastaStringExtractor
-from kipoiseq import Interval
-from kipoiseq.transforms import ReorderedOneHot
-from kipoiseq.transforms.functional import pad
-from pyfaidx import Fasta
+#from kipoiseq.extractors import FastaStringExtractor
+#from kipoiseq import Interval
+#from kipoiseq.transforms import ReorderedOneHot
+#from kipoiseq.transforms.functional import pad
+#from pyfaidx import Fasta
 
 from functools import partial
 from itertools import repeat
