@@ -19,10 +19,10 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data import random_split
 
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.benchmark = True
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.allow_tf32 = True
+#torch.backends.cuda.matmul.allow_tf32 = True
+#torch.backends.cudnn.benchmark = True
+#torch.backends.cudnn.deterministic = True
+#torch.backends.cudnn.allow_tf32 = True
 
 from functools import partial
 import ray
@@ -95,6 +95,11 @@ def parse_arguments(parser):
                           features such as the coverage track. Default: None.""").strip())
     
     data_args.add_argument('--seq_only', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, use only genomic sequences for the model and ignore
+                          bigWig tracks. Default: False.""").strip())
+    
+    data_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
                           help=textwrap.dedent("""
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())

@@ -78,6 +78,7 @@ def train(config, args, checkpoint_dir=None):
     cuda_id = args.cuda_id
     valid_ratio = args.valid_ratio
     seq_only = args.seq_only
+    cudnn_benchmark_false = args.cudnn_benchmark_false
     without_h5 = args.without_h5
     split_seed = args.split_seed
     gpu_per_trial = args.gpu_per_trial
@@ -87,6 +88,10 @@ def train(config, args, checkpoint_dir=None):
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
+    
+    if cudnn_benchmark_false:
+        torch.backends.cudnn.benchmark = False
+        print('NOTE: setting torch.backends.cudnn.benchmark = False')
     
     if bw_paths:
         try:
