@@ -236,6 +236,7 @@ def main():
     else:
         #dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1, seq_only)
         dataset_test = prepare_dataset_h5v2(test_bed, ref_genome, bw_paths, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files)
+        
         #prepare_dataset_h5v2(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False, n_h5_files=1)
             
     data_local_test = dataset_test.data_local
@@ -296,7 +297,7 @@ def main():
     if cpu_only:
         dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=0)
     else:
-        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=1)   
+        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=0)   
 
     # Do the prediction
     pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
@@ -332,7 +333,8 @@ def main():
     pred_df.to_csv(pred_file, sep='\t', float_format='%.4g', index=False)
     
     # Calculate regional correlations for a few window sizes
-    for win_size in [10000, 50000, 200000]:
+    #for win_size in [10000, 50000, 200000]:
+    for win_size in [50000]:
         corr = corr_calc_sub(pred_df, win_size, prob_names)
         print('regional corr:', str(win_size)+'bp', corr)
   

@@ -70,6 +70,11 @@ def parse_arguments(parser):
                           Order of distal sequences to be considered. Kept for 
                           future development. Default: 1. """ ).strip())
     
+    optional.add_argument('--distal_binsize', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Bin size of distal sequences. Kept for 
+                          future development. Default: 1. """ ).strip())
+    
     optional.add_argument('--i_file', type=int, metavar='INT', default=0, 
                           help=textwrap.dedent("""
                           Number of HDF5 files. Default: 0. """ ).strip())
@@ -161,6 +166,7 @@ def main():
 
     distal_radius = args.distal_radius
     distal_order = args.distal_order # reserved for future improvement
+    distal_binsize = args.distal_binsize
     
     i_file = args.i_file
     n_files = args.n_files
@@ -208,7 +214,8 @@ def main():
                          '--distal_order', str(distal_order), 
                          '--i_file', str(i+1), 
                          '--n_files', str(n_files), 
-                         '--chunk_size', str(chunk_size)]
+                         '--chunk_size', str(chunk_size),
+                         '--distal_binsize', str(distal_binsize)]
                 if bw_paths != None:
                     args.append('--bw_paths')
                     args.append(bw_paths)
@@ -239,7 +246,10 @@ def main():
         bed_regions = BedTool(test_bed.at(range((i_file-1)*single_size,np.min([i_file*single_size, len(test_bed)]))))
         
         #generate_h5f_single2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, 1, i_file, single_size)
-        generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size)
+        if distal_binsize == 1:
+            generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size)
+        else:
+            generate_h5f_singlev3(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, distal_binsize, bw_files, i_file, chunk_size)
     
     #test_bed.at(range(single_size, bed_end))
     

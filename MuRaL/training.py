@@ -182,7 +182,7 @@ def train(config, args, checkpoint_dir=None):
     #    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
     
     # Dataloader for predicting
-    dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
+    dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=0, pin_memory=True)
 
     if config['transfer_learning']:
         emb_dims = config['emb_dims']
@@ -213,7 +213,7 @@ def train(config, args, checkpoint_dir=None):
         model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
         
     elif model_no == 4:
-        model = MuTransformer(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, nhead=4, dim_feedforward=32, trans_dropout=0.1, num_layers=4)
+        model = Network4(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
 
     elif model_no == 5:
         model = Network5(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class,  nhead=4, dim_feedforward=64, trans_dropout=0.1, num_layers=3, emb_padding_idx=4**config['local_order'])
@@ -392,6 +392,8 @@ def train(config, args, checkpoint_dir=None):
             valid_y = valid_data_and_prob['mut_type'].to_numpy().squeeze()
             
             # Train the calibrator using the validataion data
+            #valid_y_prob = valid_y_prob.reset_index() #### for "ValueError: Input contains NaN"
+
             fdiri_cal, fdiri_nll = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
             #fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
             #vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
@@ -472,7 +474,8 @@ def train(config, args, checkpoint_dir=None):
             print('valid_pred_df: ', valid_pred_df.head())
             
             # Print regional correlations
-            for win_size in [20000, 100000, 500000]:
+            #for win_size in [20000, 100000, 500000]:
+            for win_size in [100000]:
                 corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
                 print('regional corr (validation):', str(win_size)+'bp', corr_win)
                 
