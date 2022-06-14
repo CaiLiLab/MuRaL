@@ -1135,9 +1135,9 @@ class CombinedDatasetNP2(Dataset):
                 bw_values = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True))
                 if(len(bw_values) < self.seq_len):
                     if start1 == 0:
-                        bw_values = np.concatenate((self.seq_len - len(bw_values))*[0], bw_values)
+                        bw_values = np.concatenate([(self.seq_len - len(bw_values))*[0], bw_values])
                     else:
-                        bw_values = np.concatenate(bw_values, (self.seq_len - len(bw_values))*[0])
+                        bw_values = np.concatenate([bw_values, (self.seq_len - len(bw_values))*[0]])
                 
                 if strand == '-':
                     bw_values = np.flip(bw_values)

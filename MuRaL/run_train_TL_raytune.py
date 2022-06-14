@@ -115,6 +115,10 @@ def parse_arguments(parser):
                           features such as the coverage track. If the pre-trained model
                           used some bigWig tracks, tracks with same names are needed 
                           to be provided with this option. Default: None.""").strip())
+    
+    data_args.add_argument('--without_h5', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
 
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -134,10 +138,31 @@ def parse_arguments(parser):
                           optimization method.  Default: 0.0001.
                           """ ).strip())
     
+    learn_args.add_argument('--lr_scheduler', type=str, metavar='STR', default=['StepLR'], nargs='+', 
+                          help=textwrap.dedent("""
+                          Learning rate scheduler.
+                          Default: 'StepLR'.
+                          """ ).strip())
+    
     learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
                           help=textwrap.dedent("""
                           'weight_decay' argument (regularization) for the optimization 
                           method.  Default: 1e-5. 
+                          """ ).strip())
+    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=None, 
+                          help=textwrap.dedent("""
+                          'weight_decay' argument (regularization) for the optimization 
+                          method.  Default: None. 
+                          """ ).strip())
+
+    learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
+                          help=textwrap.dedent("""
+                          restart learning rate
+                          """ ).strip())
+    
+    learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
+                          help=textwrap.dedent("""
+                          minimum learning rate
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
@@ -145,6 +170,11 @@ def parse_arguments(parser):
                           'gamma' argument for the learning rate scheduler.
                            Default: 0.5.
                            """ ).strip())
+    
+    learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, use only genomic sequences for the model and ignore
+                          bigWig tracks. Default: False.""").strip())
     
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""
@@ -273,7 +303,8 @@ def main():
     cuda_id = args.cuda_id
     
     optim = args.optim
-    learning_rate = args.learning_rate   
+    learning_rate = args.learning_rate
+    lr_scheduler = args.lr_scheduler
     weight_decay = args.weight_decay  
     LR_gamma = args.LR_gamma  
     epochs = args.epochs
@@ -396,6 +427,7 @@ def main():
         'distal_fc_dropout': distal_fc_dropout,
         'batch_size': tune.choice(batch_size),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
+        'lr_scheduler':tune.choice(lr_scheduler),
         #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
         'LR_gamma': tune.choice(LR_gamma),
@@ -421,6 +453,9 @@ def main():
     trainable_id = 'Train'
     tune.register_trainable(trainable_id, partial(train, args=args))
     
+    def trial_dirname_string(trial):
+        return "{}_{}".format(trial.trainable_name, trial.trial_id)
+    
     # Execute the training
     result = tune.run(
     trainable_id,
@@ -429,6 +464,7 @@ def main():
     config=config_ray,
     num_samples=n_trials,
     local_dir='./ray_results',
+    trial_dirname_creator=trial_dirname_string,
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,

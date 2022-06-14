@@ -77,6 +77,11 @@ def parse_arguments(parser):
                           the value of --valid_ratio will be ignored. Default: None.
                           """).strip()) 
     
+    data_args.add_argument('--sample_weights', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for sample weights. Default: None.
+                          """).strip())
+    
     data_args.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
                           Ratio of validation data relative to the whole training data.
@@ -99,14 +104,13 @@ def parse_arguments(parser):
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
     
-    data_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          If set, use only genomic sequences for the model and ignore
-                          bigWig tracks. Default: False.""").strip())
-    
     data_args.add_argument('--without_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
                           Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
+    
+    data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Number of HDF5 files for each BED file. Default: 1. """ ).strip())
     
     data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
                           help=textwrap.dedent("""
@@ -190,10 +194,10 @@ def parse_arguments(parser):
                           Size of mini batches for model training. Default: 128.
                           """ ).strip())
     
-    #learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
-    #                      help=textwrap.dedent("""
-    #                      Use ImbalancedDatasetSampler for dataloader.
-    #                      """ ).strip())
+    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Use ImbalancedDatasetSampler for dataloader.
+                          """ ).strip())
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
@@ -240,6 +244,10 @@ def parse_arguments(parser):
                           'gamma' argument for the learning rate scheduler.
                            Default: 0.5.
                            """ ).strip())
+
+    learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          If set, torch.backends.cudnn.benchmark will be False. Default: not set.""").strip())
     
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""
@@ -425,8 +433,10 @@ def main():
     train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data
     if valid_file: 
-        args.validation_data = os.path.abspath(args.validation_data)     
+        args.validation_data = os.path.abspath(args.validation_data) 
+
     ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
+    n_h5_files = args.n_h5_files
     
     local_radius = args.local_radius
     local_order = args.local_order
@@ -442,7 +452,10 @@ def main():
     distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
     #pred_file = args.pred_file 
-    #ImbSampler = args.ImbSampler
+    sample_weights = args.sample_weights
+    if sample_weights:
+        args.sample_weights = os.path.abspath(args.sample_weights)
+    ImbSampler = args.ImbSampler
     optim = args.optim
     lr_scheduler = args.lr_scheduler
     learning_rate = args.learning_rate   
@@ -501,7 +514,7 @@ def main():
     for d_radius in distal_radius:
         h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
         if not args.without_h5:
-            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=5)
+            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
             #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
     
     if valid_file:
@@ -509,7 +522,7 @@ def main():
         for d_radius in distal_radius:
             valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
             if not args.without_h5:
-                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=5)
+                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
     
     
     ####

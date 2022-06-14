@@ -12,7 +12,7 @@ import pickle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torch.utils.data import random_split
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -37,7 +37,7 @@ from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 
 #from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
-#from torchsampler import ImbalancedDatasetSampler
+from torchsampler import ImbalancedDatasetSampler
 
 
 def train(config, args, checkpoint_dir=None):
@@ -59,7 +59,9 @@ def train(config, args, checkpoint_dir=None):
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     batch_size = args.batch_size
-    #ImbSampler = args.ImbSampler
+    ####
+    sample_weights = args.sample_weights
+    ImbSampler = args.ImbSampler
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
@@ -176,10 +178,16 @@ def train(config, args, checkpoint_dir=None):
     
     print('train_size, valid_size:', train_size, valid_size)
     # Dataloader for training
-    #if not ImbSampler:    
-    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
-    #else:
-    #    dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
+    #if not ImbSampler: 
+    if not sample_weights:
+        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=True, num_workers=cpu_per_trial-1, pin_memory=True)
+    else:
+        weights = pd.read_csv(sample_weights, sep='\t', header=None)
+        weights = weights[3]
+        weighted_sampler = WeightedRandomSampler(weights, len(weights), replacement=True)
+        
+        dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=weighted_sampler, num_workers=cpu_per_trial-1, pin_memory=True)
+        #dataloader_train = DataLoader(dataset_train, config['batch_size'], shuffle=False, sampler=ImbalancedDatasetSampler(dataset_train), num_workers=cpu_per_trial-1, pin_memory=True)
     
     # Dataloader for predicting
     dataloader_valid = DataLoader(dataset_valid, config['batch_size'], shuffle=False, num_workers=0, pin_memory=True)
@@ -475,7 +483,7 @@ def train(config, args, checkpoint_dir=None):
             
             # Print regional correlations
             #for win_size in [20000, 100000, 500000]:
-            for win_size in [100000]:
+            for win_size in [100000, 500000]:
                 corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
                 print('regional corr (validation):', str(win_size)+'bp', corr_win)
                 
