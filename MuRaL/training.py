@@ -54,6 +54,8 @@ def train(config, args, checkpoint_dir=None):
     train_file = args.train_data # Ray requires absolute paths
     valid_file = args.validation_data
     ref_genome= args.ref_genome
+    n_h5_files = args.n_h5_files
+
     local_radius = args.local_radius
     local_order = args.local_order
     distal_radius = args.distal_radius  
@@ -118,7 +120,7 @@ def train(config, args, checkpoint_dir=None):
         train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
 
         # Prepare the datasets for trainging
-        dataset = prepare_dataset_h5v2(train_bed, ref_genome, bw_paths, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=5)
+        dataset = prepare_dataset_h5v2(train_bed, ref_genome, bw_paths, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files)
         
         #prepare_dataset_h5v2(bed_regions, ref_genome, bw_paths, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1)
     
@@ -143,7 +145,7 @@ def train(config, args, checkpoint_dir=None):
         if without_h5:
             dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
         else:
-            dataset_valid = prepare_dataset_h5v2(valid_bed, ref_genome, bw_paths, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=5)
+            dataset_valid = prepare_dataset_h5v2(valid_bed, ref_genome, bw_paths, bw_files, bw_names, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files)
         
         data_local_valid = dataset_valid.data_local
     ################
