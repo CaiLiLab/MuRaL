@@ -114,18 +114,20 @@ def main():
     input BED file.
     
     * Input data 
-    The required input files for prediction include the reference FASTA file, 
-    a BED-formated data file and a trained model. The BED file is organized 
+    Required input files for prediction include the reference FASTA file, 
+    a BED-formatted data file and a trained model. The BED file is organized 
     in the same way as that for training. The 5th column can be set to '0' 
     if no observed mutations for the sites in the prediction BED. The 
     model-related files for input are 'model' and 'model.config.pkl', which 
     are generated at the training step. The file 'model.fdiri_cal.pkl', which 
-    is for calibrating predicted mutation rates, is optional.
+    is for calibrating predicted mutation rates, is optional. If the input BED
+    file has many sites (e.g. many millions), it is recommended to spilt it
+    into smaller files (e.g. 1 million each) for parallel processing.
    
     * Output data 
     The output of `mural_predict` is a tab-separated file containing the 
     sequence coordinates and the predicted probabilities for all possible 
-    mutation types. Usually, the 'prob0' column contains probalities for the 
+    mutation types. Usually, the 'prob0' column stores probabilities for the 
     non-mutated class and other 'probX' columns for mutated classes. 
    
     Some example lines of a prediction output file are shown below:
@@ -139,13 +141,19 @@ def main():
     ---------------------
     1. The following command will predict mutation rates for all sites in 
     'testing.bed.gz' using model files under the 'checkpoint_6/' folder 
-    and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'.
+    and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. For most
+    models, as prediction tasks usually won't take long, it is recommended to 
+    set '--without_h5 --cpu_only' for using only CPUs and not generating HDF5 files.
+    If the input BED file has many sites (e.g. many millions), it is recommended 
+    to spilt it into smaller files (e.g. 1 million each) for parallel processing.
     
         mural_predict --ref_genome seq.fa --test_data testing.bed.gz \\
         --model_path checkpoint_6/model \\
         --model_config_path checkpoint_6/model.config.pkl \\
         --calibrator_path checkpoint_6/model.fdiri_cal.pkl \\
         --pred_file testing.ckpt6.fdiri.tsv.gz \\
+        --without_h5 \\
+        --cpu_only \\
         > test.out 2> test.err
     """) 
     

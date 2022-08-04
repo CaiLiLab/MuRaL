@@ -106,7 +106,7 @@ def parse_arguments(parser):
     
     data_args.add_argument('--without_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
+                          Do not generate HDF5 file for input BED files. Default: False.""").strip())
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
@@ -154,7 +154,7 @@ def parse_arguments(parser):
     
     model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[200], nargs='+', 
                           help=textwrap.dedent("""
-                          Radius of the expanded sequence to be considered in the model. 
+                          Radius of the expanded sequence to be considered. 
                           Length of the expanded sequence = distal_radius*2+1 bp.
                           Values should be >=100. Default: 200. 
                           """ ).strip())
@@ -194,10 +194,10 @@ def parse_arguments(parser):
                           Size of mini batches for model training. Default: 128.
                           """ ).strip())
     
-    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Use ImbalancedDatasetSampler for dataloader.
-                          """ ).strip())
+#    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
+#                          help=textwrap.dedent("""
+#                          Use ImbalancedDatasetSampler for dataloader.
+#                          """ ).strip())
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
@@ -208,7 +208,7 @@ def parse_arguments(parser):
     learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.001], nargs='+', 
                           help=textwrap.dedent("""
                           Learning rate for parameter learning, an argument for the 
-                          optimization method.  Default: 0.005.
+                          optimization method.  Default: 0.001.
                           """ ).strip())
     
     learn_args.add_argument('--lr_scheduler', type=str, metavar='STR', default=['StepLR'], nargs='+', 
@@ -217,26 +217,31 @@ def parse_arguments(parser):
                           Default: 'StepLR'.
                           """ ).strip())
     
-    learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
-                          help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization 
-                          method.  Default: 1e-5. 
-                          """ ).strip())
-    
     learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization 
-                          method.  Default: None. 
+                          Calcaute 'weight_decay' (regularization parameter) based on total 
+                          training steps. This is recommended, as it automatically adjusts 
+                          'weight_decay' for different batch sizes, training sizes and epochs.
+                          Set a value of <=0 to turn this off.
+                          Default: 0.1.
+                          """ ).strip())
+    
+    learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
+                          help=textwrap.dedent("""
+                          'weight_decay' argument (regularization) for the optimization method. 
+                          If you want to use this option, please also set '--weight_decay_auto' to 0.
+                          Default: 1e-5. 
                           """ ).strip())
     
     learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
                           help=textwrap.dedent("""
-                          restart learning rate
+                          When the learning rate reaches the mininum rate, reset it to 
+                          a larger one. Default: 1e-4.
                           """ ).strip())
     
     learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
                           help=textwrap.dedent("""
-                          minimum learning rate
+                          The minimum learning rate. Default: 1e-6.
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
@@ -247,7 +252,9 @@ def parse_arguments(parser):
 
     learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          If set, torch.backends.cudnn.benchmark will be False. Default: not set.""").strip())
+                          If set, torch.backends.cudnn.benchmark will be False. 
+                          Default: not set.
+                          """).strip())
     
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""
@@ -276,9 +283,9 @@ def parse_arguments(parser):
                           Default: 'loss'.
                           """ ).strip())
     
-    raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=4, 
+    raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. Default: 4.
+                          Number of CPUs requested by Ray-Tune. Default: 2.
                           """ ).strip())
     
     raytune_args.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
@@ -455,7 +462,7 @@ def main():
     sample_weights = args.sample_weights
     if sample_weights:
         args.sample_weights = os.path.abspath(args.sample_weights)
-    ImbSampler = args.ImbSampler
+    #ImbSampler = args.ImbSampler
     optim = args.optim
     lr_scheduler = args.lr_scheduler
     learning_rate = args.learning_rate   

@@ -91,6 +91,11 @@ def parse_arguments(parser):
                           the value of --valid_ratio will be ignored. Default: None.
                           """).strip()) 
     
+    data_args.add_argument('--sample_weights', type=str, metavar='FILE', default=None,
+                          help=textwrap.dedent("""
+                          File path for sample weights. Default: None.
+                          """).strip())
+    
     data_args.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
                           Ratio of validation data relative to the whole training data.
@@ -118,7 +123,11 @@ def parse_arguments(parser):
     
     data_args.add_argument('--without_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Use Kipoi functions for extracting distal seqs. Default: False.""").strip())
+                          Do not generate HDF5 files for input BED files. Default: False.""").strip())
+
+    data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Number of HDF5 files for each BED file. Default: 1. """ ).strip())
 
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -144,25 +153,31 @@ def parse_arguments(parser):
                           Default: 'StepLR'.
                           """ ).strip())
     
+    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
+                          help=textwrap.dedent("""
+                          Calcaute 'weight_decay' (regularization parameter) based on total 
+                          training steps. This is recommended, as it automatically adjusts 
+                          'weight_decay' for different batch sizes, training sizes and epochs.
+                          Set a value of <=0 to turn this off.
+                          Default: 0.1.
+                          """ ).strip())
+    
     learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
                           help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization 
-                          method.  Default: 1e-5. 
+                          'weight_decay' argument (regularization) for the optimization method. 
+                          If you want to use this option, please also set '--weight_decay_auto' to 0.
+                          Default: 1e-5.
                           """ ).strip())
-    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=None, 
-                          help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization 
-                          method.  Default: None. 
-                          """ ).strip())
-
+    
     learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
                           help=textwrap.dedent("""
-                          restart learning rate
+                          When the learning rate reaches the mininum rate, reset it to 
+                          a larger one. Default: 1e-4.
                           """ ).strip())
     
     learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
                           help=textwrap.dedent("""
-                          minimum learning rate
+                          The minimum learning rate. Default: 1e-6.
                           """ ).strip())
     
     learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
@@ -205,7 +220,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=2, 
                           help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. Default: 6.
+                          Number of CPUs requested by Ray-Tune. Default: 2.
                           """ ).strip())
     
     raytune_args.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
@@ -218,9 +233,9 @@ def parse_arguments(parser):
                           Number of CPUs used per trial. Default: 2.
                           """ ).strip())
     
-    raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.19, 
+    raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.15, 
                           help=textwrap.dedent("""
-                          Number of GPUs used per trial. Default: 0.19.
+                          Number of GPUs used per trial. Default: 0.15.
                           """ ).strip())
     
     raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default='0', 
@@ -285,7 +300,13 @@ def main():
     if valid_file: 
         args.validation_data = os.path.abspath(args.validation_data)     
     ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
- 
+    n_h5_files = args.n_h5_files
+    
+    sample_weights = args.sample_weights
+    if sample_weights:
+        args.sample_weights = os.path.abspath(args.sample_weights)
+    #ImbSampler = args.ImbSampler
+    
     batch_size = args.batch_size
     #n_class = args.n_class
     #model_no = args.model_no
@@ -384,13 +405,16 @@ def main():
     train_bed = BedTool(train_file)
     
     # Generate H5 files for storing distal regions before training, one file for each possible distal radius
-    h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order)
-    generate_h5f(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
+    if not args.without_h5:
+        h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order)
+        generate_h5fv2(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+        #generate_h5f(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
     
     if valid_file:
         valid_bed = BedTool(valid_file)
         valid_h5f_path = get_h5f_path(valid_file, bw_names, distal_radius, distal_order)
-        generate_h5f(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
+        generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+        #generate_h5f(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
     
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
@@ -468,7 +492,8 @@ def main():
     scheduler=scheduler,
     stop={'after_min_loss':3},
     progress_reporter=reporter,
-    resume=resume_flag)  
+    resume=resume_flag,
+    log_to_file=True)  
     
     # Shutdown Ray
     if ray.is_initialized():

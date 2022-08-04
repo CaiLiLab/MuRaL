@@ -378,6 +378,51 @@ def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, dist
     
     return h5f_path
 
+def generate_h5f_singlev2a(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size):
+    
+    #bed_regions = BedTool(bed_file)
+    n_channels = 4**distal_order + len(bw_files)
+    
+    with h5py.File(h5f_path, 'w') as hf:
+
+        print('Generating HDF5 file:', h5f_path)
+        sys.stdout.flush()
+
+        # Total seq len
+        seq_len =  distal_radius*2+1-(distal_order-1)
+
+        # Create distal_X dataset
+        # Note, the default dtype for create_dataset is numpy.float32
+        hf.create_dataset(name='distal_X', shape=(len(bed_regions), n_channels, seq_len), compression="gzip", compression_opts=4, chunks=(1,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
+
+        # Write data in chunks
+        #chunk_size = 50000
+        
+        seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
+        for start in range(0, len(bed_regions), chunk_size):
+            end = min(start+chunk_size, len(bed_regions))
+
+            # Extract sequence from the genome, which is in one-hot encoding format
+            seqs = get_digitalized_seq(seq_records, bed_regions.at(range(start, end)), distal_radius)
+            
+            # Handle distal bigWig data, return base-wise values
+            if len(bw_files) > 0:
+                bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
+                #print('bw_distal.shape:', np.array(bw_distal).shape)
+
+                #bw_distal should have the same seq len as that for distal_seq
+                bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
+
+                # Concatenate the sequence data and the bigWig data
+                #seqs = np.concatenate((seqs, bw_distal), axis=1)
+                seqs = np.concatenate((seqs, bw_distal), axis=1).round(decimals=2)       
+            # Write the numpy array into the H5 file
+            #hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
+            #hf['distal_X'][-seqs.shape[0]:] = seqs
+            hf['distal_X'][start:end] = seqs
+    
+    return h5f_path
+
 def generate_h5f_singlev3(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, i_file, chunk_size):
     
     #bed_regions = BedTool(bed_file)

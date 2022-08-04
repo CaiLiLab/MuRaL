@@ -63,7 +63,7 @@ def train(config, args, checkpoint_dir=None):
     batch_size = args.batch_size
     ####
     sample_weights = args.sample_weights
-    ImbSampler = args.ImbSampler
+    #ImbSampler = args.ImbSampler
     local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
@@ -311,10 +311,10 @@ def train(config, args, checkpoint_dir=None):
     #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="sigmoid", beta=0.999999, gamma=1)
     #criterion = CBLoss(samples_per_cls=[400000, 5884, 8316, 5800], no_of_classes=4, loss_type="focal", beta=0.999999, gamma=1)
     
-    if weight_decay_auto != None:
+    if weight_decay_auto != None and weight_decay_auto > 0:
         #print("rewriting config['weight_decay'] ...")
         config['weight_decay'] = 1- weight_decay_auto **(config['batch_size']/(epochs*train_size))
-        print("rewriting config['weight_decay'], new weight_decay: ", config['weight_decay'])
+        print("NOTE: rewriting config['weight_decay'], new weight_decay: ", config['weight_decay'])
     
     # Set Optimizer
     if config['optim'] == 'Adam':
@@ -367,6 +367,10 @@ def train(config, args, checkpoint_dir=None):
                    
             optimizer.zero_grad()
             loss.backward()
+            
+            #Clips gradient norm to avoid exploding gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10, error_if_nonfinite=False)
+            
             optimizer.step()
             total_loss += loss.item()
             
@@ -388,6 +392,10 @@ def train(config, args, checkpoint_dir=None):
         
         model.eval()
         with torch.no_grad():
+            if model_no != 0:
+                print('model.conv1[0].weight:', model.conv1[0].weight)
+                print('model.conv1[0].weight.grad:', model.conv1[0].weight.grad)
+            #print('model.conv1.0.weight.grad:', model.conv1.0.weight)
 
             valid_pred_y, valid_total_loss = model_predict_m(model, dataloader_valid, criterion, device, n_class, distal=True)
 

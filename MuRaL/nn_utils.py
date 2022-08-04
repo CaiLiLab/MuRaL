@@ -56,7 +56,7 @@ def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
             
             if device == torch.device('cpu'):
                 if  np.random.uniform(0,1) < 0.0001:
-                    print('in the model_predict_m:', device)
+                    #print('in the model_predict_m:', device)
                     sys.stdout.flush()
 
     return pred_y, total_loss
