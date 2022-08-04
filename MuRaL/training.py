@@ -36,8 +36,7 @@ from MuRaL.nn_utils import *
 from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 
-#from MuRaL.pc_softmax import PCSoftmaxCrossEntropyV1
-from torchsampler import ImbalancedDatasetSampler
+#from torchsampler import ImbalancedDatasetSampler
 
 
 def train(config, args, checkpoint_dir=None):

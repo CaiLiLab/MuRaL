@@ -25,6 +25,6 @@ setup(
 	author_email='caililab@outlook.com',
     packages=find_packages(),
     description='Mutation Rate Learner with Neural Networks',
-	scripts=['bin/mural_train', 'bin/mural_train_TL', 'bin/mural_predict', 'bin/gen_distal_h5'],
+	scripts=['bin/mural_train', 'bin/mural_train_TL', 'bin/mural_predict', 'bin/gen_distal_h5', 'bin/get_best_mural_models'],
 	include_package_data=True,
 )

@@ -571,6 +571,7 @@ def main():
     
     # Allocate CPU/GPU resources for this Ray job
     ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
+    #ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus)
     
     sys.stdout.flush()
     

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+if [ $# -eq 0 -o "$1" == "-h" ];
+  then
+    echo -ne "\nThis tool is for finding the best model per trial, given the progress.csv files.\nExample command:\n\n  get_best_mural_models ./ray_results/experiment_1/Train_*/progress.csv ./ray_results/experiment_2/Train_*/progress.csv\n\n1st column of output: the folder storing the best model files for each trial; 2nd column: validation losses.\nThe first row of output can be considered the best model among all trials.\n\n"
+else
+  ls $@ | while read line; do folder="`dirname $line`/checkpoint_"; echo -ne $folder; cat $line | sed 's/,/\t/g' | awk 'NR>1{print NR-2"\t"$1}' | sort -k2g | head -1; done | sort -k2g
+
+fi
