@@ -265,8 +265,8 @@ def main():
     Overview
     --------    
     This tool uses learned weights from a pre-trained MuRaL model to train new models. 
-    The inputs include training and validation mutation data and the training results 
-    are saved under the "./ray_results/" folder.
+    The inputs include training and validation mutation data and training results will
+    be saved under the "./ray_results/" folder.
     
     * Input data 
     The input files include the reference FASTA file (required), a training data file 

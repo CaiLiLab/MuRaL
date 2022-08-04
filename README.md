@@ -10,7 +10,7 @@
 
 
 ## 1. Overview <a name="Overview"></a>
-**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
+**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a deep learning framework to learn and predict single-nucleotide mutation rates. 
 
 The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
@@ -21,7 +21,7 @@ MuRaL depends on several other packages, and we recommend using [Miniconda](http
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
 
-MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training/prediction without GPUs will take a much longer time. 
+MuRaL supports training and prediction with or without CUDA GPUs. Please be aware that training tasks without GPUs could take a much longer time. For most models, prediction tasks can be done with only CPUs.
 
 Before installing MuRaL, use `conda` command from Miniconda to create an environment and install the dependencies. The dependencies are included in `environment.yml` (if using GPUs) or `environment_cpu.yml` (if CPU-only computing). Run one of the following commands to create a conda environment and install the dependencies (this may take >30 minutes depending on your internet speed):
 ```
@@ -29,22 +29,22 @@ Before installing MuRaL, use `conda` command from Miniconda to create an environ
 conda env create -n mural -f environment.yml 
 
 # if the above command is interupted because of internet issues or some dependencies 
-# in environment.yml are updated, run the following:
+# in environment.yml are updated, try the following:
 conda env update -n mural -f environment.yml --prune
 
 # if your machine has only CPUs
 conda env create -n mural -f environment_cpu.yml 
 ```
-If the command ends without errors, you will have a conda environment named 'mural' (or another name if you change the `-n mural` option above). Use the following command to activate the conda environment:
+If the command ends without errors, you will have a conda environment named 'mural'. Use the following command to activate the conda environment:
 ```
 conda activate mural
 ```
 And then install MuRaL by typing:
 ```
-python setup.py install
+pip install .
 ```
 
-If the installation is complete, the following three commands are available from the command line. Type a commnad with the '-h' option to see detailed help message. 
+If the installation is complete, the following three commands are available from the command line. Type a commnad with '-h' option to see detailed help message. 
    * `mural_train`: This tool is for training mutation rate models from the beginning.
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
@@ -62,10 +62,10 @@ chr1	2333468	2333469	.	1	-
 chr1	2333510	2333511	.	3	-
 chr1	2333812	2333813	.	0	- 
 ```
-   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers means specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G', '3' for 'A>T'). You can specify an arbitrary order for a group of mutation types with incremental numbers starting from 0, but make sure that the same order is consistently used in training, validation and testing datasets. Importantly, the training and validation BED file MUST BE SORTED by chromosome coordinates. You can sort BED files by `bedtools sort` or `sort -k1,1 -k2,2n`.
+   In the BED-formatted lines above, the 5th column is used to represent mutation status: usually, '0' means the non-mutated status and other numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G', '3' for 'A>T'). You can specify an arbitrary order for a group of mutation types with incremental numbers starting from 0, but make sure that the same order is consistently used in training, validation and testing datasets. Importantly, the training and validation BED file MUST BE SORTED by chromosome coordinates. You can sort BED files by `bedtools sort` or `sort -k1,1 -k2,2n`.
 
    * Output data \
-    `mural_train` saves the model information at each checkpoint, normally at the end of each training epoch of each trial. The checkpointed model files during training are saved under folders named like:
+    `mural_train` saves the model information at each checkpoint, normally at the end of each training epoch of a trial. The checkpointed model files during training are saved under folders named like:
 ```
     ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
             - model
@@ -109,6 +109,7 @@ chr1    10012   10013   -       0       0.9711  0.004898 0.02029 0.003746
 mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \
         --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl \
         --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
+        --without_h5 --cpu_only \
         > test3.out 2> test3.err
 ```
 

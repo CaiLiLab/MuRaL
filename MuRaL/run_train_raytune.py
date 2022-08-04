@@ -339,7 +339,7 @@ def main():
     * Input data
     Input data files include the reference sequence file (FASTA format, required), 
     a training data file (required) and a validation data file (optional). If the 
-    validation data file isn't provided,  a fraction of the sites from the training 
+    validation data file isn't provided, a fraction of the sites from the training 
     data file are used as validation data.
     
     Input training and validation data files must be in BED format

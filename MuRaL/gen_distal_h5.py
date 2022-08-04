@@ -245,11 +245,10 @@ def main():
         h5f_path_i = re.sub('h5$', str(i_file)+'.h5', h5f_path)
         bed_regions = BedTool(test_bed.at(range((i_file-1)*single_size,np.min([i_file*single_size, len(test_bed)]))))
         
-        #generate_h5f_single2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, 1, i_file, single_size)
         if distal_binsize == 1:
-            generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size)
+            generate_h5f_singlev1(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, chunk_size)
         else:
-            generate_h5f_singlev3(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, distal_binsize, bw_files, i_file, chunk_size)
+            generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, distal_binsize, bw_files, chunk_size)
     
     #test_bed.at(range(single_size, bed_end))
     

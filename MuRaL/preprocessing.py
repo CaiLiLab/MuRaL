@@ -19,12 +19,6 @@ import time
 from sklearn import metrics, calibration
 from itertools import product
 
-#from kipoiseq.extractors import FastaStringExtractor
-#from kipoiseq import Interval
-#from kipoiseq.transforms import ReorderedOneHot
-#from kipoiseq.transforms.functional import pad
-#from pyfaidx import Fasta
-
 from functools import partial
 from itertools import repeat
 from multiprocessing import Pool
@@ -245,97 +239,10 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
             
     return None
 
-def generate_h5f_single(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, i_file, single_size):
-    
-    n_channels = 4**distal_order + len(bw_files)
-    
-    with h5py.File(h5f_path, 'w') as hf:
 
-        print('Generating HDF5 file:', h5f_path)
-        sys.stdout.flush()
 
-        # Total seq len
-        seq_len =  distal_radius*2+1-(distal_order-1)
-
-        # Create distal_X dataset
-        # Note, the default dtype for create_dataset is numpy.float32
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-
-        # Write data in chunks
-        chunk_size = 50000
-        for start in range(i_file*single_size, np.min([(i_file+1)*single_size, len(bed_regions)]), chunk_size):
-            end = min(start+chunk_size, len(bed_regions))
-
-            # Extract sequence from the genome, which is in one-hot encoding format
-            seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-
-            #print('seqs.shape 1:', seqs.shape)
-            # Get the correct shape (batch_size, channels, seq_len) for pytorch
-            seqs = np.array(seqs).squeeze((1,3)).transpose(0,2,1)
-
-            # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0:
-                bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
-                #print('bw_distal.shape:', np.array(bw_distal).shape)
-
-                #bw_distal should have the same seq len as that for distal_seq
-                bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                # Concatenate the sequence data and the bigWig data
-                seqs = np.concatenate((seqs, bw_distal), axis=1)       
-            # Write the numpy array into the H5 file
-            hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-            hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-    return h5f_path
-
-def generate_h5f_single2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, i_file, single_size):
-    
-    #bed_regions = BedTool(bed_file)
-    n_channels = 4**distal_order + len(bw_files)
-    
-    with h5py.File(h5f_path, 'w') as hf:
-
-        print('Generating HDF5 file:', h5f_path)
-        sys.stdout.flush()
-
-        # Total seq len
-        seq_len =  distal_radius*2+1-(distal_order-1)
-
-        # Create distal_X dataset
-        # Note, the default dtype for create_dataset is numpy.float32
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=2, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-
-        # Write data in chunks
-        chunk_size = 50000
-        for start in range(0, len(bed_regions), chunk_size):
-            end = min(start+chunk_size, len(bed_regions))
-
-            # Extract sequence from the genome, which is in one-hot encoding format
-            seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=distal_order, verbose=True)
-
-            #print('seqs.shape 1:', seqs.shape)
-            # Get the correct shape (batch_size, channels, seq_len) for pytorch
-            seqs = np.array(seqs).squeeze((1,3)).transpose(0,2,1)
-
-            # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0:
-                bw_distal = Cover.create_from_bigwig(name='', bigwigfiles=bw_files, roi=bed_regions.at(range(start, end)), resolution=1, flank=distal_radius, verbose=True)
-                #print('bw_distal.shape:', np.array(bw_distal).shape)
-
-                #bw_distal should have the same seq len as that for distal_seq
-                bw_distal = np.array(bw_distal).squeeze(axis=(1,3)).transpose(0,2,1)[:,:,:(distal_radius*2-distal_order+2)]
-
-                # Concatenate the sequence data and the bigWig data
-                seqs = np.concatenate((seqs, bw_distal), axis=1)       
-            # Write the numpy array into the H5 file
-            hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-            hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-    return h5f_path
-
-def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size):
-    
+def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, chunk_size):
+    """generate an HDF file for specific regions"""
     #bed_regions = BedTool(bed_file)
     n_channels = 4**distal_order + len(bw_files)
     
@@ -378,7 +285,7 @@ def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, dist
     
     return h5f_path
 
-def generate_h5f_singlev2a(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, i_file, chunk_size):
+def generate_h5f_singlev2a(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, chunk_size):
     
     #bed_regions = BedTool(bed_file)
     n_channels = 4**distal_order + len(bw_files)
@@ -423,7 +330,7 @@ def generate_h5f_singlev2a(bed_regions, h5f_path, ref_genome, distal_radius, dis
     
     return h5f_path
 
-def generate_h5f_singlev3(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, i_file, chunk_size):
+def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, chunk_size):
     
     #bed_regions = BedTool(bed_file)
     n_channels = 4**distal_order + len(bw_files)
@@ -484,48 +391,6 @@ def generate_h5f_singlev3(bed_regions, h5f_path, ref_genome, distal_radius, dist
     
     return h5f_path
 
-def generate_h5f_mp(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, n_h5_files):
-    """Generate the H5 file for storing distal data"""
-    n_channels = 4**distal_order + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r') as hf:
-                bed_path = bed_regions.fn
-                
-                if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-        except OSError:
-            print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
-            
-    # If the H5 file is unavailable or im complete, generate the file
-    if write_h5f:            
-        with h5py.File(h5f_path, 'w') as hf:
-        
-            with Pool(processes=5) as pool:
-
-                single_size = int(np.ceil(len(bed_regions)/float(n_h5_files)))
-                print('single_size:', single_size)
-
-                #args = [(bed_regions, re.sub('h5$', str(i)+'.h5', h5f_path), ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, i, single_size) for i in range(n_h5_files)]
-                #h5f_paths = pool.starmap(generate_h5f_single, args)
-                args = [( BedTool(bed_regions.at(range(i*single_size,np.min([(i+1)*single_size, len(bed_regions)])))), re.sub('h5$', str(i)+'.h5', h5f_path), ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, i, single_size) for i in range(n_h5_files)]
-                #h5f_paths = pool.starmap(generate_h5f_single2, args)
-                h5f_paths = pool.starmap_async(generate_h5f_single2, args)
-                
-
-                #generate_h5f_single(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, i_file, single_size)
-                pool.close()
-                pool.join()
-                print('h5f_paths:', h5f_paths)
-
-                for i in  range(n_h5_files):
-                    #hf['data'+str(i)] = h5py.ExternalLink(h5f_paths[i], 'distal_X')
-                    hf['data'+str(i)] = h5py.ExternalLink(re.sub('h5$', str(i)+'.h5', h5f_path), 'distal_X')
- 
-
-    return None
 
 def get_seqs(ref_genome, bed_regions, distal_radius, start, size, end):
     
@@ -534,7 +399,6 @@ def get_seqs(ref_genome, bed_regions, distal_radius, start, size, end):
     seqs = Bioseq.create_from_refgenome(name='distal', refgenome=ref_genome, roi=bed_regions.at(range(start, end)), flank=distal_radius, order=1, cache=False, verbose=False)
 
     return np.array(seqs).squeeze((1,3)).transpose(0,2,1)
-
 
 
 
@@ -769,112 +633,10 @@ class CombinedDatasetH5(Dataset):
     def _get_labels(self, dataset, idx):
         return dataset.__getitem__(idx)[1]
 
-class CombinedDatasetKP(Dataset):
-    """Combine local data and distal into Dataset, using Kipoi funcions"""
-    def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels):
-        """  
-        Args:
-            data: DataFrame containing local seq data and categorical data
-            seq_cols: names of local seq columns
-            cat_cols: names of categorical columns used for training
-            output_col: name of the label column
-            h5f_path: H5 file storing the distal data
-            n_channels: number of columns (channels) in distal data to be extracted
-        """
-        # Store the local seq data and label for later use
-        self.data_local = data[seq_cols+[output_col]]
-        
-        # First, change labels to digits (NOTE: the labels already digitalized)
-        #label_encoders = {}
-        #print("Not using LabelEncoder ...")
-        #for cat_col in cat_cols:
-            #label_encoders[cat_col] = LabelEncoder()
-            #data[cat_col] = label_encoders[cat_col].fit_transform(data[cat_col])
-            #keywords = [''.join(i) for i in product(['A','C','G','T'], repeat = 3)]
-            #a = LabelEncoder().fit(keywords)
-        
-        # Sample size
-        self.n = data.shape[0]
-        
-        # Output column
-        if output_col:
-            self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
-        else:
-            self.y = np.zeros((self.n, 1))
-        
-        # Names of categorical columns
-        self.cat_cols = cat_cols
-        
-        # Set biggest dimension for each categorical column
-        self.cat_dims = [np.max(data[col]) + 1 for col in cat_cols]
-        
-        # Find the continuous columns
-        self.cont_cols = [col for col in data.columns if col not in self.cat_cols + seq_cols + [output_col]]
-        
-        # Assign the continuous data to cont_X
-        if self.cont_cols:
-            self.cont_X = data[self.cont_cols].astype(np.float32).values
-        else:
-            self.cont_X = np.zeros((self.n, 1)) 
-        
-        # Assign the categorical data to cat_X
-        if len(self.cat_cols) > 0:
-            self.cat_X = data[cat_cols].astype(np.int64).values
-        else:
-            print("Error: no categorical data, something is wrong!", file=sys.stderr)
-            sys.exit()
-        
-        # For distal data
-        #self.h5f_path = h5f_path
-        self.distal_X = None
-        self.n_channels = n_channels
-        print('Number of channels to be used for distal data:', self.n_channels)
-        
-        self.fasta_extractor = FastaStringExtractor(fasta_file=ref_genome, use_strand=True, force_upper=True)
-        self.bed_regions = bed_regions
-        self.distal_radius = distal_radius
-        self.seq_transform = ReorderedOneHot()
-        self.fasta = Fasta(ref_genome)
-        
 
-    def __len__(self):
-        """ Denote the total number of samples. """
-        return self.n
-
-    def __getitem__(self, idx):
-        """ Generate one sample of data. """
-
-        region = self.bed_regions[idx]
-        
-        #from kipoiseq.transforms.functional import pad
-        #self.fasta['chr2L'].__len__()
-        #pad(seq, 220, value="N", anchor="end")
-        chr_len = self.fasta[region.chrom].__len__()
-        start = np.max([0, region.start-self.distal_radius])
-        end = np.min([chr_len, region.stop+self.distal_radius])
-        
-        interval = Interval(region.chrom, start=start, end=end, strand=region.strand)
-        distal_seq = self.fasta_extractor.extract(interval)
-        
-        if region.start < self.distal_radius:
-            distal_seq = pad(distal_seq, 2*self.distal_radius+1, value="N", anchor="end")
-            print("Warning: padding at the front!")
-        if region.stop+self.distal_radius > chr_len:
-            distal_seq = pad(distal_seq, 2*self.distal_radius+1, value="N", anchor="start")
-            
-        distal_seq = self.seq_transform(distal_seq)      
-        
-        return self.y[idx], self.cont_X[idx], self.cat_X[idx], distal_seq.T.astype(np.float32)
-    
-    def get_labels(self): 
-        return np.squeeze(self.y)
-    
-    def _get_labels(self, dataset, idx):
-        return dataset.__getitem__(idx)[1]
-    
 
 class CombinedDatasetNP(Dataset):
-    """Combine local data and distal into Dataset, using Kipoi funcions"""
+    """Combine local data and distal into Dataset, using NumPy funcions"""
     def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels):
         """  
         Args:
@@ -1025,7 +787,7 @@ class CombinedDatasetNP(Dataset):
         return dataset.__getitem__(idx)[1]
 
 class CombinedDatasetNP2(Dataset):
-    """Combine local data and distal into Dataset, using Kipoi funcions"""
+    """Combine local data and distal into Dataset, using NumPy funcions"""
     def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels, bw_files, seq_only):
         """  
         Args:
@@ -1254,24 +1016,6 @@ def prepare_dataset_h5v2(bed_regions, ref_genome, bw_paths, bw_files, bw_names, 
     #return dataset, data_local, categorical_features
     return dataset
 
-def prepare_dataset_kp(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
-    """Prepare the datasets for given regions, using H5 file"""
-    
-    # Prepare local data
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
-
-    # If seq_only flag was set, bigWig files will be ignored
-    if seq_only:
-        n_channels = 4**distal_order
-        print('NOTE: seq_only flag was set, so will not use any bigWig track!')
-    else:
-        n_channels = 4**distal_order + len(bw_files)
-    
-    # Combine local data and distal into Dataset objects
-    dataset = CombinedDatasetKP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels)
-    
-    #return dataset, data_local, categorical_features
-    return dataset
 
 def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
