@@ -4,17 +4,24 @@
 1. [Overview](#Overview)
 2. [Installation](#Installation)
 3. [Usage examples ](#Usage_examples)
+4. [Scale predicted mutation rates](#Scaling)
 4. [Pre-trained models and predicted mutation rate profiles](#Trained_models)
 5. [Citation](#Citation)
 6. [Contact](#Contact)
 
 
 ## 1. Overview <a name="Overview"></a>
-**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a deep learning framework to learn and predict single-nucleotide mutation rates. 
+Germline mutation rates are crucial parameters in genetics, genomics and evolutionary biology. It is long known that mutation rates vary substantially across the genome, but existing methods can only obtain very rough estimates of local mutation rates and are difficult to be applied in non-model species. 
 
-The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
+**MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a generalizable framework to estimate single-nucleotide mutation rates based on deep learning. MuRaL has better predictive performance at different scales than current state-of-the-art methods. Moreover, it can generate genome-wide mutation rate maps with rare variants from a moderate number of sequenced individuals (e.g. ~100 individuals), and can leverage transfer learning to further reduce data and time requirements. It can be applied to many sequenced species with population polymorphism data. 
+
+The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide), the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
 <img src="./images/model_schematic.jpg" alt="model schematic" width="830"/>
+
+Below is an example showing that MuRaL-predicted rates (colored lines) are highly correlated with observed mutation rates (grey shades) at different scales on Chr3 of *A. thaliana*. 
+
+<img src="./images/regional_correlation_example.jpg" alt="model schematic" width="500"/>
 
 ## 2. Installation <a name="Installation"></a>
 MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (version 3 or newer) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
@@ -44,10 +51,17 @@ And then install MuRaL by typing:
 pip install .
 ```
 
-If the installation is complete, the following three commands are available from the command line. Type a commnad with '-h' option to see detailed help message. 
+If the installation is complete, the following commands are available from the command line. Type a commnad with '-h' option to see detailed help message.
+
+   Main commands: 
    * `mural_train`: This tool is for training mutation rate models from the beginning.
    * `mural_train_TL`: This tool is for training transfer learning models, taking advantage of learned weights of a pre-trained model.
    * `mural_predict`: This tool is for predicting mutation rates of new sites with a trained model.
+   
+   Auxiliary commands:
+   * `get_best_mural_models`: This tool is for finding the best model per trial, given the 'progress.csv' files of trials.
+   * `calc_mu_scaling_factor`: This tool is for calculating scaling factors for generating per-generation mutation rates.
+   * `scale_mu`: This tool is for scaling raw MuRaL-predicted mutation rates into per-generation rates given a scaling factor.
 
 ## 3. Usage examples <a name="Usage_examples"></a>
 ### 3.1 Model training <a name="Model_training"></a>
@@ -72,7 +86,11 @@ chr1	2333812	2333813	.	0	-
             - model.config.pkl
             - model.fdiri_cal.pkl
 ```
-   In the above folder, the 'model' file contains the learned model parameters. The 'model.config.pkl' file contains configured hyperparameters of the model. The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model learned with validation data, which can be used for calibrating predicted mutation rates. These files can be used in downstream analyses such as model prediction and transfer learning.
+   In the above folder, the 'model' file contains the learned model parameters. The 'model.config.pkl' file contains configured hyperparameters of the model. The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model learned with validation data, which can be used for calibrating predicted mutation rates. These files can be used in downstream analyses such as model prediction and transfer learning. 
+   The 'progress.csv' files in 'Train_xxx' folders contain important information for each training epoch of trials (e.g., validation loss, used time, etc.). One can use the command `get_best_mural_models` to find the best model per trial after training.
+```
+    get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
+```
     
    * Example 1 \
    The following command will train a model by running two trials, using data in 'data/training.sorted.bed' for training. The training results will be saved under the folder './ray_results/example1/'. Default values will be used for other unspecified arguments. Note that, by default, 10% of the sites sampled from 'training.sorted.bed' is used as validation data (i.e. '--valid_ratio 0.1'). You can run this example under the 'examples/' folder in the package.
@@ -128,14 +146,19 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
         --model_config_path models/checkpoint_6/model.config.pkl --train_all \
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 ```
-   
-### 4. Trained models and predicted mutation rate profiles of multiple species <a name="Trained_models"></a>
+
+### 4. Scale MuRaL-predicted mutation rates to per base per generation rates <a name="Scaling">
+The raw MuRaL-predicted mutation rates are not mutation rates per bp per generation. To obtain a mutation rate per bp per generation for each nucleotide, one can scale the MuRaL-predicted rates using reported genome-wide DNM mutation rate and spectrum per generation. First, use the tool `calc_mu_scaling_factor` to calculate scaling factors for specific groups of sites (e.g. A/T sites, C/G sites). Then use the scaling factors to scale mutation rates in prediction files via the tool `scale_mu`.
+
+Note that we cannot compare, nor add up raw predicted rates from different MuRaL models (e.g. A/T model and C/G model), but we can do that with scaled mutation rates.
+
+### 5. Trained models and predicted mutation rate profiles of multiple species <a name="Trained_models"></a>
 Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster*** are provided in the 'models/' folder of the package. One can use these model files for prediction or transfer learning.
  
 Predicted single-nucleotide mutation rate profiles for these genomes are available at [ScienceDB](https://www.doi.org/10.11922/sciencedb.01173).
 
-### 5. Citation <a name="Citation"></a>
+### 6. Citation <a name="Citation"></a>
 Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
 
-### 6. Contact <a name="Contact"></a>
+### 7. Contact <a name="Contact"></a>
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.

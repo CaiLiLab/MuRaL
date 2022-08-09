@@ -47,7 +47,7 @@ def parse_arguments(parser):
     
     required.add_argument('--test_data', type=str, metavar='FILE', required=True,
                           help= textwrap.dedent("""
-                          File path of test data to do prediction, in BED format.""").strip())
+                          File path of the data to do prediction, in BED format.""").strip())
     
     required.add_argument('--model_path', type=str, metavar='FILE', required=True,
                           help=textwrap.dedent("""
@@ -59,9 +59,9 @@ def parse_arguments(parser):
                           File path for the paired configurations of the trained model.
                           """ ).strip()) 
 
-    optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv', help=textwrap.dedent("""
+    optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv.gz', help=textwrap.dedent("""
                           Name of the output file for prediction results.
-                          Default: 'pred.tsv'.
+                          Default: 'pred.tsv.gz'.
                           """ ).strip())
         
     optional.add_argument('--calibrator_path', type=str, metavar='FILE', default='',help=textwrap.dedent("""
@@ -74,13 +74,12 @@ def parse_arguments(parser):
                           features such as the coverage track. Default: None.""").strip())
     optional.add_argument('--n_h5_files', metavar='INT', default=1, 
                           help=textwrap.dedent("""
-                          Size of mini batches for prediction. Default: 1.
+                          Number of HDF5 files for each BED file. Default: 1.
                           """ ).strip())
     
     optional.add_argument('--without_h5', default=False, action='store_true',  
                           help=textwrap.dedent("""
-                          Do not generate HDF5 file the BED file. If the file is large, 
-                          this could take much GPU/CPU memory. Default: False.
+                          Do not generate HDF5 file for the BED file. Default: False.
                           """).strip())
     
     optional.add_argument('--cpu_only', default=False, action='store_true',  

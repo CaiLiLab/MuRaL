@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+import sys
+import argparse
+import pandas as pd
+import numpy as np
+from pybedtools import BedTool
+#import vcf
+import re
+
+import warnings
+
+
+def parse_arguments(parser):
+    """
+    Parse parameters from the command line
+    """
+
+    parser.add_argument('--benchmark_regions', type=str, metavar='FILE', default='',
+                        help='High-confidence regions used for calculating the scaling factor')
+
+    parser.add_argument('--pred_files', type=str, metavar='FILE', default=[], nargs='+', help='Prediction files (one or more) for calculating scaling factors.')
+    
+    parser.add_argument('--genomewide_mu', type=float, metavar='FLOAT', default=None, help='Mutation rate per base per generation.')
+        
+    parser.add_argument('--m_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific mutation types.')
+    
+    parser.add_argument('--g_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific sites in the genome.')
+    
+    parser.add_argument('--do_scaling', default=False, action='store_true', help='Save scaled mutation rates for input pred files. Default: False.')
+    
+    if len(sys.argv) == 1:
+        parser.parse_args(['--help'])
+    else:
+        args = parser.parse_args()
+
+    return args
+
+def main():
+    
+    #parse the command line
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+    description="""
+    Calculate scaling factors for specific groups of sites (e.g. A/T sites), 
+    which can be used to scale original MuRaL mutation rates to per-generation rates.
+    
+    Example
+    -------
+    calc_mu_scaling_factor --benchmark_regions hg19.high-confidence.bed --pred_files \\
+    AT_sites.validation_data.pred.tsv.gz nonCpG_sites.validation_data.pred.tsv.gz  \\
+    --genomewide_mu 1.2e-8 --m_proportions 0.404975 0.410809 --g_proportions 0.590564 0.389689
+    
+    """)
+    args = parse_arguments(parser)
+    
+    benchmark_regions = args.benchmark_regions
+    
+    genomewide_mu = args.genomewide_mu
+    
+    g_proportions = args.g_proportions
+    
+    m_proportions = args.m_proportions
+    
+    pred_files = args.pred_files
+    
+    do_scaling = args.do_scaling
+    
+    if len(m_proportions) != len(pred_files):
+        print('ERROR: length of proportions does not equal to length of pred_files!', file=sys.stderr)
+        
+        sys.exit()
+    
+    for i in range(len(pred_files)):
+
+        df = pd.read_table(pred_files[i], sep='\t', header=0)
+
+        benchmark_bed = BedTool(benchmark_regions)
+
+
+        df_name = pd.DataFrame('.', index=range(df.shape[0]), columns=['name'])
+
+        pred_df = pd.concat((df[['chrom', 'start', 'end']], df_name, df['prob1'].astype(float)+df['prob2'].astype(float)+df['prob3'].astype(float), df['strand']), axis=1)
+        #pred_df = pd.concat((df[['chrom', 'start', 'end']], df_name, df['prob3'].astype(float), df['strand']), axis=1)
+        
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        
+        pred_df_bed = BedTool.from_dataframe(pred_df)
+
+        probs = pred_df_bed.intersect(benchmark_bed).to_dataframe()[['score']]
+
+        prob_sum = np.sum(probs.values)
+
+        n_sites = probs.shape[0]
+
+        scale_factor = (genomewide_mu * n_sites * m_proportions[i] / g_proportions[i]) / prob_sum
+        print('\nType '+str(i+1)+':\n'+ 'pred_file:', pred_files[i])
+        print('genomewide_mu:', genomewide_mu)
+        print('n_sites:', n_sites)
+        print('g_proportion:', g_proportions[i])
+        print('m_proportion:', m_proportions[i])
+        print('prob_sum:', prob_sum)
+        print('Scale factor is:', scale_factor)
+        
+        if do_scaling:
+            df['prob1'] = df['prob1'].astype(float) * scale_factor
+            df['prob2'] = df['prob2'].astype(float) * scale_factor
+            df['prob3'] = df['prob3'].astype(float) * scale_factor
+            df['prob0'] = 1.0 - df['prob1'] - df['prob2'] - df['prob3']
+            #df.to_csv(re.sub('tsv.gz$', 'scaled.tsv.gz', pred_files[i]), sep='\t', float_format='%.4g', index=False)
+            df.to_csv(pred_files[i]+'.scaled.tsv.gz', sep='\t', float_format='%.4g', index=False)
+    
+  
+
+if __name__ == '__main__':
+    main()
