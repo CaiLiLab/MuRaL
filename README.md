@@ -68,7 +68,7 @@ If the installation is complete, the following commands are available from the c
 `mural_train` trains MuRaL models with training and validation mutation data, and exports training results under the "./ray_results/" folder.
    * Input data \
    Input data files include the reference sequence file (FASTA format, required), a training data file (required) and a validation data file (optional). If the validation data file isn't provided, a fraction of the sites sampled from the training data file are used as validation data. \
-   Input training and validation data files are in BED format (more info about BED at https://genome.ucsc.edu/FAQ/FAQformat.html#format1). Some example lines of an input BED file are shown below.
+   Input training and validation data files are in BED format (more info about BED format [here](https://genome.ucsc.edu/FAQ/FAQformat.html#format1)). Some example lines of an input BED file are shown below.
 ```
 chr1	2333436	2333437	.	0	+ 
 chr1	2333446	2333447	.	2	-
@@ -148,7 +148,7 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
 ```
 
 ### 4. Scale MuRaL-predicted mutation rates to per base per generation rates <a name="Scaling">
-The raw MuRaL-predicted mutation rates are not mutation rates per bp per generation. To obtain a mutation rate per bp per generation for each nucleotide, one can scale the MuRaL-predicted rates using reported genome-wide DNM mutation rate and spectrum per generation. First, use the tool `calc_mu_scaling_factor` to calculate scaling factors for specific groups of sites (e.g. A/T sites, C/G sites). Then use the scaling factors to scale mutation rates in prediction files via the tool `scale_mu`.
+The raw MuRaL-predicted mutation rates are not mutation rates per bp per generation. To obtain a mutation rate per bp per generation for each nucleotide, one can scale the MuRaL-predicted rates using reported genome-wide DNM mutation rate and spectrum per generation. First, use the command `calc_mu_scaling_factor` to calculate scaling factors for specific groups of sites (e.g. A/T sites, C/G sites). Then use the scaling factors to scale mutation rates in prediction files via the command `scale_mu`.
 
 Note that we cannot compare, nor add up raw predicted rates from different MuRaL models (e.g. A/T model and C/G model), but we can do that with scaled mutation rates.
 
@@ -158,7 +158,7 @@ Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***A
 Predicted single-nucleotide mutation rate profiles for these genomes are available at [ScienceDB](https://www.doi.org/10.11922/sciencedb.01173).
 
 ### 6. Citation <a name="Citation"></a>
-Fang Y, Deng S, Li C. 2021. A deep learning-based framework for estimating fine-scale germline mutation rates. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
+Fang Y, Deng S, Li C. 2021. A generalizable deep learning framework for inferring fine-scale germline mutation rate maps. bioRxiv [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
 
 ### 7. Contact <a name="Contact"></a>
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.
