@@ -92,6 +92,20 @@ def parse_arguments(parser):
                           Size of mini batches for prediction. Default: 16.
                           """ ).strip())
     
+    optional.add_argument('--kmer_corr', type=int, metavar='INT', default=[], nargs='+',
+                          help=textwrap.dedent("""
+                          Calculate k-mer correlations with observed variants in 5th column.
+                          Accept one or more odd positive integers for k-mers, e.g., "3 5 7".
+                          Default: no value.
+                          """ ).strip())
+    
+    optional.add_argument('--region_corr', type=int, metavar='INT', default=[], nargs='+',
+                          help=textwrap.dedent("""
+                          Calculate region correlations with observed variants in 5th column.
+                          Accept one or more positive integers for window size (bp), 
+                          e.g., "10000 50000". Default: no value.
+                          """ ).strip())
+    
     optional.add_argument('-v', '--version', action='version',
                         version='%(prog)s {}'.format(__version__))
     
@@ -181,6 +195,9 @@ def main():
     model_path = args.model_path
     model_config_path = args.model_config_path
     calibrator_path = args.calibrator_path
+    
+    kmer_corr = args.kmer_corr
+    region_corr = args.region_corr
 
     # Load model config (hyperparameters)
     if model_config_path != '':
@@ -328,11 +345,8 @@ def main():
     
     print('Mean Loss, Total Loss, Test Size:', test_total_loss/test_size, test_total_loss, test_size)
     
-    # Combine data and do k-mer evaluation
+    # Combine data 
     data_and_prob = pd.concat([data_local_test, y_prob], axis=1)         
-    print('3mer correlation: ', freq_kmer_comp_multi(data_and_prob, 3, n_class))
-    print('5mer correlation: ', freq_kmer_comp_multi(data_and_prob, 5, n_class))
-    print('7mer correlation: ', freq_kmer_comp_multi(data_and_prob, 7, n_class))
 
     # Write the prediction
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
@@ -340,13 +354,29 @@ def main():
     pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] +  prob_names
     pred_df.to_csv(pred_file, sep='\t', float_format='%.4g', index=False)
     
+    #do k-mer evaluation
+    if len(kmer_corr) > 0:
+        modes = [i%2 for i in kmer_corr]
+        
+        if sum(modes) != len(kmer_corr) or min(kmer_corr) < 0:
+            print('Warning: please provide odd positive mumbers for k-mer lengths', kmer_corr, '. No k-mer correlation was calculated.')
+        else:
+            for kmer in kmer_corr:
+                print(str(kmer)+'mer correlation: ', freq_kmer_comp_multi(data_and_prob, kmer, n_class))
+   
     # Calculate regional correlations for a few window sizes
     #for win_size in [10000, 50000, 200000]:
-    for win_size in [50000]:
-        corr = corr_calc_sub(pred_df, win_size, prob_names)
-        print('regional corr:', str(win_size)+'bp', corr)
-  
-    print('Total time used: %s seconds' % (time.time() - start_time))
+    if len(region_corr) > 0:
+        if min(region_corr) <=0:
+            print('Warning: please provide  positive mumbers for window sizes. No regional correlation was calculated.')
+        else:      
+            pred_df.sort_values(['chrom', 'start'], inplace=True)
+            
+            for win_size in region_corr:
+                corr = corr_calc_sub(pred_df, win_size, prob_names)
+                print('regional corr:', str(win_size)+'bp', corr)
+
+            print('Total time used: %s seconds' % (time.time() - start_time))
    
     
 if __name__ == "__main__":

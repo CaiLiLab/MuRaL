@@ -462,15 +462,6 @@ def train(config, args, checkpoint_dir=None):
             
             print('valid_pred_df: ', valid_pred_df.head())
             
-            # Print regional correlations
-            #for win_size in [20000, 100000, 500000]:
-            for win_size in [100000, 500000]:
-                corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
-                print('regional corr (validation):', str(win_size)+'bp', corr_win)
-                
-                corr_win_cal = corr_calc_sub(valid_cal_pred_df, win_size, prob_names)
-                print('regional corr (validation, after calibration):', str(win_size)+'bp', corr_win_cal)
-            
             # Save model data for each checkpoint
             with tune.checkpoint_dir(epoch) as checkpoint_dir:
                 path = os.path.join(checkpoint_dir, 'model')
@@ -483,7 +474,19 @@ def train(config, args, checkpoint_dir=None):
                     pickle.dump(config, fp)
                 if save_valid_preds:
                     valid_pred_df.to_csv(path + '.valid_preds.tsv.gz', sep='\t', float_format='%.4g', index=False)
-            
+                    
+            # Print regional correlations
+            valid_pred_df.sort_values(['chrom', 'start'], inplace=True)
+            valid_cal_pred_df.sort_values(['chrom', 'start'], inplace=True)
+            #for win_size in [20000, 100000, 500000]:
+            for win_size in [100000, 500000]:
+                
+                corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
+                print('regional corr (validation):', str(win_size)+'bp', corr_win)
+                
+                corr_win_cal = corr_calc_sub(valid_cal_pred_df, win_size, prob_names)
+                print('regional corr (validation, after calibration):', str(win_size)+'bp', corr_win_cal)
+                    
             current_loss = valid_total_loss/valid_size
             if epoch == 0 or current_loss < min_loss:
                 min_loss = current_loss

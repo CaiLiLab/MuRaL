@@ -179,8 +179,12 @@ def corr_calc_sub(data, window, prob_names):
         print('CV for ', str(window)+'bp:', CV_obs, CV_pred)
         
         #corr = result['avg_obs'+str(i)].astype(float).corr(result['avg_pred'+str(i)]).astype(float)
-        #from scipy.stats.stats import pearsonr   
-        corr = pearsonr(result['avg_obs'+str(i)], result['avg_pred'+str(i)])[0]
+        #from scipy.stats.stats import pearsonr 
+        if result.shape[0] >= 3:
+            corr = pearsonr(result['avg_obs'+str(i)], result['avg_pred'+str(i)])[0]
+        else:
+            corr = 0
+            print('Warning: too few windows for calculating correlation', window, 'subtype', i)
         corr_list.append(corr)
     
     return corr_list
