@@ -24,6 +24,8 @@ Below is an example showing that MuRaL-predicted rates (colored lines) are highl
 <img src="./images/regional_correlation_example.jpg" alt="model schematic" width="500"/>
 
 ## 2. Installation <a name="Installation"></a>
+You can install MuRaL with conda, or download pre-built Singularity images if Singularity works in your system. More details are given below.
+### 2.1 Using Conda
 MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (version 3 or newer) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
 
 After installing Miniconda, download or clone the MuRaL source code from github and go into the source code root folder 'MuRal-xxx/'.
@@ -62,6 +64,20 @@ If the installation is complete, the following commands are available from the c
    * `get_best_mural_models`: This tool is for finding the best model per trial, given the 'progress.csv' files of trials.
    * `calc_mu_scaling_factor`: This tool is for calculating scaling factors for generating per-generation mutation rates.
    * `scale_mu`: This tool is for scaling raw MuRaL-predicted mutation rates into per-generation rates given a scaling factor.
+
+### 2.2 Using Singularity
+Singularity is a popular container platform for scientific research. We also built Singularity images for specific versions, which can be found at this [OSF repo](https://osf.io/rd9k5/). You can just download the Singularity image `mural_vx.x.x.sif` from the OSF repo and don't need to install the dependencies of MuRaL. Once Singularity is installed in your system, you can try running the MuRaL commands with the `mural_vx.x.x.sif` file. 
+
+If your machine has GPUs and you want to use GPU resources for MuRaL tools, please remember to set the '--nv' flag for Singularity commands. See the following examples:
+```
+singularity exec --nv /path/to/mural_vx.x.x.sif mural_train ...
+singularity exec --nv /path/to/mural_vx.x.x.sif mural_train_TL ...
+```
+For prediction tasks, it is recommended to use only CPUs so that you can run many prediction tasks in parallel. See the example below:
+```
+singularity exec /path/to/mural_vx.x.x.sif mural_predict ...
+```
+For more about Singularity, please refer to the [Singularity documentation](https://docs.sylabs.io).
 
 ## 3. Usage examples <a name="Usage_examples"></a>
 ### 3.1 Model training <a name="Model_training"></a>
