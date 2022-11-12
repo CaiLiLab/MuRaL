@@ -1,4 +1,4 @@
-<img src="./images/mural-logo.jpg" alt="MuRaL logo" width="300"/>
+![MuRaL logo](images/mural-logo.jpg)
 
 ## 1. Overview
 **MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
