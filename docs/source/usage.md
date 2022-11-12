@@ -1,11 +1,11 @@
-![](images/mural-logo.jpg =300x)
+![](images/mural-logo.jpg)
 
 ## 1. Overview
 **MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a computational framework based on neural networks to learn and predict single-nucleotide mutation rates. 
 
 The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide) of a focal nucleotide, the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
-<img src="./images/model_schematic.jpg" alt="model schematic" width="830"/>
+![](images/model_schematic.jpg)
 
 ## 2. Installation
 MuRaL depends on several other packages, and we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (version 3 or newer) to create a conda environment for installing MuRaL and its dependencies. Please refer to Miniconda's documentation for its installation.
