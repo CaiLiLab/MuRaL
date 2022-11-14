@@ -93,11 +93,12 @@ help message.
 
 Main commands: 
 
-* ``mural_train``: This tool is for training mutation rate models from 
-the beginning. 
-* ``mural_train_TL``: This tool is for training transfer learning models, 
-taking advantage of learned weightsof a pre-trained model. 
-* ``mural_predict``: This tool is forpredicting mutation rates of new sites with a trained model.
+-| ``mural_train``: This tool is for training mutation rate models from 
+ the beginning. 
+-| ``mural_train_TL``: This tool is for training transfer learning models, 
+ taking advantage of learned weightsof a pre-trained model. 
+-| ``mural_predict``: This tool is forpredicting mutation rates of new 
+ sites with a trained model.
 
 Auxiliary commands: \* ``get_best_mural_models``: This tool is for
 finding the best model per trial, given the 'progress.csv' files of
