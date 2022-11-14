@@ -149,7 +149,8 @@ documentation <https://docs.sylabs.io>`__.
 mutation data, and exports training results under the "./ray\_results/"
 folder. 
 
--  | Input data
+* Input data
+   
    Input data files include the reference sequence file (FASTA format,
    required), a training data file (required) and a validation data file
    (optional). If the validation data file isn't provided, a fraction of
@@ -178,7 +179,8 @@ folder.
    BE SORTED by chromosome coordinates. You can sort BED files by
    ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
 
--  | Output data
+* Output data
+
    ``mural_train`` saves the model information at each checkpoint,
    normally at the end of each training epoch of a trial. The
    checkpointed model files during training are saved under folders
