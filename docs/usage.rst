@@ -94,7 +94,7 @@ help message.
 Main commands: 
 
 * ``mural_train``: This tool is for training mutation rate models from 
-the beginning. 
+  the beginning. 
 * ``mural_train_TL``: This tool is for training transfer learning models, 
   taking advantage of learned weightsof a pre-trained model. 
 * ``mural_predict``: This tool is forpredicting mutation rates of new 
@@ -345,14 +345,13 @@ that with scaled mutation rates.
 5. Trained models and predicted mutation rate profiles of multiple species
 --------------------------------------------------------------------------
 
-Trained models for four species - ***Homo sapiens***, ***Macaca
-mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster***
-are provided in the 'models/' folder of the package. One can use these
-model files for prediction or transfer learning.
+Trained models for four species - *Homo sapiens*, *Macaca mulatta*, 
+*Arabidopsis thaliana* and *Drosophila melanogaster* are provided in 
+the 'models/' folder of the package. One can use these model files 
+for prediction or transfer learning.
 
 Predicted single-nucleotide mutation rate profiles for these genomes are
-available at
-`ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
+available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 
 6. Citation
 -----------
