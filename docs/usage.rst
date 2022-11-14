@@ -140,7 +140,7 @@ documentation <https://docs.sylabs.io>`__.
 3.1 Model training 
 ~~~~~~~~~~~~~~~~~~~
 
-| ``mural_train`` trains MuRaL models with training and validation
+``mural_train`` trains MuRaL models with training and validation
 mutation data, and exports training results under the "./ray\_results/"
 folder. 
 
