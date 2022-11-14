@@ -94,19 +94,19 @@ help message.
 Main commands: 
 
 - ``mural_train``: This tool is for training mutation rate models from 
- the beginning. 
+  the beginning. 
 - ``mural_train_TL``: This tool is for training transfer learning models, 
- taking advantage of learned weightsof a pre-trained model. 
+  taking advantage of learned weightsof a pre-trained model. 
 - ``mural_predict``: This tool is forpredicting mutation rates of new 
- sites with a trained model.
+  sites with a trained model.
 
 Auxiliary commands: 
 
-- | ``get_best_mural_models``: This tool is for finding the best model 
+* ``get_best_mural_models``: This tool is for finding the best model 
   per trial, given the 'progress.csv' files of trials. 
-- | ``calc_mu_scaling_factor``: This tool is for calculating
+* ``calc_mu_scaling_factor``: This tool is for calculating
   scaling factors for generating per-generation mutation rates.
-- | ``scale_mu``: This tool is for scaling raw MuRaL-predicted mutation
+* ``scale_mu``: This tool is for scaling raw MuRaL-predicted mutation
   rates into per-generation rates given a scaling factor.
 
 2.2 Using Singularity
