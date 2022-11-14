@@ -1,9 +1,9 @@
-Welcome to MuRaL's documentation |release| !
+Welcome to the documentation of MuRaL \(|release|\) !
 ============================================
 
 **MuRaL** is a deep learning framework for estimating single-nucleotide mutation rates across the genome.
 
-.. image:: images/mural_logo.jpg
+.. image:: ../images/mural-logo.jpg
 
 
 .. note::

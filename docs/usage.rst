@@ -1,5 +1,5 @@
-1. Overview 
-------------
+1. Overview
+-----------
 
 .. image:: ../images/mural-logo.jpg
 
@@ -30,13 +30,17 @@ Below is an example showing that MuRaL-predicted rates (colored lines)
 are highly correlated with observed mutation rates (grey shades) at
 different scales on Chr3 of *A. thaliana*.
 
-2. Installation 
-----------------
+2. Installation
+---------------
 
 You can install MuRaL with conda, or download pre-built Singularity
 images if Singularity works in your system. More details are given
-below. ### 2.1 Using Conda MuRaL depends on several other packages, and
-we recommend using
+below.
+
+2.1 Using Conda
+~~~~~~~~~~~~~~~~
+
+MuRaL depends on several other packages, and we recommend using
 `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`__ (version
 3 or newer) to create a conda environment for installing MuRaL and its
 dependencies. Please refer to Miniconda's documentation for its

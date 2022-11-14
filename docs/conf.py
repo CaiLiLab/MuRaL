@@ -23,7 +23,7 @@ def get_version():
         mo = re.match("__version__ = '([^']+)'", line)
         if mo:
             ver = mo.group(1)
-            return ver
+            return 'v' + ver
     return None
 
 
