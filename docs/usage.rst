@@ -141,11 +141,11 @@ documentation <https://docs.sylabs.io>`__.
 ~~~~~~~~~~~~~~~~~~~
 
 | ``mural_train`` trains MuRaL models with training and validation
-| mutation data, and exports training results under the "./ray\_results/"
-| folder. 
+mutation data, and exports training results under the "./ray\_results/"
+folder. 
 
 -  | Input data
-   | Input data files include the reference sequence file (FASTA format,
+   Input data files include the reference sequence file (FASTA format,
    required), a training data file (required) and a validation data file
    (optional). If the validation data file isn't provided, a fraction of
    the sites sampled from the training data file are used as validation
@@ -174,7 +174,7 @@ documentation <https://docs.sylabs.io>`__.
    ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
 
 -  | Output data
-   | ``mural_train`` saves the model information at each checkpoint,
+   ``mural_train`` saves the model information at each checkpoint,
    normally at the end of each training epoch of a trial. The
    checkpointed model files during training are saved under folders
    named like:
@@ -203,7 +203,7 @@ documentation <https://docs.sylabs.io>`__.
        get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 -  | Example 1
-   | The following command will train a model by running two trials,
+   The following command will train a model by running two trials,
    using data in 'data/training.sorted.bed' for training. The training
    results will be saved under the folder './ray\_results/example1/'.
    Default values will be used for other unspecified arguments. Note
@@ -217,7 +217,7 @@ documentation <https://docs.sylabs.io>`__.
                --experiment_name example1 > test1.out 2> test1.err
 
 -  | Example 2
-   | The following command will use data in 'data/training.sorted.bed'
+   The following command will use data in 'data/training.sorted.bed'
    as training data and a separate 'data/validation.sorted.bed' as
    validation data. The option '--local\_radius 7' means that length of
    the local sequence used for training is 7\*2+1 = 15 bp.
