@@ -93,11 +93,11 @@ help message.
 
 Main commands: 
 
-- ``mural_train``: This tool is for training mutation rate models from 
-  the beginning. 
-- ``mural_train_TL``: This tool is for training transfer learning models, 
+* ``mural_train``: This tool is for training mutation rate models from 
+the beginning. 
+* ``mural_train_TL``: This tool is for training transfer learning models, 
   taking advantage of learned weightsof a pre-trained model. 
-- ``mural_predict``: This tool is forpredicting mutation rates of new 
+* ``mural_predict``: This tool is forpredicting mutation rates of new 
   sites with a trained model.
 
 Auxiliary commands: 
@@ -139,11 +139,11 @@ run many prediction tasks in parallel. See the example below:
 For more about Singularity, please refer to the `Singularity
 documentation <https://docs.sylabs.io>`__.
 
-3. Usage examples 
-------------------
+3. Usage examples
+-----------------
 
-3.1 Model training 
-~~~~~~~~~~~~~~~~~~~
+3.1 Model training
+~~~~~~~~~~~~~~~~~~
 
 ``mural_train`` trains MuRaL models with training and validation
 mutation data, and exports training results under the "./ray\_results/"
@@ -209,49 +209,57 @@ training.
 
    get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
--  | Example 1
-   The following command will train a model by running two trials,
-   using data in 'data/training.sorted.bed' for training. The training
-   results will be saved under the folder './ray\_results/example1/'.
-   Default values will be used for other unspecified arguments. Note
-   that, by default, 10% of the sites sampled from 'training.sorted.bed'
-   is used as validation data (i.e. '--valid\_ratio 0.1'). You can run
-   this example under the 'examples/' folder in the package.
+* Example 1
 
-   ::
+The following command will train a model by running two trials,
+using data in 'data/training.sorted.bed' for training. The training
+results will be saved under the folder './ray\_results/example1/'.
+Default values will be used for other unspecified arguments. Note
+that, by default, 10% of the sites sampled from 'training.sorted.bed'
+is used as validation data (i.e. '--valid\_ratio 0.1'). You can run
+this example under the 'examples/' folder in the package.
 
-       mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+::
+
+   mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
                --experiment_name example1 > test1.out 2> test1.err
 
--  | Example 2
-   The following command will use data in 'data/training.sorted.bed'
-   as training data and a separate 'data/validation.sorted.bed' as
-   validation data. The option '--local\_radius 7' means that length of
-   the local sequence used for training is 7\*2+1 = 15 bp.
-   '--distal\_radius 200' means that length of the expanded sequence
-   used for training is 200\*2+1 = 401 bp. You can run this example
-   under the 'examples/' folder in the package.
+* Example 2
 
-   ::
+The following command will use data in 'data/training.sorted.bed'
+as training data and a separate 'data/validation.sorted.bed' as
+validation data. The option '--local\_radius 7' means that length of
+the local sequence used for training is 7\*2+1 = 15 bp.
+'--distal\_radius 200' means that length of the expanded sequence
+used for training is 200\*2+1 = 401 bp. You can run this example
+under the 'examples/' folder in the package.
 
-       mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
-               --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 7 \
-               --distal_radius 200 --experiment_name example2 > test2.out 2> test2.err
+::
+
+  mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+              --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 7 \
+              --distal_radius 200 --experiment_name example2 > test2.out 2> test2.err
 
 3.2 Model prediction 
 ~~~~~~~~~~~~~~~~~~~~~
 
-| ``mural_predict`` predicts mutation rates for all sites in a BED file
-based on a trained model. \* Input data
-|  The required input files for prediction include the reference FASTA
+``mural_predict`` predicts mutation rates for all sites in a BED file
+based on a trained model. 
+
+* Input data
+
+The required input files for prediction include the reference FASTA
 file, a BED-formated data file and a trained model. The BED file is
 organized in the same way as that for training. The 5th column can be
 set to '0' if no observed mutations for the sites in the prediction BED.
 The model-related files for input are 'model' and 'model.config.pkl',
 which are generated at the training step. The file
 'model.fdiri\_cal.pkl', which is for calibrating predicted mutation
-rates, is optional. \* Output data
-|  The output of ``mural_predict`` is a tab-separated file containing
+rates, is optional. 
+
+* Output data
+
+The output of ``mural_predict`` is a tab-separated file containing
 the sequence coordinates (BED-formatted) and the predicted probabilities
 for all possible mutation types. Usually, the 'prob0' column contains
 probabilities for the non-mutated class and other 'probX' columns for
@@ -266,49 +274,57 @@ shown below.
     chr1    10008   10009   +       0       0.9817  0.004801 0.01006 0.003399
     chr1    10012   10013   -       0       0.9711  0.004898 0.02029 0.003746
 
--  | Example 3
-   |  The following command will predict mutation rates for all sites in
-   'data/testing.bed.gz' using model files under the
-   'models/checkpoint\_6/' folder and save prediction results into
-   'testing.ckpt6.fdiri.tsv.gz'. You can run this example under the
-   'examples/' folder in the package.
+* Example 3
 
-   ::
+The following command will predict mutation rates for all sites in
+'data/testing.bed.gz' using model files under the
+'models/checkpoint\_6/' folder and save prediction results into
+'testing.ckpt6.fdiri.tsv.gz'. You can run this example under the
+'examples/' folder in the package.
 
-       mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \
-               --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl \
-               --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
-               --without_h5 --cpu_only \
-               > test3.out 2> test3.err
+::
+
+   mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \
+                 --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl \
+                 --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
+                 --without_h5 --cpu_only \
+                 > test3.out 2> test3.err
 
 3.3 Transfer learning 
 ~~~~~~~~~~~~~~~~~~~~~~
 
-| ``mural_train_TL`` trains MuRaL models like ``mural_train`` but
+``mural_train_TL`` trains MuRaL models like ``mural_train`` but
 initializes model parameters with learned weights from a pre-trained
 model. Its training results are also saved under the "./ray\_results/"
-folder. \* Input data
-|  The input files for ``mural_train_TL`` include the reference FASTA
+folder. 
+
+* Input data
+
+The input files for ``mural_train_TL`` include the reference FASTA
 file (required), a training data file (required), a validation data file
 (optional), and model-related files of a trained model (required). The
 required model-related files are 'model' and 'model.config.pkl' under a
 specific checkpoint folder, normally generated by ``mural_train`` or
-``mural_train_TL``. \* Output data
-|  Output data has the same structure as that of ``mural_train``.
+``mural_train_TL``. 
 
--  | Example 4
-   |  The following command will train a transfer learning model using
-   training data in 'data/training\_TL.sorted.bed', the validation data
-   in 'data/validation.sorted.bed', and the model files under
-   'models/checkpoint\_6/'. You can run this example under the
-   'examples/' folder in the package.
+* Output data
 
-   ::
+Output data has the same structure as that of ``mural_train``.
 
-       mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed \
-               --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model \
-               --model_config_path models/checkpoint_6/model.config.pkl --train_all \
-               --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
+* Example 4
+
+The following command will train a transfer learning model using
+training data in 'data/training\_TL.sorted.bed', the validation data
+in 'data/validation.sorted.bed', and the model files under
+'models/checkpoint\_6/'. You can run this example under the
+'examples/' folder in the package.
+
+::
+
+ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed \
+                --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model \
+                --model_config_path models/checkpoint_6/model.config.pkl --train_all \
+                --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 
 4. Scale MuRaL-predicted mutation rates to per base per generation rates
 ------------------------------------------------------------------------
