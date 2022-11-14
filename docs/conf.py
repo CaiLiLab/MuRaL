@@ -6,8 +6,30 @@ project = 'MuRaL'
 copyright = '2022, MuRaL'
 author = 'MuRaL'
 
-release = '0.1'
-version = '0.1.0'
+# The version info for the project you're documenting, acts as replacement for
+# |version| and |release|, also used in various other places throughout the
+# built documents.
+#
+# The short X.Y version.
+
+
+def get_version():
+    import re
+    try:
+        f = open("../deeptools/_version.py")
+    except EnvironmentError:
+        return None
+    for line in f.readlines():
+        mo = re.match("__version__ = '([^']+)'", line)
+        if mo:
+            ver = mo.group(1)
+            return ver
+    return None
+
+
+version = get_version()
+# The full version, including alpha/beta/rc tags.
+release = version
 
 # -- General configuration
 
@@ -17,7 +39,6 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-	'recommonmark',
 ]
 
 intersphinx_mapping = {
