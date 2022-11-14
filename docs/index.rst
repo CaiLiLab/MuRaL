@@ -1,5 +1,5 @@
 ==================================================
-MuRaL: estimating mutation rates via deep learning
+MuRaL: inferring mutation rates via deep learning
 ==================================================
 
 .. image:: ../images/mural-logo.jpg

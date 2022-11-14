@@ -1,5 +1,5 @@
-1. Overview
------------
+Overview
+--------
 
 Germline mutation rates are crucial parameters in genetics, genomics and
 evolutionary biology. It is long known that mutation rates vary
@@ -32,15 +32,15 @@ different scales on Chr3 of *A. thaliana*.
 .. image:: images/regional_correlation_example.jpg
    :width: 500px
 
-2. Installation
----------------
+Installation
+------------
 
 You can install MuRaL with conda, or download pre-built Singularity
 images if Singularity works in your system. More details are given
 below.
 
-2.1 Using Conda
-~~~~~~~~~~~~~~~~
+Using Conda
+~~~~~~~~~~~
 
 MuRaL depends on several other packages, and we recommend using
 `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`__ (version
@@ -111,8 +111,8 @@ Auxiliary commands:
 * ``scale_mu``: This tool is for scaling raw MuRaL-predicted mutation
   rates into per-generation rates given a scaling factor.
 
-2.2 Using Singularity
-~~~~~~~~~~~~~~~~~~~~~
+Using Singularity
+~~~~~~~~~~~~~~~~~
 
 Singularity is a popular container platform for scientific research. We
 also built Singularity images for specific versions, which can be found
@@ -141,11 +141,11 @@ run many prediction tasks in parallel. See the example below:
 For more about Singularity, please refer to the `Singularity
 documentation <https://docs.sylabs.io>`__.
 
-3. Usage examples
------------------
+Usage examples
+--------------
 
-3.1 Model training
-~~~~~~~~~~~~~~~~~~
+Model training
+~~~~~~~~~~~~~~
 
 ``mural_train`` trains MuRaL models with training and validation
 mutation data, and exports training results under the "./ray\_results/"
@@ -242,8 +242,8 @@ under the 'examples/' folder in the package.
               --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 7 \
               --distal_radius 200 --experiment_name example2 > test2.out 2> test2.err
 
-3.2 Model prediction 
-~~~~~~~~~~~~~~~~~~~~~
+Model prediction
+~~~~~~~~~~~~~~~~
 
 ``mural_predict`` predicts mutation rates for all sites in a BED file
 based on a trained model. 
@@ -292,8 +292,8 @@ The following command will predict mutation rates for all sites in
                  --without_h5 --cpu_only \
                  > test3.out 2> test3.err
 
-3.3 Transfer learning 
-~~~~~~~~~~~~~~~~~~~~~~
+Transfer learning
+~~~~~~~~~~~~~~~~~
 
 ``mural_train_TL`` trains MuRaL models like ``mural_train`` but
 initializes model parameters with learned weights from a pre-trained
@@ -328,8 +328,8 @@ in 'data/validation.sorted.bed', and the model files under
                 --model_config_path models/checkpoint_6/model.config.pkl --train_all \
                 --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 
-4. Scale MuRaL-predicted mutation rates to per base per generation rates
-------------------------------------------------------------------------
+Scale MuRaL-predicted mutation rates to per base per generation rates
+---------------------------------------------------------------------
 
 The raw MuRaL-predicted mutation rates are not mutation rates per bp per
 generation. To obtain a mutation rate per bp per generation for each
@@ -344,8 +344,8 @@ Note that we cannot compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
 that with scaled mutation rates.
 
-5. Trained models and predicted mutation rate profiles of multiple species
---------------------------------------------------------------------------
+Trained models and predicted mutation rate profiles of multiple species
+-----------------------------------------------------------------------
 
 Trained models for four species - *Homo sapiens*, *Macaca mulatta*, 
 *Arabidopsis thaliana* and *Drosophila melanogaster* are provided in 
@@ -355,15 +355,15 @@ for prediction or transfer learning.
 Predicted single-nucleotide mutation rate profiles for these genomes are
 available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 
-6. Citation
------------
+Citation
+--------
 
 Fang Y, Deng S, Li C. 2021. A generalizable deep learning framework for
 inferring fine-scale germline mutation rate maps. bioRxiv
 `doi:10.1101/2021.10.25.465689 <https://doi.org/10.1101/2021.10.25.465689>`__
 
-7. Contact
-----------
+Contact
+-------
 
 For reporting issues or requests related to the package, please write to
 mural-project@outlook.com.
