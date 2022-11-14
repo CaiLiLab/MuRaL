@@ -29,7 +29,7 @@ def get_version():
 
 version = get_version()
 # The full version, including alpha/beta/rc tags.
-release = version
+release = 'v1.0.0'
 
 # -- General configuration
 
