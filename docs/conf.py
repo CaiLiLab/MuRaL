@@ -4,7 +4,7 @@
 
 project = 'MuRaL'
 copyright = '2022, MuRaL'
-author = 'MuRaL'
+author = 'Cai Li, Yiyuan Fang, Shuyi Deng'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
