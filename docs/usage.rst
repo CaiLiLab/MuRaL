@@ -1,8 +1,6 @@
 1. Overview
 -----------
 
-.. image:: ../images/mural-logo.jpg
-
 Germline mutation rates are crucial parameters in genetics, genomics and
 evolutionary biology. It is long known that mutation rates vary
 substantially across the genome, but existing methods can only obtain
@@ -147,17 +145,17 @@ documentation <https://docs.sylabs.io>`__.
 | folder. 
 
 -  | Input data
-   |  Input data files include the reference sequence file (FASTA format,
-   | required), a training data file (required) and a validation data file
-   | (optional). If the validation data file isn't provided, a fraction of
-   | the sites sampled from the training data file are used as validation
-   | data.
-   |  Input training and validation data files are in BED format (more info
-   | about BED format
-   | `here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
-   | example lines of an input BED file are shown below.
+   | Input data files include the reference sequence file (FASTA format,
+   required), a training data file (required) and a validation data file
+   (optional). If the validation data file isn't provided, a fraction of
+   the sites sampled from the training data file are used as validation
+   data.
+   Input training and validation data files are in BED format (more info
+   about BED format
+   `here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
+   example lines of an input BED file are shown below.
 
-::
+   ::
 
     chr1    2333436 2333437 .   0   + 
     chr1    2333446 2333447 .   2   -
@@ -165,18 +163,18 @@ documentation <https://docs.sylabs.io>`__.
     chr1    2333510 2333511 .   3   -
     chr1    2333812 2333813 .   0   - 
 
-   | In the BED-formatted lines above, the 5th column is used to represent
-   | mutation status: usually, '0' means the non-mutated status and other
-   | numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
-   | '3' for 'A>T'). You can specify an arbitrary order for a group of
-   | mutation types with incremental numbers starting from 0, but make sure
-   | that the same order is consistently used in training, validation and
-   | testing datasets. Importantly, the training and validation BED file MUST
-   | BE SORTED by chromosome coordinates. You can sort BED files by
-   | ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
+   In the BED-formatted lines above, the 5th column is used to represent
+   mutation status: usually, '0' means the non-mutated status and other
+   numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
+   '3' for 'A>T'). You can specify an arbitrary order for a group of
+   mutation types with incremental numbers starting from 0, but make sure
+   that the same order is consistently used in training, validation and
+   testing datasets. Importantly, the training and validation BED file MUST
+   BE SORTED by chromosome coordinates. You can sort BED files by
+   ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
 
 -  | Output data
-   |  ``mural_train`` saves the model information at each checkpoint,
+   | ``mural_train`` saves the model information at each checkpoint,
    normally at the end of each training epoch of a trial. The
    checkpointed model files during training are saved under folders
    named like:
@@ -205,7 +203,7 @@ documentation <https://docs.sylabs.io>`__.
        get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 -  | Example 1
-   |  The following command will train a model by running two trials,
+   | The following command will train a model by running two trials,
    using data in 'data/training.sorted.bed' for training. The training
    results will be saved under the folder './ray\_results/example1/'.
    Default values will be used for other unspecified arguments. Note
@@ -219,7 +217,7 @@ documentation <https://docs.sylabs.io>`__.
                --experiment_name example1 > test1.out 2> test1.err
 
 -  | Example 2
-   |  The following command will use data in 'data/training.sorted.bed'
+   | The following command will use data in 'data/training.sorted.bed'
    as training data and a separate 'data/validation.sorted.bed' as
    validation data. The option '--local\_radius 7' means that length of
    the local sequence used for training is 7\*2+1 = 15 bp.
