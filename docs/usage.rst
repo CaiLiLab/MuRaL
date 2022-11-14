@@ -93,7 +93,7 @@ If the installation is complete, the following commands are available
 from the command line. Type a commnad with '-h' option to see detailed
 help message.
 
-Main commands: 
+**Main commands**: 
 
 * ``mural_train``: This tool is for training mutation rate models from 
   the beginning. 
@@ -102,7 +102,7 @@ Main commands:
 * ``mural_predict``: This tool is forpredicting mutation rates of new 
   sites with a trained model.
 
-Auxiliary commands: 
+**Auxiliary commands**: 
 
 * ``get_best_mural_models``: This tool is for finding the best model 
   per trial, given the 'progress.csv' files of trials. 
@@ -238,9 +238,12 @@ under the 'examples/' folder in the package.
 
 ::
 
-  mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
-              --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 7 \
-              --distal_radius 200 --experiment_name example2 > test2.out 2> test2.err
+  mural_train --ref_genome data/seq.fa \
+              --train_data data/training.sorted.bed \
+              --validation_data data/validation.sorted.bed \
+              --n_trials 2 --local_radius 7 \
+              --distal_radius 200 --experiment_name example2 \
+              > test2.out 2> test2.err
 
 Model prediction
 ~~~~~~~~~~~~~~~~
@@ -287,10 +290,11 @@ The following command will predict mutation rates for all sites in
 ::
 
    mural_predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \
-                 --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl \
-                 --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl --pred_file testing.ckpt6.fdiri.tsv.gz \
-                 --without_h5 --cpu_only \
-                 > test3.out 2> test3.err
+                 --model_path models/checkpoint_6/model \
+                 --model_config_path models/checkpoint_6/model.config.pkl \
+                 --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl \
+                 --pred_file testing.ckpt6.fdiri.tsv.gz \
+                 --without_h5 --cpu_only > test3.out 2> test3.err
 
 Transfer learning
 ~~~~~~~~~~~~~~~~~
@@ -323,10 +327,13 @@ in 'data/validation.sorted.bed', and the model files under
 
 ::
 
- mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed \
-                --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model \
-                --model_config_path models/checkpoint_6/model.config.pkl --train_all \
-                --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
+ mural_train_TL --ref_genome data/seq.fa \
+                --train_data data/training_TL.sorted.bed \
+                --validation_data data/validation.sorted.bed \
+                --model_path models/checkpoint_6/model \
+                --model_config_path models/checkpoint_6/model.config.pkl \
+                --train_all --init_fc_with_pretrained \
+                --experiment_name example4 > test4.out 2> test4.err
 
 Scale MuRaL-predicted mutation rates to per base per generation rates
 ---------------------------------------------------------------------
