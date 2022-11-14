@@ -134,7 +134,7 @@ run many prediction tasks in parallel. See the example below:
 
 ::
 
-    singularity exec /path/to/mural_vx.x.x.sif mural_predict ...
+   singularity exec /path/to/mural_vx.x.x.sif mural_predict ...
 
 For more about Singularity, please refer to the `Singularity
 documentation <https://docs.sylabs.io>`__.
@@ -151,17 +151,17 @@ folder.
 
 * Input data
    
-   Input data files include the reference sequence file (FASTA format,
-   required), a training data file (required) and a validation data file
-   (optional). If the validation data file isn't provided, a fraction of
-   the sites sampled from the training data file are used as validation
-   data.
-   Input training and validation data files are in BED format (more info
-   about BED format
-   `here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
-   example lines of an input BED file are shown below.
+Input data files include the reference sequence file (FASTA format,
+required), a training data file (required) and a validation data file
+(optional). If the validation data file isn't provided, a fraction of
+the sites sampled from the training data file are used as validation
+data.
+Input training and validation data files are in BED format (more info
+about BED format
+`here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
+example lines of an input BED file are shown below.
 
-   ::
+::
 
     chr1    2333436 2333437 .   0   + 
     chr1    2333446 2333447 .   2   -
@@ -169,45 +169,45 @@ folder.
     chr1    2333510 2333511 .   3   -
     chr1    2333812 2333813 .   0   - 
 
-   In the BED-formatted lines above, the 5th column is used to represent
-   mutation status: usually, '0' means the non-mutated status and other
-   numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
-   '3' for 'A>T'). You can specify an arbitrary order for a group of
-   mutation types with incremental numbers starting from 0, but make sure
-   that the same order is consistently used in training, validation and
-   testing datasets. Importantly, the training and validation BED file MUST
-   BE SORTED by chromosome coordinates. You can sort BED files by
-   ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
+In the BED-formatted lines above, the 5th column is used to represent
+mutation status: usually, '0' means the non-mutated status and other
+numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
+'3' for 'A>T'). You can specify an arbitrary order for a group of
+mutation types with incremental numbers starting from 0, but make sure
+that the same order is consistently used in training, validation and
+testing datasets. Importantly, the training and validation BED file MUST
+BE SORTED by chromosome coordinates. You can sort BED files by
+``bedtools sort`` or ``sort -k1,1 -k2,2n``.
 
 * Output data
 
-   ``mural_train`` saves the model information at each checkpoint,
-   normally at the end of each training epoch of a trial. The
-   checkpointed model files during training are saved under folders
-   named like:
+``mural_train`` saves the model information at each checkpoint,
+normally at the end of each training epoch of a trial. The
+checkpointed model files during training are saved under folders
+named like:
 
-   ::
+::
 
-           ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+    ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
                - model
                - model.config.pkl
                - model.fdiri_cal.pkl
 
-   In the above folder, the 'model' file contains the learned model
-   parameters. The 'model.config.pkl' file contains configured
-   hyperparameters of the model. The 'model.fdiri\_cal.pkl' file (if
-   exists) contains the calibration model learned with validation data,
-   which can be used for calibrating predicted mutation rates. These
-   files can be used in downstream analyses such as model prediction and
-   transfer learning. The 'progress.csv' files in 'Train\_xxx' folders
-   contain important information for each training epoch of trials
-   (e.g., validation loss, used time, etc.). One can use the command
-   ``get_best_mural_models`` to find the best model per trial after
-   training.
+In the above folder, the 'model' file contains the learned model
+parameters. The 'model.config.pkl' file contains configured
+hyperparameters of the model. The 'model.fdiri\_cal.pkl' file (if
+exists) contains the calibration model learned with validation data,
+which can be used for calibrating predicted mutation rates. These
+files can be used in downstream analyses such as model prediction and
+transfer learning. The 'progress.csv' files in 'Train\_xxx' folders
+contain important information for each training epoch of trials
+(e.g., validation loss, used time, etc.). One can use the command
+``get_best_mural_models`` to find the best model per trial after
+training.
 
-   ::
+::
 
-       get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
+   get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 -  | Example 1
    The following command will train a model by running two trials,
