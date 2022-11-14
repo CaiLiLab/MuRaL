@@ -1,6 +1,6 @@
-=================================================================
-MuRaL \(|version|\): estimating mutation rates via deep learning!
-=================================================================
+==================================================
+MuRaL: estimating mutation rates via deep learning
+==================================================
 
 .. image:: ../images/mural-logo.jpg
    :width: 420px
@@ -11,11 +11,14 @@ nucleotide level using only genomic sequences as input. MuRaL
 can build models with relatively few training mutations and 
 a moderate number of sequenced individuals (e.g. ~100 individuals), 
 and can leverage transfer learning to further reduce data and 
-time demands. 
+time demands. It can be applied to many species with population
+genomic data.
+
+This documentation is for MuRaL |version|\.
 
 .. note::
 
-   This project is under active development.
+   This project is still under active development.
 
 Contents
 --------
