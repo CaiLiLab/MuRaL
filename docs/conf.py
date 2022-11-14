@@ -16,7 +16,7 @@ author = 'MuRaL'
 def get_version():
     import re
     try:
-        f = open("../deeptools/_version.py")
+        f = open("../MuRaL/_version.py")
     except EnvironmentError:
         return None
     for line in f.readlines():
@@ -29,7 +29,8 @@ def get_version():
 
 version = get_version()
 # The full version, including alpha/beta/rc tags.
-release = 'v1.0.0'
+#release = 'v1.0.0'
+release = version
 
 # -- General configuration
 
