@@ -166,7 +166,7 @@ mural_train_TL --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed
 ### 4. Scale MuRaL-predicted mutation rates to per base per generation rates <a name="Scaling">
 The raw MuRaL-predicted mutation rates are not mutation rates per bp per generation. To obtain a mutation rate per bp per generation for each nucleotide, one can scale the MuRaL-predicted rates using reported genome-wide DNM mutation rate and spectrum per generation. First, use the command `calc_mu_scaling_factor` to calculate scaling factors for specific groups of sites (e.g. A/T sites, C/G sites). Then use the scaling factors to scale mutation rates in prediction files via the command `scale_mu`.
 
-Note that we cannot compare, nor add up raw predicted rates from different MuRaL models (e.g. A/T model and C/G model), but we can do that with scaled mutation rates.
+Note that we cannot compare or add up raw predicted rates from different MuRaL models (e.g. A/T model and C/G model), but we can do that with scaled mutation rates.
 
 ### 5. Trained models and predicted mutation rate profiles of multiple species <a name="Trained_models"></a>
 Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster*** are provided in the 'models/' folder of the package. One can use these model files for prediction or transfer learning.

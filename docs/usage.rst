@@ -143,17 +143,19 @@ documentation <https://docs.sylabs.io>`__.
 ~~~~~~~~~~~~~~~~~~~
 
 | ``mural_train`` trains MuRaL models with training and validation
-mutation data, and exports training results under the "./ray\_results/"
-folder. \* Input data
-|  Input data files include the reference sequence file (FASTA format,
-required), a training data file (required) and a validation data file
-(optional). If the validation data file isn't provided, a fraction of
-the sites sampled from the training data file are used as validation
-data.
-|  Input training and validation data files are in BED format (more info
-about BED format
-`here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
-example lines of an input BED file are shown below.
+| mutation data, and exports training results under the "./ray\_results/"
+| folder. 
+
+-  | Input data
+   |  Input data files include the reference sequence file (FASTA format,
+   | required), a training data file (required) and a validation data file
+   | (optional). If the validation data file isn't provided, a fraction of
+   | the sites sampled from the training data file are used as validation
+   | data.
+   |  Input training and validation data files are in BED format (more info
+   | about BED format
+   | `here <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`__). Some
+   | example lines of an input BED file are shown below.
 
 ::
 
@@ -163,15 +165,15 @@ example lines of an input BED file are shown below.
     chr1    2333510 2333511 .   3   -
     chr1    2333812 2333813 .   0   - 
 
-In the BED-formatted lines above, the 5th column is used to represent
-mutation status: usually, '0' means the non-mutated status and other
-numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
-'3' for 'A>T'). You can specify an arbitrary order for a group of
-mutation types with incremental numbers starting from 0, but make sure
-that the same order is consistently used in training, validation and
-testing datasets. Importantly, the training and validation BED file MUST
-BE SORTED by chromosome coordinates. You can sort BED files by
-``bedtools sort`` or ``sort -k1,1 -k2,2n``.
+   | In the BED-formatted lines above, the 5th column is used to represent
+   | mutation status: usually, '0' means the non-mutated status and other
+   | numbers for specific mutation types (e.g. '1' for 'A>C', '2' for 'A>G',
+   | '3' for 'A>T'). You can specify an arbitrary order for a group of
+   | mutation types with incremental numbers starting from 0, but make sure
+   | that the same order is consistently used in training, validation and
+   | testing datasets. Importantly, the training and validation BED file MUST
+   | BE SORTED by chromosome coordinates. You can sort BED files by
+   | ``bedtools sort`` or ``sort -k1,1 -k2,2n``.
 
 -  | Output data
    |  ``mural_train`` saves the model information at each checkpoint,
@@ -315,7 +317,7 @@ specific groups of sites (e.g. A/T sites, C/G sites). Then use the
 scaling factors to scale mutation rates in prediction files via the
 command ``scale_mu``.
 
-Note that we cannot compare, nor add up raw predicted rates from
+Note that we cannot compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
 that with scaled mutation rates.
 
