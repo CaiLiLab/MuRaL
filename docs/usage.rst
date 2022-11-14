@@ -23,12 +23,14 @@ side of the focal nucleotide), the other for learning signals from
 expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
 .. image:: images/model_schematic.jpg
+   :width: 830px
 
 Below is an example showing that MuRaL-predicted rates (colored lines)
 are highly correlated with observed mutation rates (grey shades) at
 different scales on Chr3 of *A. thaliana*.
 
 .. image:: images/regional_correlation_example.jpg
+   :width: 500px
 
 2. Installation
 ---------------
