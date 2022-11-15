@@ -406,10 +406,11 @@ correlation include regional correlation and p-value will be listed in
 the last line.
 
 ::
+
  chrom	end	sites_count	mut_type_total	mut_type_avg	avg_pred
  chr3	100000	61492	576	0.009367072139465296	0.020374342255903233
  chr3	200000	60680	531	0.008750823994726434	0.02025859070533955
- chr3	300000	59005	499	0.00845691043131938	0.01882644280993153
+ chr3	300000	59005	499	0.00845691043131938	    0.01882644280993153
  ...
  0.4999	6.040983e-16
 
@@ -425,6 +426,7 @@ executed in parallel on the terminal to save time by changing the parameters
 and file names.
 
 ::
+
  python cor_calculate.py --result_file testing.ckpt4.fdiri.tsv.gz \
  --window 100000 --model prob2 --outfile test_region_corr.100kb.prob2.txt
 
@@ -435,6 +437,7 @@ You can run the commands like below to extract k-mer correlations and correspond
 p-values for further visualization:
 
 ::
+
  for i in {3,5,7}; do tail -3 /public/home/dengsy/DNMML/example/test_${i}mer_corr.txt \
  | awk '{OFS="\t"; print "'$i'-mer", "prob"NR,$0}'; done \
  | awk 'BEGIN{print "k-mer\tmut_type\tcorrelation\tp-value"}{print;}' > kmer_correlations.tsv
@@ -444,8 +447,8 @@ The resulting 'kmer_correlations.tsv' file is tab-delimited, looking like:
 ::
 
  k-mer	mut_type	correlation	p-value
- 3-mer	A>C	0.8527	2.7049e-05
- 3-mer	A>G	0.8453	3.7235e-05
+ 3-mer	A>C			0.8527		2.7049e-05
+ 3-mer	A>G			0.8453		3.7235e-05
  ...
 
 The following python code can be used for generating bar plots for k-mer 
@@ -475,7 +478,7 @@ visualize how predicted rates fit observed rates for windows across
 a chromosome or a specific region. First, we should standardize the 
 observed rates and the predicted rates for all regions by using z-score 
 transformation. Then we select some regions to generate the plots. Below 
-we use the file for 100Kb windows and A>G mutation type, and the region 
+we use the results for 100Kb windows and A>G mutation type, and the region 
 selected is from 15Mb to 23.6Mb. The solid line indicates average 
 predicted mutation rates and the shade for average observed mutation 
 rates:
