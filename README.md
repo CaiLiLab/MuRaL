@@ -1,4 +1,4 @@
-<img src="./images/mural-logo.jpg" alt="MuRaL logo" width="300"/>
+<img src="./docs/images/mural-logo.jpg" alt="MuRaL logo" width="300"/>
 
 ## Table of contents
 1. [Overview](#Overview)
@@ -17,11 +17,11 @@ Germline mutation rates are crucial parameters in genetics, genomics and evoluti
 
 The MuRaL network architecture has two main modules (shown below), one is for learning signals from local genomic regions (e.g. 10bp on each side of the focal nucleotide), the other for learning signals from expanded regions (e.g. 1Kb on each side of the focal nucleotide).
 
-<img src="./images/model_schematic.jpg" alt="model schematic" width="830"/>
+<img src="./docs/images/model_schematic.jpg" alt="model schematic" width="830"/>
 
 Below is an example showing that MuRaL-predicted rates (colored lines) are highly correlated with observed mutation rates (grey shades) at different scales on Chr3 of *A. thaliana*. 
 
-<img src="./images/regional_correlation_example.jpg" alt="model schematic" width="500"/>
+<img src="./docs/images/regional_correlation_example.jpg" alt="model schematic" width="500"/>
 
 ## 2. Installation <a name="Installation"></a>
 You can install MuRaL with conda, or download pre-built Singularity images if Singularity works in your system. More details are given below.
