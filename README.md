@@ -3,7 +3,7 @@
 ## MuRaL: inferring genomic mutation rate maps via deep learning
 1. [Introduction](#Introduction)
 2. [Installation and usage](#Usage)
-3. [Pre-trained models and predicted mutation rate profiles](#Trained_models)
+3. [Pre-trained models and predicted mutation rate maps](#Trained_models)
 4. [Citation](#Citation)
 5. [Contact](#Contact)
 

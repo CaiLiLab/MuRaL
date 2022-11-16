@@ -126,7 +126,7 @@ Tools and examples
 ------------------
 
 The following tools in MuRaL are available from the command line. Type 
-a commnad with '-h' option to see detailed help message. More specific 
+a command with '-h' option to see detailed help message. More specific 
 examples are given in later sections.
 
 **Main commands**: 
@@ -134,8 +134,8 @@ examples are given in later sections.
 * ``mural_train``: This tool is for training mutation rate models from 
   the beginning. 
 * ``mural_train_TL``: This tool is for training transfer learning models, 
-  taking advantage of learned weightsof a pre-trained model. 
-* ``mural_predict``: This tool is forpredicting mutation rates of new 
+  taking advantage of learned weights of a pre-trained model. 
+* ``mural_predict``: This tool is for predicting mutation rates of new 
   sites with a trained model.
 
 **Auxiliary commands**: 
@@ -361,7 +361,7 @@ The inputs for k-mer correlation analysis include the reference
 FASTA file, a prediction tsv file and the length of k-mer. Note that for 
 evaluation, we need to provide a specific set of observed mutations 
 (e.g. all available rare variants), which are stored in the 5th column of 
-the prediction tsv files. Thsese observed mutations are used for
+the prediction tsv files. These observed mutations are used for
 calculating observed mutation rates. We can change the content in the 5th 
 column to evaluate model performance in different observed datasets.
    
