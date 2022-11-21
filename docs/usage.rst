@@ -146,6 +146,10 @@ examples are given in later sections.
   scaling factors for generating per-generation mutation rates.
 * ``scale_mu``: This tool is for scaling raw MuRaL-predicted mutation
   rates into per-generation rates given a scaling factor.
+* ``calc_kmer_corr``: This tool is for calculating kmer mutation rate 
+  correlations for evaluation.
+* ``calc_region_corr``: This tool is for calculating regional mutation
+  rate correlations for evaluation.
 
 Model training
 ~~~~~~~~~~~~~~
@@ -367,21 +371,24 @@ column to evaluate model performance in different observed datasets.
    
 * Output data
 
-The output file contains predicted and observed k-mer rates of all possible
-mutation subtypes. The k-mer correlations (Pearson's r and p-value) of three 
-mutation types are given in the last three lines in a specific order (e.g., 
-for A/T sites, prob1, prob2 and prob3 are for A>C, A>G and A>T, respectively).
+The outputs include a file ('*-mer.mut\_rates.tsv') storing predicted and 
+observed k-mer rates of all possible mutation subtypes, and a file ('*-mer.corr.txt')
+storing the k-mer correlations (Pearson's r and p-value) of three mutation
+types in a specific order (e.g., for A/T sites, prob1, prob2 and prob3 are
+for A>C, A>G and A>T, respectively).
 
 ::
 
- type	obs_rate1	obs_rate2	obs_rate3	avg_pred_prob1	avg_pred_prob2	avg_pred_prob3	number_of_mut1	number_of_mut2	number_of_mut3	number_of_total
+ # example of '*-mer.mut_rates.tsv'
+ type	avg_obs_rate1	avg_obs_rate2	avg_obs_rate3	avg_pred_prob1	avg_pred_prob2	avg_pred_prob3	number_of_mut1	number_of_mut2	number_of_mut3	number_of_all
  TAG	0.006806776385512125	0.010141979926438501	0.012039461380213204	0.012744358544122413	0.01817057941563919	0.021860978496512425	3494	5206	6180	513312
  TAA	0.007517292690907348	0.011278023120833133	0.01318808653952362	0.013600087566977897	0.019697007577734515	0.024266536859123104	7214	10823	12656	959654
  AAA	0.0068964404639771226	0.010705555691654661	0.009617493130148654	0.012599749576515839	0.020442895433664586	0.01646869397956817	11542	17917	16096	1673617
- ...
- 0.9569216831654604	6.585788162834682e-09 # r and p for prob1
- 0.9326211281771537	1.4129640985193586e-07 # r and p for prob2
- 0.947146892265788	2.6848989196451608e-08 # r and p for prob3
+ 
+ # example of '*-mer.corr.txt'
+ 3-mer	prob1	0.9569216831654604	6.585788162834682e-09 # r and p for prob1
+ 3-mer	prob2	0.9326211281771537	1.4129640985193586e-07 # r and p for prob2
+ 3-mer	prob3	0.947146892265788	2.6848989196451608e-08 # r and p for prob3
 
 
 * Example 5 
@@ -391,9 +398,9 @@ to calculate 3-mer, 5-mer and 7-mer correlations:
 
 ::
 
- python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --outfile test_3mer_corr.txt
- python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 5 --outfile test_5mer_corr.txt
- python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 7 --outfile test_7mer_corr.txt
+ calc_kmer_corr --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --out_prefix test
+ python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 5 --out_prefix test
+ python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 7 --out_prefix test
 
 Regional correlation analysis
 .............................
@@ -410,19 +417,22 @@ regional mutation rates.
 
 * Output data
 
-The output files '*.corr_table.txt' have six columns: chromosome name, the end 
-position of the window, number of valid sites in the window, number of observed
-mutations in the window, average observed mutation rate and average 
-predicted mutation rate in the window. The regional correlation (Pearson's r 
-and p-value) of the considered mutation type is given in the '*.corr.txt'.
+There are multiple output files. The files storing regional rates 
+('*.regional\_rates.tsv') have seven columns: chromosome name, the end
+position of the window, number of valid sites in the window, number of 
+observed mutations in the window, average observed mutation rate, average 
+predicted mutation rate in the window and the 'used_or_deprecated' label. 
+The windows labeled 'deprecated' are not used in correlation analysis due 
+to too few valid sites. The regional correlation (Pearson's r and p-value)
+of the considered mutation type is given in the '*.corr.txt'.
 
 ::
 
- # example of '*.corr_table.txt'
- chrom	end	sites_count	mut_type_total	mut_type_avg	avg_pred
- chr3	100000	61492	576	0.009367072139465296	0.020374342255903233
- chr3	200000	60680	531	0.008750823994726434	0.02025859070533955
- chr3	300000	59005	499	0.00845691043131938	0.01882644280993153
+ # example of '*.regional_rates.tsv'
+ chrom	end	sites_count	mut_type_total	mut_type_avg	avg_pred	used_or_deprecated
+ chr3	100000	61492	576	0.009367072139465296	0.020374342255903233	used
+ chr3	200000	60680	531	0.008750823994726434	0.02025859070533955	used
+ chr3	300000	59005	499	0.00845691043131938	0.01882644280993153	used
  ...
  
  # example of '*.corr.txt'
@@ -436,8 +446,8 @@ The following command will calculate the regional correlation for 100Kb windows 
 
 ::
 
- python cor_calculate.py --result_file testing.ckpt4.fdiri.tsv.gz \
- --window 100000 --model prob2 --outfile test_region_corr.100kb.prob2.txt
+ calc_regional_corr --pred_file testing.ckpt4.fdiri.tsv.gz \
+ --window 100000 --model prob2 --out_prefix test_region_corr
 
 Visualization of correlation results
 ....................................
@@ -447,9 +457,7 @@ p-values for further visualization:
 
 ::
 
- for i in {3,5,7}; do tail -3 /public/home/dengsy/DNMML/example/test_${i}mer_corr.txt \
- | awk '{OFS="\t"; print "'$i'-mer", "prob"NR,$0}'; done \
- | awk 'BEGIN{print "k-mer\tmut_type\tcorrelation\tp-value"}{print;}' > kmer_correlations.tsv
+ cat test.{3,5,7}-mer.corr.txt | awk 'BEGIN{print "k-mer\tmut_type\tcorrelation\tp-value"}{print;}' > kmer_correlations.tsv
 
 The resulting 'kmer_correlations.tsv' file is tab-delimited, looking like:
 
@@ -485,7 +493,7 @@ evaluation.
 In addition, based on the output of ``calc_region_corr`` above, we can 
 visualize how predicted rates fit observed rates for windows across 
 a chromosome or a specific region. First, we should standardize the 
-observed rates and the predicted rates for all regions by using z-score 
+observed rates and the predicted rates for all windows by using z-score 
 transformation. Then we select some regions to generate the plots. Below 
 we use the results for 100Kb windows and A>G mutation type, and the region 
 selected is from 15Mb to 23.6Mb. The solid line indicates average 
@@ -500,7 +508,8 @@ rates:
  from sklearn import preprocessing
  from scipy.stats import pearsonr
 
- df = pd.read_table('test_region_corr.100kb.prob2.txt.corr_table.txt')
+ df = pd.read_table('test2.100Kb.prob2.regional_rates.tsv')
+ df = df[df['used_or_deprecated'] == 'used']
 
  #z-score preprocessing
  avg_obs = preprocessing.scale(df['avg_obs'])
@@ -515,16 +524,16 @@ rates:
 
  #plot
  fig, ax = plt.subplots(1, figsize=(10, 2))
- ax.set_xlabel("Chr3(10Mb)")
- ax.fill_between(df2['window_end'],df2['avg_obs'], alpha=0.3, color = 'Grey')
- ax.plot(df2['window_end'],df2['avg_pred'], label="avg_pred", linewidth = 1.5)
+ ax.set_xlabel("Chr3(Mb)")
+ ax.fill_between(df2['window_end']/1000000,df2['avg_obs'], alpha=0.3, color = 'Grey')
+ ax.plot(df2['window_end']/1000000,df2['avg_pred'], label="avg_pred", linewidth = 1.5)
  plt.ylabel('average mutation rate (Z-score)')
- plt.title('The line plot of example')
- plt.savefig('region_line_plot.pdf')
+ 
+ plt.savefig('regional_rates.jpg', bbox_inches = 'tight')
 
 The plot looks like below:
 
-.. image:: images/kmer_correlations.jpg
+.. image:: images/regional_rates.jpg
 
 Scaling MuRaL-predicted mutation rates to per base per generation rates
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -557,7 +566,7 @@ Citation
 --------
 
 Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for
-inferring fine-scale germline mutation rate maps. bioRxiv
+inferring fine-scale germline mutation rate maps. Nat Mach Intell
 `doi:10.1101/2021.10.25.465689 <https://doi.org/10.1101/2021.10.25.465689>`__
 
 Contact
