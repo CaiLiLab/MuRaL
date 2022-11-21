@@ -2,7 +2,7 @@
 MuRaL: inferring mutation rates via deep learning
 ==================================================
 
-.. image:: ../images/mural-logo.jpg
+.. image:: images/mural-logo.jpg
    :width: 420px
    
 **MuRaL**,  short for **Mu**\ tation **Ra**\ te **L**\ earner, 
