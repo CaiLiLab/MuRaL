@@ -55,7 +55,7 @@ MuRaL supports training and prediction with or without CUDA GPUs. Please
 be aware that training tasks without GPUs could take a much longer time.
 For most models, prediction tasks can be done with only CPUs.
 
-Before installing MuRaL, use ``conda`` command from Miniconda to create
+Before installing MuRaL, use the ``conda`` command from Miniconda to create
 an environment and install the dependencies. The dependencies are
 included in ``environment.yml`` (if using GPUs) or
 ``environment_cpu.yml`` (if CPU-only computing). Run one of the
@@ -371,8 +371,8 @@ column to evaluate model performance in different observed datasets.
    
 * Output data
 
-The outputs include a file ('*-mer.mut\_rates.tsv') storing predicted and 
-observed k-mer rates of all possible mutation subtypes, and a file ('*-mer.corr.txt')
+The outputs include a file ('\*-mer.mut\_rates.tsv') storing predicted and 
+observed k-mer rates of all possible mutation subtypes, and a file ('\*-mer.corr.txt')
 storing the k-mer correlations (Pearson's r and p-value) of three mutation
 types in a specific order (e.g., for A/T sites, prob1, prob2 and prob3 are
 for A>C, A>G and A>T, respectively).
@@ -418,13 +418,13 @@ regional mutation rates.
 * Output data
 
 There are multiple output files. The files storing regional rates 
-('*.regional\_rates.tsv') have seven columns: chromosome name, the end
+('\*.regional\_rates.tsv') have seven columns: chromosome name, the end
 position of the window, number of valid sites in the window, number of 
 observed mutations in the window, average observed mutation rate, average 
 predicted mutation rate in the window and the 'used_or_deprecated' label. 
 The windows labeled 'deprecated' are not used in correlation analysis due 
 to too few valid sites. The regional correlation (Pearson's r and p-value)
-of the considered mutation type is given in the '*.corr.txt'.
+of the considered mutation type is given in the '\*.corr.txt'.
 
 ::
 
@@ -551,7 +551,7 @@ Note that we cannot compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
 that with scaled mutation rates.
 
-Trained models and predicted mutation rate profiles of multiple species
+Trained models and predicted mutation rate maps of multiple species
 -----------------------------------------------------------------------
 
 Trained models for four species - *Homo sapiens*, *Macaca mulatta*, 
@@ -559,7 +559,7 @@ Trained models for four species - *Homo sapiens*, *Macaca mulatta*,
 the 'models/' folder of the package. One can use these model files 
 for prediction or transfer learning.
 
-Predicted single-nucleotide mutation rate profiles for these genomes are
+Predicted single-nucleotide mutation rate maps for these genomes are
 available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 
 Citation

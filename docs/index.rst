@@ -16,10 +16,6 @@ genomic data.
 
 This documentation is for MuRaL |version|\.
 
-.. note::
-
-   This project is still under active development.
-
 Contents
 --------
 

@@ -30,7 +30,7 @@ Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***A
 Predicted single-nucleotide mutation rate maps for these genomes are available at [ScienceDB](https://www.doi.org/10.11922/sciencedb.01173).
 
 ### 4. Citation <a name="Citation"></a>
-Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for inferring fine-scale germline mutation rate maps. Nat Mach Intell (in press) [doi:10.1101/2021.10.25.465689](https://doi.org/10.1101/2021.10.25.465689)
+Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for inferring fine-scale germline mutation rate maps. Nature Machine Intelligence [https://doi.org/10.1038/s42256-022-00574-5](https://doi.org/10.1038/s42256-022-00574-5)
 
 ### 5. Contact <a name="Contact"></a>
 For reporting issues or requests related to the package, please write to mural-project@outlook.com.
