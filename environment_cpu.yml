@@ -5,21 +5,23 @@ channels:
   - defaults
 dependencies:
   - python=3.8.5
-  - pip
-  - pytorch
-  - torchvision
-  - torchaudio
-  - cpuonly
+  - pip=22.0.4
+  - numpy=1.21.2
+  - pytorch=1.10.2
+  - cpuonly=2.0
   - pybigwig=0.3.17
-  - prettytable
-  - pynvml
+  - prettytable=3.2.0
+  - pynvml=11.4.1
+  - bedtools=2.30.0
   - pip:
+    - h5py==2.10.0
+    - scipy==1.4.1
     - scikit-learn==0.24.2
+    - biopython==1.77
     - pysam==0.15.1
-    - pybedtools
-    - janggu[tf2]>=0.10.0
+    - pybedtools==0.9.0
     - ray[tune]==1.0.0 #updated
     - dirichletcal
-    - jax
-    - jaxlib
-    - autograd
+    - jax==0.3.1
+    - jaxlib==0.3.0
+    - autograd==1.3

@@ -165,9 +165,8 @@ def main():
         if n_files == 1:
             h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
             generate_h5f(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
-            #generate_h5f2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
             #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
-            #generate_h5f_mp(test_bed, test_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, 5)
+
         elif n_files > 1:
             cmd = sys.argv[0]
             

@@ -253,14 +253,14 @@ def main():
 
     # Prepare testing data 
     if without_h5:
-        #dataset_test = prepare_dataset(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, seq_only)
+
         dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, seq_only)
         print('using prepare_dataset_np ...')
     else:
-        #dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 1, seq_only)
-        dataset_test = prepare_dataset_h5v2(test_bed, ref_genome, bw_paths, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files)
+
+        dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files)
         
-        #prepare_dataset_h5v2(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False, n_h5_files=1)
+        #prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False, n_h5_files=1)
             
     data_local_test = dataset_test.data_local
     n_cont = len(dataset_test.cont_cols)

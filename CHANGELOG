@@ -1,3 +1,9 @@
+1.0.1
+-----
+- remove janggu dependency
+- add rtd documentation
+- delete unused code
+
 1.0.0
 -----
 - update network model (add middle-scale layers)
