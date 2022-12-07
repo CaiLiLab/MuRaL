@@ -566,7 +566,7 @@ Citation
 --------
 
 Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for
-inferring fine-scale germline mutation rate maps. Nat Mach Intell
+inferring fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
 `doi:10.1038/s42256-022-00574-5 <https://doi.org/10.1038/s42256-022-00574-5>`__
 
 Contact
