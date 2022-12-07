@@ -9,7 +9,7 @@
 
 
 ## 1. Introduction <a name="Introduction"></a>
-Germline mutation rates are crucial parameters in genetics, genomics and evolutionary biology. It is long known that mutation rates vary substantially across the genome, but existing methods can only obtain very rough estimates of local mutation rates and are difficult to be applied in non-model species. 
+Germline mutation rates are crucial parameters in genetics, genomics and evolutionary biology. It is long known that mutation rates vary substantially across the genome, but existing methods can only obtain very rough estimates of local mutation rates and are difficult to be applied to non-model species. 
 
 **MuRaL**, short for **Mu**tation **Ra**te **L**earner, is a generalizable framework to estimate single-nucleotide mutation rates based on deep learning. MuRaL has better predictive performance at different scales than current state-of-the-art methods. Moreover, it can generate genome-wide mutation rate maps with rare variants from a moderate number of sequenced individuals (e.g. ~100 individuals), and can leverage transfer learning to further reduce data and time requirements. It can be applied to many sequenced species with population polymorphism data. 
 

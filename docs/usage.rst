@@ -5,7 +5,7 @@ Germline mutation rates are crucial parameters in genetics, genomics and
 evolutionary biology. It is long known that mutation rates vary
 substantially across the genome, but existing methods can only obtain
 very rough estimates of local mutation rates and are difficult to be
-applied in non-model species.
+applied to non-model species.
 
 **MuRaL**, short for **Mu**\ tation **Ra**\ te **L**\ earner, is a
 generalizable framework to estimate single-nucleotide mutation rates
@@ -399,8 +399,8 @@ to calculate 3-mer, 5-mer and 7-mer correlations:
 ::
 
  calc_kmer_corr --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --out_prefix test
- python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 5 --out_prefix test
- python kmer_corr.py --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 7 --out_prefix test
+ calc_kmer_corr --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 5 --out_prefix test
+ calc_kmer_corr --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 7 --out_prefix test
 
 Regional correlation analysis
 .............................
@@ -412,7 +412,7 @@ The tool ``calc_region_corr`` is used for calculating regional correlations.
 The inputs for regional correlation analysis include a prediction tsv 
 file and the window size. Like the k-mer correlation analysis, we need to 
 provide a specific set of observed mutations in the 5th column of the prediction
-tsv files. Thsese observed mutations are used for calculating observed 
+tsv files. These observed mutations are used for calculating observed 
 regional mutation rates. 
 
 * Output data
@@ -436,7 +436,7 @@ of the considered mutation type is given in the '\*.corr.txt'.
  ...
  
  # example of '*.corr.txt'
- 0.4999	6.040983e-16 
+ 100Kb	prob3	0.4999	6.040983e-16 
 
 
 * Example 6
@@ -567,7 +567,7 @@ Citation
 
 Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for
 inferring fine-scale germline mutation rate maps. Nat Mach Intell
-`doi:10.1101/2021.10.25.465689 <https://doi.org/10.1101/2021.10.25.465689>`__
+`doi:10.1038/s42256-022-00574-5 <https://doi.org/10.1038/s42256-022-00574-5>`__
 
 Contact
 -------
