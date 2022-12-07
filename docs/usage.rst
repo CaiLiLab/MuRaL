@@ -1,7 +1,7 @@
 Overview
 --------
 
-Germline mutation rates are crucial parameters in genetics, genomics and
+Germline mutation rates are important in genetics, genomics and
 evolutionary biology. It is long known that mutation rates vary
 substantially across the genome, but existing methods can only obtain
 very rough estimates of local mutation rates and are difficult to be
@@ -565,8 +565,8 @@ available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 Citation
 --------
 
-Fang Y, Deng S, Li C. 2022. A generalizable deep learning framework for
-inferring fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
+Fang Y, Deng S, Li C. A generalizable deep learning framework for inferring 
+fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
 `doi:10.1038/s42256-022-00574-5 <https://doi.org/10.1038/s42256-022-00574-5>`__
 
 Contact
