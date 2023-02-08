@@ -488,12 +488,13 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
     local_seq_cat = get_digitalized_seq(ref_genome, bed_regions, local_radius, order=1)    
     
     # Check whether the data is correctly extracted (e.g. not all sites are A/T; incorrect padding in the beginning of a chromosome)
-    if np.unique(local_seq_cat[:,local_radius], axis=0).shape[0] != 1:
+    retrieve_central_bps = np.unique(local_seq_cat[:, local_radius], axis=0)
+    if retrieve_central_bps.shape[0] != 1:
         print('ERROR: The positions in input BED file have different bases (A/T and C/G mixed)! The ref_genome or input BED file could be wrong.', file=sys.stderr)
         sys.exit()
   
     # NOTE: replace negatives with 0, meaning replacing 'N' with 'A'
-    local_seq_cat = np.where(local_seq_cat>=0, local_seq_cat, 0)
+    local_seq_cat = np.where(local_seq_cat>=0, local_seq_cat, retrieve_central_bps[0])
     
     # Assign column names and convert to DataFrame
     seq_cols = ['us'+str(local_radius - i) for i in range(local_radius)] + ['mid'] + ['ds'+str(i+1) for i in range(local_radius)]
