@@ -27,6 +27,8 @@ from MuRaL.preprocessing import *
 from MuRaL._version import __version__
 
 import subprocess
+#import resource
+
 import h5py
 
 
@@ -164,11 +166,15 @@ def main():
     if i_file == 0:
         if n_files == 1:
             h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+            
+            #test_bed = BedTool(bed_file)
             generate_h5f(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
             #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
 
         elif n_files > 1:
             cmd = sys.argv[0]
+            
+            #resource.setrlimit(resource.RLIMIT_CPU, (1, 4))
             
             ps = []
             for i in range(n_files):
@@ -205,7 +211,12 @@ def main():
 
             
     else:
+        #resource.setrlimit(resource.RLIMIT_CPU, (1, n_files))
+        
         h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+        
+        #test_bed = BedTool(bed_file)
+        
         single_size = int(np.ceil(len(test_bed)/float(n_files)))
         h5f_path_i = re.sub('h5$', str(i_file)+'.h5', h5f_path)
         bed_regions = BedTool(test_bed.at(range((i_file-1)*single_size,np.min([i_file*single_size, len(test_bed)]))))

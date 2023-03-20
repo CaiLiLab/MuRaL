@@ -55,7 +55,7 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
     write_h5f = True
     if os.path.exists(h5f_path):
         try:
-            with h5py.File(h5f_path, 'r') as hf:
+            with h5py.File(h5f_path, 'r', swmr=True) as hf:
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file is latest and complete
@@ -66,7 +66,7 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
         except OSError:
             print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
             
-    # If the H5 file is unavailable or im complete, generate the file
+    # If the H5 file is unavailable or imcomplete, generate the file
     if write_h5f:            
         with h5py.File(h5f_path, 'w') as hf:
             
@@ -110,7 +110,7 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
     write_h5f = True
     if os.path.exists(h5f_path):
         try:
-            with h5py.File(h5f_path, 'r') as hf:
+            with h5py.File(h5f_path, 'r', swmr=True) as hf:
                 bed_path = bed_regions.fn
                 
                 # Check whether the existing H5 file (not following the link) is latest and complete
@@ -338,7 +338,7 @@ def get_digitalized_seq(ref_genome, bed_regions, radius, order):
     
     return digit_seqs
 
-def get_mean_bw_for_bed(bw_files, bw_names, bed_regions, radius):
+def get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions):
 
     bw_fh = []
     for file in bw_files:
@@ -355,8 +355,8 @@ def get_mean_bw_for_bed(bw_files, bw_names, bed_regions, radius):
             
             for j, bw in enumerate(bw_fh):
                             
-                start1 = max([int(start)-radius, 0])
-                stop1 = min([int(stop)+radius, bw.chroms(chrom)])
+                start1 = max([int(start)-bw_radii[j], 0])
+                stop1 = min([int(stop)+bw_radii[j], bw.chroms(chrom)])
                 bw_data[i,j] = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True)).mean()
                 
 
@@ -481,7 +481,7 @@ def get_bw_for_bed(bw_files, bed_regions, radius):
     
     return bw_data
 
-def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only):
+def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only):
     """Prepare local data for given regions"""
     
     # Read the seq data
@@ -529,7 +529,7 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius
     # Add feature data in bigWig files
     if len(bw_files) > 0 and seq_only == False:
         # Use the mean value of the region of 2*radius+1 bp around the focal site
-        bw_data = get_mean_bw_for_bed(bw_files, bw_names, bed_regions, local_radius)
+        bw_data = get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions)
  
         data_local = pd.concat([local_seq_cat2, bw_data, y], axis=1)
     else:
@@ -602,7 +602,7 @@ class CombinedDatasetH5(Dataset):
         if self.h5f is None:
             
             # Open the H5 file once
-            self.h5f = h5py.File(self.h5f_path, 'r')
+            self.h5f = h5py.File(self.h5f_path, 'r', swmr=True)
             
             if len(self.h5f.keys()) > 1:
                 self.single_h5_size = self.h5f['distal_X1'].shape[0]
@@ -788,14 +788,14 @@ class CombinedDatasetNP(Dataset):
     def _get_labels(self, dataset, idx):
         return dataset.__getitem__(idx)[1]
 
-def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1):
+def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1):
     """Prepare the datasets for given regions, using H5 file"""
  
     # Generate H5 file for distal data
     generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size, n_h5_files)
     
     # Prepare local data
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only:
@@ -811,11 +811,11 @@ def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, lo
     return dataset
 
 
-def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
+def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
     """Prepare the datasets for given regions, using H5 file"""
     
     # Prepare local data
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only:

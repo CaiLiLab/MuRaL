@@ -237,12 +237,17 @@ def main():
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
+    bw_radii = []
     
     if bw_paths:
         try:
             bw_list = pd.read_table(bw_paths, sep='\s+', header=None, comment='#')
             bw_files = list(bw_list[0])
             bw_names = list(bw_list[1])
+            if bw_list.shape[1]>2:
+                bw_radii = list(bw_list[2].astype(int))
+            else:
+                bw_radii = [local_radius]*len(bw_files)
         except pd.errors.EmptyDataError:
             print('Warnings: no bigWig files provided in', bw_paths)
     else:
@@ -254,11 +259,11 @@ def main():
     # Prepare testing data 
     if without_h5:
 
-        dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, seq_only)
+        dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, distal_radius, distal_order, seq_only)
         print('using prepare_dataset_np ...')
     else:
 
-        dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files)
+        dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files)
         
         #prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False, n_h5_files=1)
             
@@ -294,13 +299,20 @@ def main():
         model = Network1(in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class).to(device)
     elif model_no == 2:
         model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+    elif model_no == 3:
+        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order-1, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
     elif model_no == 10:
         model = Network10(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
     elif model_no == 11:
         model = Network11(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order+n_cont, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
     elif model_no == 12:
         model = Network12(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
-
+    elif model_no == 13:
+        model = Network13(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+    elif model_no == 14:
+        model = Network14(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
+    elif model_no == 15:
+        model = Network15(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=4**distal_order, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
     else:
         print('Error: no model selected!')
         sys.exit() 
@@ -379,7 +391,7 @@ def main():
                 corr = corr_calc_sub(pred_df, win_size, prob_names)
                 print('regional corr:', str(win_size)+'bp', corr)
 
-            print('Total time used: %s seconds' % (time.time() - start_time))
+    print('Total time used: %s seconds' % (time.time() - start_time))
    
     
 if __name__ == "__main__":
