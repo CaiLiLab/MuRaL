@@ -114,7 +114,10 @@ def parse_arguments(parser):
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. Default: 1. """ ).strip())
+                          Number of HDF5 files for each BED file. When the BED file has many
+                          positions and the distal radius is large, increasing the value for 
+                          --n_h5_files files can reduce the time for generating HDF5 files.
+                          Default: 1.                          """ ).strip())
     
     data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
                           help=textwrap.dedent("""

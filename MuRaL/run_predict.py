@@ -56,7 +56,7 @@ def parse_arguments(parser):
         
     required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
                           help=textwrap.dedent("""
-                          File path for the paired configurations of the trained model.
+                          File path for the configurations of the trained model.
                           """ ).strip()) 
 
     optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv.gz', help=textwrap.dedent("""
@@ -74,7 +74,10 @@ def parse_arguments(parser):
                           features such as the coverage track. Default: None.""").strip())
     optional.add_argument('--n_h5_files', metavar='INT', default=1, 
                           help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. Default: 1.
+                          Number of HDF5 files for each BED file. When the BED file has many
+                          positions and the distal radius is large, increasing the value for 
+                          --n_h5_files files can reduce the time for generating HDF5 files.
+                          Default: 1.
                           """ ).strip())
     
     optional.add_argument('--without_h5', default=False, action='store_true',  

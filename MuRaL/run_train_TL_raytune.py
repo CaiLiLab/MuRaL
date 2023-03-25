@@ -70,7 +70,7 @@ def parse_arguments(parser):
     
     required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
                           help=textwrap.dedent("""
-                          File path for the paired configurations of the trained model.
+                          File path for the configurations of the trained model.
                           """ ).strip())    
     
     model_args.add_argument('--train_all', default=False, action='store_true', 
@@ -127,7 +127,11 @@ def parse_arguments(parser):
 
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. Default: 1. """ ).strip())
+                          Number of HDF5 files for each BED file. When the BED file has many
+                          positions and the distal radius is large, increasing the value for 
+                          --n_h5_files files can reduce the time for generating HDF5 files.
+                          Default: 1.
+                          """ ).strip())
 
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -137,7 +141,7 @@ def parse_arguments(parser):
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
-                          Optimization method for parameter learning.
+                          Optimization method for parameter learning: 'Adam' or 'AdamW'.
                           Default: 'Adam'.
                           """ ).strip())
  
