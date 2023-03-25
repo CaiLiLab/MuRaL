@@ -104,7 +104,7 @@ your system, you can try running the MuRaL commands with the
 ``mural_vx.x.x.sif`` file.
 
 If your machine has GPUs and you want to use GPU resources for MuRaL
-tools, please remember to set the '--nv' flag for Singularity commands.
+tools, please remember to set the ``--nv`` flag for Singularity commands.
 See the following examples:
 
 ::
@@ -155,7 +155,7 @@ Model training
 ~~~~~~~~~~~~~~
 
 ``mural_train`` trains MuRaL models with training and validation
-mutation data, and exports training results under the "./ray\_results/"
+mutation data, and exports training results under the './ray\_results/'
 folder. 
 
 * Input data
@@ -239,7 +239,7 @@ The following command will use data in 'data/training.sorted.bed'
 as training data and a separate 'data/validation.sorted.bed' as
 validation data. The option ``--local_radius 7`` means that length of
 the local sequence used for training is 7\*2+1 = 15 bp.
-'--distal\_radius 200' means that length of the expanded sequence
+``--distal_radius 200`` means that length of the expanded sequence
 used for training is 200\*2+1 = 401 bp. You can run this example
 under the 'examples/' folder in the package.
 
@@ -308,7 +308,7 @@ Transfer learning
 
 ``mural_train_TL`` trains MuRaL models like ``mural_train`` but
 initializes model parameters with learned weights from a pre-trained
-model. Its training results are also saved under the "./ray\_results/"
+model. Its training results are also saved under the './ray\_results/'
 folder. 
 
 * Input data
