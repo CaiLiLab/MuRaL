@@ -225,7 +225,7 @@ using data in 'data/training.sorted.bed' for training. The training
 results will be saved under the folder './ray\_results/example1/'.
 Default values will be used for other unspecified arguments. Note
 that, by default, 10% of the sites sampled from 'training.sorted.bed'
-is used as validation data (i.e. '--valid\_ratio 0.1'). You can run
+is used as validation data (i.e. ``--valid_ratio 0.1``). You can run
 this example under the 'examples/' folder in the package.
 
 ::
@@ -237,7 +237,7 @@ this example under the 'examples/' folder in the package.
 
 The following command will use data in 'data/training.sorted.bed'
 as training data and a separate 'data/validation.sorted.bed' as
-validation data. The option '--local\_radius 7' means that length of
+validation data. The option ``--local_radius 7`` means that length of
 the local sequence used for training is 7\*2+1 = 15 bp.
 '--distal\_radius 200' means that length of the expanded sequence
 used for training is 200\*2+1 = 401 bp. You can run this example
