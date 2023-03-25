@@ -59,6 +59,10 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           File path for a list of BigWig files for non-sequence 
                           features such as the coverage track. Default: None.""").strip())
+    
+    optional.add_argument('--without_bw_distal', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Do not use BigWig tracks for distal-related layers. Default: False.""").strip())
 
     optional.add_argument('--distal_radius', type=int, metavar='INT', default=200, 
                           help=textwrap.dedent("""
@@ -152,6 +156,7 @@ def main():
     bw_paths = args.bw_paths
     bw_files = []
     bw_names = []
+    without_bw_distal = args.without_bw_distal
     
     if bw_paths:
         try:
@@ -165,10 +170,10 @@ def main():
 
     if i_file == 0:
         if n_files == 1:
-            h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+            h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order, without_bw_distal)
             
             #test_bed = BedTool(bed_file)
-            generate_h5f(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
+            generate_h5f(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size, without_bw_distal)
             #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
 
         elif n_files > 1:
@@ -180,7 +185,7 @@ def main():
             for i in range(n_files):
                 args = [cmd, 
                          '--ref_genome', ref_genome, 
-                         '--bed_file', bed_file, 
+                         '--bed_file', bed_file,
                          '--distal_radius', str(distal_radius), 
                          '--distal_order', str(distal_order), 
                          '--i_file', str(i+1), 
@@ -190,13 +195,15 @@ def main():
                 if bw_paths != None:
                     args.append('--bw_paths')
                     args.append(bw_paths)
-                #'--bw_paths', bw_paths, 
+                if without_bw_distal:
+                    args.append('--without_bw_distal')
+                
                 p = subprocess.Popen(args)
                 ps.append(p)
             for p in ps:
                 p.wait()
             
-            h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+            h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order, without_bw_distal)
             
             with h5py.File(h5f_path, 'w') as hf:
                 for i in  range(n_files):
@@ -213,7 +220,7 @@ def main():
     else:
         #resource.setrlimit(resource.RLIMIT_CPU, (1, n_files))
         
-        h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order)
+        h5f_path = get_h5f_path(bed_file, bw_names, distal_radius, distal_order, without_bw_distal)
         
         #test_bed = BedTool(bed_file)
         
@@ -222,9 +229,9 @@ def main():
         bed_regions = BedTool(test_bed.at(range((i_file-1)*single_size,np.min([i_file*single_size, len(test_bed)]))))
         
         if distal_binsize == 1:
-            generate_h5f_singlev1(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, chunk_size)
+            generate_h5f_singlev1(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, bw_files, chunk_size, without_bw_distal)
         else:
-            generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, distal_binsize, bw_files, chunk_size)
+            generate_h5f_singlev2(bed_regions, h5f_path_i, ref_genome, distal_radius, distal_order, distal_binsize, bw_files, chunk_size, without_bw_distal)
     
     #test_bed.at(range(single_size, bed_end))
     

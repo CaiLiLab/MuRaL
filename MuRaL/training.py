@@ -89,6 +89,7 @@ def train(config, args, checkpoint_dir=None):
     save_valid_preds = args.save_valid_preds
     
     bw_paths = args.bw_paths
+    without_bw_distal = args.without_bw_distal
     bw_files = []
     bw_names = []
     bw_radii = []
@@ -117,14 +118,14 @@ def train(config, args, checkpoint_dir=None):
     train_bed = BedTool(train_file)
     
     if without_h5:
-        dataset = prepare_dataset_np(train_bed, ref_genome, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+        dataset = prepare_dataset_np(train_bed, ref_genome, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only, without_bw_distal=without_bw_distal)
         print('using numpy/pandas for distal_seq ...')
     else:
         # Get the H5 file path
-        train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order)
+        train_h5f_path = get_h5f_path(train_file, bw_names, config['distal_radius'], distal_order, without_bw_distal)
 
         # Prepare the datasets for trainging
-        dataset = prepare_dataset_h5(train_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files)
+        dataset = prepare_dataset_h5(train_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, train_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
         
         #prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1)
     
@@ -136,6 +137,7 @@ def train(config, args, checkpoint_dir=None):
     config['n_class'] = n_class
     config['model_no'] = model_no
     #config['bw_paths'] = bw_paths
+    config['without_bw_distal'] = without_bw_distal
     config['seq_only'] = seq_only
     config['restart_lr'] = restart_lr
     config['min_lr'] = min_lr
@@ -145,11 +147,11 @@ def train(config, args, checkpoint_dir=None):
     if valid_file:
         print('using given validation file:', valid_file)
         valid_bed = BedTool(valid_file)
-        valid_h5f_path = get_h5f_path(valid_file, bw_names, config['distal_radius'], distal_order)
+        valid_h5f_path = get_h5f_path(valid_file, bw_names, config['distal_radius'], distal_order, without_bw_distal)
         if without_h5:
-            dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+            dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only, without_bw_distal=without_bw_distal)
         else:
-            dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files)
+            dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, config['local_radius'], config['local_order'], config['distal_radius'], distal_order, valid_h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
         
         data_local_valid = dataset_valid.data_local
     ################
@@ -208,7 +210,13 @@ def train(config, args, checkpoint_dir=None):
         # According to https://stackoverflow.com/questions/48479915/what-is-the-preferred-ratio-between-the-vocabulary-size-and-embedding-dimension
         emb_dims = [(x, min(16, int(x**0.25))) for x in cat_dims] 
         config['emb_dims'] = emb_dims    
-        
+    #####
+    if without_bw_distal:
+        in_channels = 4**distal_order
+    else:
+        in_channels = 4**distal_order+n_cont
+    #####
+    
     # Choose the network model for training
     if model_no == 0:
         # Local-only model
@@ -216,15 +224,15 @@ def train(config, args, checkpoint_dir=None):
 
     elif model_no == 1:
         # ResNet model
-        model = Network1(in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class)
+        model = Network1(in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class)
 
     elif model_no == 2:
         # Combined model
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order+n_cont, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
+        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
         
     elif model_no == 3:
         # Combined model
-        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=4**distal_order-1, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
+        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
         
     elif model_no == 4:
         # Combined model
@@ -350,7 +358,7 @@ def train(config, args, checkpoint_dir=None):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config['learning_rate'], weight_decay=config['weight_decay'])
 
     elif config['optim'] == 'AdamW':
-        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=config['learning_rate'], weight_decay=config['weight_decay'])
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=config['learning_rate'], weight_decay=config['weight_decay'], amsgrad=True)
 
     elif config['optim'] == 'AdamW2':
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=config['learning_rate'], weight_decay=config['weight_decay'], amsgrad=True)
@@ -367,7 +375,9 @@ def train(config, args, checkpoint_dir=None):
     if config['lr_scheduler'] == 'StepLR':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=(5000*128)//config['batch_size'], gamma=config['LR_gamma'])
     elif config['lr_scheduler'] == 'StepLR2':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=train_size//config['batch_size'], gamma=config['LR_gamma'])
+        gamma = (config['min_lr']/config['restart_lr'])**(1/(train_size//config['batch_size']))
+        print('learning rate gamma:', gamma)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=gamma)
     elif config['lr_scheduler'] == 'ROP':
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,mode='min', factor=0.2, patience=1, threshold=0.0001, min_lr=1e-7)
         print("using lr_scheduler.ReduceLROnPlateau ...")
@@ -385,6 +395,10 @@ def train(config, args, checkpoint_dir=None):
 
         model.train()
         total_loss = 0
+        
+        if epoch > 0 and config['lr_scheduler'] == 'StepLR2':
+            for g in optimizer.param_groups:
+                g['lr'] = config['restart_lr']            
 
         for y, cont_x, cat_x, distal_x in dataloader_train:
             cat_x = cat_x.to(device)
@@ -411,6 +425,7 @@ def train(config, args, checkpoint_dir=None):
                 
                 # avoid very small learning rates
                 if optimizer.param_groups[0]['lr'] < config['min_lr']:
+                    print("optimizer.param_groups[0]:", optimizer.param_groups[0]['lr'])
                     for g in optimizer.param_groups:
                         g['lr'] = config['restart_lr']
                         #scheduler.step(1)

@@ -33,7 +33,7 @@ def to_np(tensor):
     else:
         return tensor.detach().numpy()
 
-def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
+def get_h5f_path(bed_file, bw_names, distal_radius, distal_order, without_bw_distal):
     """Get the H5 file path name based on input data"""
     
     h5f_path = bed_file + '.distal_' + str(distal_radius)
@@ -41,16 +41,20 @@ def get_h5f_path(bed_file, bw_names, distal_radius, distal_order):
     if distal_order > 1:
         h5f_path = h5f_path + '_' + str(distal_order)
         
-    if len(bw_names) > 0:
+    if len(bw_names) > 0 and (not without_bw_distal):
         h5f_path = h5f_path + '.' + '.'.join(list(bw_names))
     
     h5f_path = h5f_path + '.h5'
     
     return h5f_path
 
-def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, chunk_size=50000):
+def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, chunk_size=50000, without_bw_distal=False):
     """Generate the H5 file for storing distal data"""
-    n_channels = 4**distal_order + len(bw_files)
+    
+    if without_bw_distal:
+        n_channels = 4**distal_order
+    else:
+        n_channels = 4**distal_order + len(bw_files)
     
     write_h5f = True
     if os.path.exists(h5f_path):
@@ -90,7 +94,7 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
                 seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
                 
                 # Handle distal bigWig data, return base-wise values
-                if len(bw_files) > 0:
+                if len(bw_files) > 0 and (not without_bw_distal):
  
                     bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
 
@@ -103,9 +107,12 @@ def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order,
     return None
 
 
-def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=50000, n_h5_files=1):
+def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=50000, n_h5_files=1, without_bw_distal=False):
     """Generate the H5 file for storing distal data"""
-    n_channels = 4**distal_order + len(bw_files)
+    if without_bw_distal:
+        n_channels = 4**distal_order
+    else:    
+        n_channels = 4**distal_order + len(bw_files)
     
     write_h5f = True
     if os.path.exists(h5f_path):
@@ -150,6 +157,8 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
         if bw_paths != None:
             args.append('--bw_paths')
             args.append(bw_paths)
+        if without_bw_distal:
+            args.append('--without_bw_distal')
         p = subprocess.Popen(args)
         p.wait()
             
@@ -157,10 +166,13 @@ def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_orde
 
 
 
-def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, chunk_size):
+def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, chunk_size, without_bw_distal):
     """generate an HDF file for specific regions"""
     #bed_regions = BedTool(bed_file)
-    n_channels = 4**distal_order + len(bw_files)
+    if without_bw_distal:
+        n_channels = 4**distal_order
+    else:
+        n_channels = 4**distal_order + len(bw_files)
     
     with h5py.File(h5f_path, 'w') as hf:
 
@@ -185,7 +197,7 @@ def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, dist
             seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
             
             # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0:
+            if len(bw_files) > 0 and (not without_bw_distal):
                 bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
 
                 # Concatenate the sequence data and the bigWig data
@@ -197,10 +209,13 @@ def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, dist
     
     return h5f_path
 
-def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, chunk_size):
+def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, chunk_size, without_bw_distal):
     
     #bed_regions = BedTool(bed_file)
-    n_channels = 4**distal_order + len(bw_files)
+    if without_bw_distal:
+        n_channels = 4**distal_order
+    else:
+        n_channels = 4**distal_order + len(bw_files)
     
     with h5py.File(h5f_path, 'w') as hf:
 
@@ -232,7 +247,7 @@ def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, dist
             seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
             
             # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0:
+            if len(bw_files) > 0 and (not without_bw_distal):
                 bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
 
                 # Concatenate the sequence data and the bigWig data
@@ -626,7 +641,7 @@ class CombinedDatasetH5(Dataset):
 
 class CombinedDatasetNP(Dataset):
     """Combine local data and distal into Dataset, using NumPy funcions"""
-    def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels, bw_files, seq_only):
+    def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels, bw_files, seq_only, without_bw_distal):
         """  
         Args:
             data: DataFrame containing local seq data and categorical data
@@ -682,6 +697,7 @@ class CombinedDatasetNP(Dataset):
             self.bw_fh.append(pyBigWig.open(file))
         ####
         self.seq_only = seq_only
+        self.without_bw_distal = without_bw_distal
         print('Number of channels to be used for distal data:', self.n_channels)
         
         self.distal_radius = distal_radius
@@ -765,7 +781,7 @@ class CombinedDatasetNP(Dataset):
             print('short_seq:', short_seq)
 
         # Handle distal bigWig data
-        if len(self.bw_fh) > 0 and self.seq_only == False:
+        if len(self.bw_fh) > 0 and (not self.seq_only) and (not self.without_bw_distal):
             for bw in self.bw_fh:
                 bw_values = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True))
                 if(len(bw_values) < self.seq_len):
@@ -788,17 +804,17 @@ class CombinedDatasetNP(Dataset):
     def _get_labels(self, dataset, idx):
         return dataset.__getitem__(idx)[1]
 
-def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1):
+def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1, without_bw_distal=False):
     """Prepare the datasets for given regions, using H5 file"""
  
     # Generate H5 file for distal data
-    generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size, n_h5_files)
+    generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size, n_h5_files, without_bw_distal)
     
     # Prepare local data
     data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
-    if seq_only:
+    if seq_only or without_bw_distal:
         n_channels = 4**distal_order
         print('NOTE: seq_only flag was set, so will not use any bigWig track!')
     else:
@@ -811,20 +827,20 @@ def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw
     return dataset
 
 
-def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
+def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, seq_only=False, without_bw_distal=False):
     """Prepare the datasets for given regions, using H5 file"""
     
     # Prepare local data
     data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
 
     # If seq_only flag was set, bigWig files will be ignored
-    if seq_only:
+    if seq_only or without_bw_distal:
         n_channels = 4**distal_order
         print('NOTE: seq_only flag was set, so will not use any bigWig track!')
     else:
         n_channels = 4**distal_order + len(bw_files)
     
     # Combine local data and distal into Dataset objects  
-    dataset = CombinedDatasetNP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels, bw_files=bw_files, seq_only=seq_only)
+    dataset = CombinedDatasetNP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels, bw_files=bw_files, seq_only=seq_only, without_bw_distal=without_bw_distal)
     #return dataset, data_local, categorical_features
     return dataset

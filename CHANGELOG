@@ -1,3 +1,9 @@
+1.1.0
+-----
+- add a new network model (model 3)
+- add support for AdamW optimizer
+- update documentation
+
 1.0.1
 -----
 - remove janggu dependency
@@ -19,5 +25,4 @@
 
 0.9.0
 -----
-
 - First public version

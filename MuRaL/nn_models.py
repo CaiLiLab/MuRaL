@@ -131,6 +131,7 @@ class Network1(nn.Module):
         super(Network1, self).__init__()
         
         self.n_class = n_class
+        self.in_channels = in_channels
         
         self.kernel_size = kernel_size
         self.seq_len = distal_radius*2+1 - (distal_order-1)
@@ -235,7 +236,7 @@ class Network1(nn.Module):
         # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
         assert distal_input.shape[2] > 200, "Error: distal seq len must be >200bp"
         
-        distal_input0 = distal_input[:,:,(distal_input.shape[2]//2-100):(distal_input.shape[2]//2+100+1)].detach().clone()
+        distal_input0 = distal_input[:,0:self.in_channels,(distal_input.shape[2]//2-100):(distal_input.shape[2]//2+100+1)].detach().clone()
         distal_out = self.conv1(distal_input0) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
         jump_input = distal_out = self.maxpool1(distal_out)
         
@@ -257,7 +258,7 @@ class Network1(nn.Module):
         distal_out = self.distal_fc1(distal_out)
 ##############################
         # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
-        distal_out2 = self.conv1_2(distal_input) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
+        distal_out2 = self.conv1_2(distal_input[:,0:self.in_channels,:]) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
         jump_input2 = distal_out2 = self.maxpool1_2(distal_out2)
         
         distal_out2 = self.RBs1_2(distal_out2)    
@@ -309,6 +310,7 @@ class Network2(nn.Module):
         super(Network2, self).__init__()
         
         self.n_class = n_class
+        self.in_channels = in_channels
         
         # FeedForward layers for local input
         # Embedding layers
@@ -468,7 +470,7 @@ class Network2(nn.Module):
         assert distal_input.shape[2] > 200, "Error: distal seq len must be >200"
         # CNN layers for distal_input
         # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
-        distal_input0 = distal_input[:,:,(distal_input.shape[2]//2-100):(distal_input.shape[2]//2+100+1)].detach().clone()
+        distal_input0 = distal_input[:,0:self.in_channels,(distal_input.shape[2]//2-100):(distal_input.shape[2]//2+100+1)].detach().clone()
         distal_out = self.conv1(distal_input0) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
         jump_input = distal_out = self.maxpool1(distal_out)
         
@@ -491,7 +493,7 @@ class Network2(nn.Module):
         distal_out = self.distal_fc1(distal_out)
 ##############################
         # Input data shape: batch_size, in_channels, L_in (lenth of sequence)
-        distal_out2 = self.conv1_2(distal_input) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
+        distal_out2 = self.conv1_2(distal_input[:,0:self.in_channels,:]) #output shape: batch_size, L_out; L_out = floor((L_in+2*padding-kernel_size)/stride + 1) 
         jump_input2 = distal_out2 = self.maxpool1_2(distal_out2)
         
         distal_out2 = self.RBs1_2(distal_out2)    
@@ -676,12 +678,12 @@ class Network3(nn.Module):
             nn.Linear(lin_layer_sizes[-1], n_class), 
         ) 
         
-                # Local FC layers
-        self.local_fc2 = nn.Sequential(
-            nn.BatchNorm1d(self.no_of_cont),
-            nn.Dropout(lin_layer_dropouts[0]),
-            nn.Linear(self.no_of_cont, n_class), 
-        ) 
+        if self.no_of_cont > 0:
+            self.local_fc2 = nn.Sequential(
+                nn.BatchNorm1d(self.no_of_cont),
+                nn.Dropout(lin_layer_dropouts[0]),
+                nn.Linear(self.no_of_cont, n_class), 
+            ) 
     
     def forward(self, local_input, distal_input):
         """
@@ -739,7 +741,9 @@ class Network3(nn.Module):
         
         # Separate FC layers 
         local_out = self.local_fc(local_out)
-        local_out2 = self.local_fc2(cont_data)
+        
+        if self.no_of_cont > 0:
+            local_out2 = self.local_fc2(cont_data)
         
         
         
@@ -772,16 +776,22 @@ class Network3(nn.Module):
         #distal_out = torch.log((F.softmax(distal_out, dim=1)+ F.softmax(distal_out2, dim=1))/2)
         distal_out = (F.softmax(distal_out, dim=1) + F.softmax(distal_out2, dim=1))/2
         local_out = F.softmax(local_out, dim=1)
-        local_out2 = F.softmax(local_out2, dim=1)
+        
+        if self.no_of_cont > 0:
+            local_out2 = F.softmax(local_out2, dim=1)
         
         if self.training == False and np.random.uniform(0,1) < 0.00001*local_out.shape[0]:
             print('local_out1:', torch.min(local_out[:,1]).item(), torch.max(local_out[:,1]).item(), torch.var(local_out[:,1]).item())
-            print('local_out2:', torch.min(local_out2[:,1]).item(), torch.max(local_out2[:,1]).item(), torch.var(local_out2[:,1]).item())
+            if self.no_of_cont > 0:
+                print('local_out2:', torch.min(local_out2[:,1]).item(), torch.max(local_out2[:,1]).item(), torch.var(local_out2[:,1]).item())
             print('distal_out1:', torch.min(distal_out[:,1]).item(), torch.max(distal_out[:,1]).item(),torch.var(distal_out[:,1]).item())
 
         
         #out = torch.log(torch.clamp((local_out + distal_out)/2*local_out2, min=1e-9))  
-        out = torch.log(torch.clamp((local_out + distal_out + local_out2)/3, min=1e-9))
+        if self.no_of_cont > 0:
+            out = torch.log(torch.clamp((local_out + distal_out + local_out2)/3, min=1e-9))
+        else:
+            out = torch.log(torch.clamp((local_out + distal_out)/2, min=1e-9))
         
         return out
     

@@ -98,6 +98,10 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           File path for a list of BigWig files for non-sequence 
                           features such as the coverage track. Default: None.""").strip())
+
+    data_args.add_argument('--without_bw_distal', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                          Do not use BigWig tracks for distal-related layers. Default: False.""").strip())
     
     data_args.add_argument('--seq_only', default=False, action='store_true', 
                           help=textwrap.dedent("""
@@ -123,7 +127,9 @@ def parse_arguments(parser):
                           Which network architecture to be used: 
                           0 - 'local-only' model;
                           1 - 'expanded-only' model;
-                          2 - 'local + expanded' model. 
+                          2 - 'local + expanded' model.
+                          3 - 'local + expanded' model, with separate local FC layers for
+                              features in BigWig tracks.
                           Default: 2.
                           """ ).strip())
     model_args.add_argument('--n_class', type=int, metavar='INT', default='4',  
@@ -201,7 +207,7 @@ def parse_arguments(parser):
                           
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
-                          Optimization method for parameter learning.
+                          Optimization method for parameter learning: 'Adam' or 'AdamW'.
                           Default: 'Adam'.
                           """ ).strip())
  
@@ -492,6 +498,7 @@ def main():
     
     # Read bigWig file names
     bw_paths = args.bw_paths
+    without_bw_distal = args.without_bw_distal
     if bw_paths:
        args.bw_paths =  os.path.abspath(args.bw_paths)
     
@@ -519,17 +526,17 @@ def main():
     
     # Generate H5 files for storing distal regions before training, one file for each possible distal radius
     for d_radius in distal_radius:
-        h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order)
+        h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order, without_bw_distal)
         if not args.without_h5:
-            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
             #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
     
     if valid_file:
         valid_bed = BedTool(valid_file)
         for d_radius in distal_radius:
-            valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order)
+            valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order, without_bw_distal)
             if not args.without_h5:
-                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
     
     
     ####

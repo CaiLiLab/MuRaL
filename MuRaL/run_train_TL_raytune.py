@@ -281,10 +281,10 @@ def main():
     Command line examples
     ---------------------
     1. The following command will train a transfer learning model using training data 
-    in 'train.sorted.bed', the validation data in 'validation.sorted.bed', and the model
+    in 'training.sorted.bed', the validation data in 'validation.sorted.bed', and the model
     files under 'checkpoint_6/'.
    
-        mural_train_TL --ref_genome seq.fa --train_data train.sorted.bed \\
+        mural_train_TL --ref_genome seq.fa --train_data training.sorted.bed \\
         --validation_data validation.sorted.bed --model_path checkpoint_6/model \\
         --model_config_path checkpoint_6/model.config.pkl --train_all \\
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
@@ -369,7 +369,12 @@ def main():
 
         args.n_class = config['n_class']
         args.model_no = config['model_no']
-
+        
+        if 'without_bw_distal' in config: 
+            args.without_bw_distal = without_bw_distal = config['without_bw_distal']
+        else:
+            args.without_bw_distal = without_bw_distal = False
+            
         args.seq_only = config['seq_only']
     
     
@@ -406,14 +411,14 @@ def main():
     
     # Generate H5 files for storing distal regions before training, one file for each possible distal radius
     if not args.without_h5:
-        h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order)
-        generate_h5fv2(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+        h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order, without_bw_distal)
+        generate_h5fv2(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
         #generate_h5f(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
     
     if valid_file:
         valid_bed = BedTool(valid_file)
-        valid_h5f_path = get_h5f_path(valid_file, bw_names, distal_radius, distal_order)
-        generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files)
+        valid_h5f_path = get_h5f_path(valid_file, bw_names, distal_radius, distal_order, without_bw_distal)
+        generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
         #generate_h5f(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
     
     if ray_ngpus > 0 or gpu_per_trial > 0:
