@@ -156,8 +156,9 @@ def parse_arguments(parser):
     learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
                           help=textwrap.dedent("""
                           Calcaute 'weight_decay' (regularization parameter) based on total 
-                          training steps. This is recommended, as it automatically adjusts 
-                          'weight_decay' for different batch sizes, training sizes and epochs.
+                          training steps. It automatically adjusts 'weight_decay' for different 
+                          batch sizes, training sizes and epochs. Its value MUST be smaller than 1.
+                          For values in the range 0~1, smaller values mean stronger regularization.
                           Set a value of <=0 to turn this off.
                           Default: 0.1.
                           """ ).strip())

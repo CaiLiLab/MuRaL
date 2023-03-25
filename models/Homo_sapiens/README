@@ -1,6 +1,6 @@
 This folder contains the best trained models with lowest validation losses for the human genome (hg19). 500,000 mutated and 10,000,000 non-mutated sites were chosen for training each of A/T, non-CpG and CpG models. The read coverage information was not used for training.
 
-hyperparameter settings for running MuRaL:
+hyperparameter settings for running MuRaL (v1.0.0):
 --local_radius  7
 --local_order   3
 --distal_radius 1000

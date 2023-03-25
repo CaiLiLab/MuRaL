@@ -126,7 +126,7 @@ Tools and examples
 ------------------
 
 The following tools in MuRaL are available from the command line. Type 
-a command with '-h' option to see detailed help message. More specific 
+a command with '-h' option to see the detailed help message. More specific 
 examples are given in later sections.
 
 **Main commands**: 

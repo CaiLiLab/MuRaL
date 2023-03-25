@@ -350,6 +350,9 @@ def train(config, args, checkpoint_dir=None):
     
     if weight_decay_auto != None and weight_decay_auto > 0:
         #print("rewriting config['weight_decay'] ...")
+        if weight_decay_auto >=1:
+            print('Please set a value smaller than 1 for --weight_decay_auto.', file=sys.stderr)
+            sys.exit()
         config['weight_decay'] = 1- weight_decay_auto **(config['batch_size']/(epochs*train_size))
         print("NOTE: rewriting config['weight_decay'], new weight_decay: ", config['weight_decay'])
     
