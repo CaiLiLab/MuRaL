@@ -812,7 +812,7 @@ def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, lo
 
 
 def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1,seq_only=False):
-    """Prepare the datasets for given regions, using H5 file"""
+    """Prepare the datasets for given regions, without an H5 file"""
     
     # Prepare local data
     data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, local_radius, local_order, seq_only)
