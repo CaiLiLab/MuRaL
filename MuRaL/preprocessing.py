@@ -816,7 +816,7 @@ def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only or without_bw_distal:
         n_channels = 4**distal_order
-        print('NOTE: seq_only flag was set, so will not use any bigWig track!')
+        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
     else:
         n_channels = 4**distal_order + len(bw_files)
     
@@ -836,7 +836,7 @@ def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii, lo
     # If seq_only flag was set, bigWig files will be ignored
     if seq_only or without_bw_distal:
         n_channels = 4**distal_order
-        print('NOTE: seq_only flag was set, so will not use any bigWig track!')
+        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
     else:
         n_channels = 4**distal_order + len(bw_files)
     
