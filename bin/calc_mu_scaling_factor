@@ -73,7 +73,8 @@ def main():
 
         df = pd.read_table(pred_files[i], sep='\t', header=0)
 
-        benchmark_bed = BedTool(benchmark_regions)
+        if benchmark_regions:
+            benchmark_bed = BedTool(benchmark_regions)
 
 
         df_name = pd.DataFrame('.', index=range(df.shape[0]), columns=['name'])
@@ -85,7 +86,10 @@ def main():
         
         pred_df_bed = BedTool.from_dataframe(pred_df)
 
-        probs = pred_df_bed.intersect(benchmark_bed).to_dataframe()[['score']]
+        if benchmark_regions:
+            probs = pred_df_bed.intersect(benchmark_bed).to_dataframe()[['score']]
+        else:
+            probs = pred_df_bed.to_dataframe()[['score']]
 
         prob_sum = np.sum(probs.values)
 
@@ -97,8 +101,8 @@ def main():
         print('n_sites:', n_sites)
         print('g_proportion:', g_proportions[i])
         print('m_proportion:', m_proportions[i])
-        print('prob_sum:', prob_sum)
-        print('Scale factor is:', scale_factor)
+        print('prob_sum: %.3e' % prob_sum)
+        print('Scale factor is: %.3e' % scale_factor)
         
         if do_scaling:
             df['prob1'] = df['prob1'].astype(float) * scale_factor

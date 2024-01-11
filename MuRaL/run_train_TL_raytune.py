@@ -185,10 +185,10 @@ def parse_arguments(parser):
                           The minimum learning rate. Default: 1e-6.
                           """ ).strip())
     
-    learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.5], nargs='+', 
+    learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.9], nargs='+', 
                           help=textwrap.dedent("""
                           'gamma' argument for the learning rate scheduler.
-                           Default: 0.5.
+                           Default: 0.9.
                            """ ).strip())
     
     learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 

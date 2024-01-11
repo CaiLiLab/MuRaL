@@ -510,13 +510,9 @@ class Network2(nn.Module):
         distal_out2 = self.conv3_2(distal_out2)
         distal_out2, _ = torch.max(distal_out2, dim=2)
         
-
         distal_out2 = self.distal_fc2(distal_out2)
 
-        
-        #distal_out = torch.log((F.softmax(mid_out1, dim=1) +F.softmax(mid_out2, dim=1) + F.softmax(distal_out, dim=1))/3)
-        #distal_out = torch.log((F.softmax(distal_out, dim=1)+ F.softmax(distal_out2, dim=1))/2)
-        distal_out = (F.softmax(distal_out, dim=1)+ F.softmax(distal_out2, dim=1))/2
+        distal_out = (F.softmax(distal_out, dim=1) + F.softmax(distal_out2, dim=1))/2
         local_out = F.softmax(local_out, dim=1)
         
         if self.training == False and np.random.uniform(0,1) < 0.00001*local_out.shape[0]:

@@ -551,6 +551,70 @@ Note that we cannot compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
 that with scaled mutation rates.
 
+Here is an example for scaling mutation rates for A/T sites. Suppose that we 
+have the following proportions of different mutation types and proportions
+of different site groups in a genome. In addition, suppose we already know from 
+previous research that the per generation mutation rate of the species is 5 × 10^−9
+per base per generation. If per generation mutation rate is not available, one
+may use the estimates of closely related species.
+
+::
+
+ #proportions of different mutation types
+ mutation type	proportion
+ AT_mutations		0.355
+ nonCpG_mutations	0.423
+ CpG_mutations		0.222
+ 
+ #proportions of different site groups
+ AT_sites		0.475
+ nonCpG_sites	0.391
+ CpG_sites		0.134
+
+To do the scaling, firstly we need to get the predicted mutation rates for
+a specific set of sites based on a trained model. It is recommended to use
+the validation sites at the training step for calculating the scaling factor.
+The following command is for obtaining predicted mutation rates for validation
+sites of the AT model.
+
+::
+ 
+ mural_predict --ref_genome data/seq.fa --test_data data/AT_validation.sorted.bed --model_path 
+ models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  --calibrator_path  
+ models/checkpoint_6/model.fdiri_cal.pkl --pred_file AT_validation.ckpt6.fdiri.tsv.gz --without_h5 --cpu_only > 
+ test.out 2> test.err
+
+Next, the command ``calc_mu_scaling_factor`` will be used to get the scaling
+factor based on the predicted rates, the proportions of A/T mutation types and 
+proportions of A/T sites in the genome, and the genome-wide per generation mutation
+rate.
+
+:: 
+
+ calc_mu_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
+ --m_proportions 0.355 --g_proportions 0.475
+ 
+ #Output may look like the following:
+ pred_file: AT_validation.ckpt6.fdiri.tsv.gz
+ genomewide_mu: 5e-09
+ n_sites: 84000
+ g_proportion: 0.475
+ m_proportion: 0.355
+ prob_sum: 4.000e+03
+ Scale factor is: 7.848e-08
+ 
+Finally, the obtained scaling factor ``7.848e-08`` can be used to scale all the 
+predicted rates of all A/T sites using ``scale_mu``. You can run  ``scale_mu`` 
+separately for each chromosome.
+
+::
+ 
+ scale_mu --pred_file AT_chr1.tsv.gz --scale_factor 7.848e-08 --out_file 
+ AT_chr1.scaled.tsv.gz
+
+Similarly, you can generate the scaled mutation rates for non-CpG and CpG sites like
+the above example. More details can be found in the MuRaL paper.
+
 Trained models and predicted mutation rate maps of multiple species
 -----------------------------------------------------------------------
 

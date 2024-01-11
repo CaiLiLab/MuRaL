@@ -137,7 +137,8 @@ def main():
         prob2 = float(info[7])
         prob3 = float(info[8])
         seq = chromosomeSeq[start-m:start+m+1]
-        kmer_calculate(base,seq,mut_type,prob1,prob2,prob3,all_kmers,pred_prob1_sum,pred_prob2_sum,pred_prob3_sum,mut1_sum,mut2_sum,mut3_sum)
+        if len(seq) == kmer_length:
+            kmer_calculate(base,seq,mut_type,prob1,prob2,prob3,all_kmers,pred_prob1_sum,pred_prob2_sum,pred_prob3_sum,mut1_sum,mut2_sum,mut3_sum)
 
     # Assign 0 to k-mer without mutation
     for a in all_kmers.keys():
