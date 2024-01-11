@@ -541,22 +541,26 @@ Scaling MuRaL-predicted mutation rates to per base per generation rates
 The raw MuRaL-predicted mutation rates are not mutation rates per bp per
 generation. To obtain a mutation rate per bp per generation for each
 nucleotide, one can scale the MuRaL-predicted rates using reported
-genome-wide DNM mutation rate and spectrum per generation. First, use
+genome-wide de novo mutation rate and spectrum per generation. First, use
 the command ``calc_mu_scaling_factor`` to calculate scaling factors for
 specific groups of sites (e.g. A/T sites, C/G sites). Then use the
 scaling factors to scale mutation rates in prediction files via the
 command ``scale_mu``.
 
-Note that we cannot compare or add up raw predicted rates from
+Note that we cannot directly compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
-that with scaled mutation rates.
+that with scaled mutation rates. The accuray of genome-wide mutation rate
+per generation does not affect within-genome comparison but can affect
+between-species comparison. 
 
+* Example 7
 Here is an example for scaling mutation rates for A/T sites. Suppose that we 
 have the following proportions of different mutation types and proportions
 of different site groups in a genome. In addition, suppose we already know from 
-previous research that the per generation mutation rate of the species is 5 × 10^−9
-per base per generation. If per generation mutation rate is not available, one
-may use the estimates of closely related species.
+previous research that the genome-wide mutation rate per generation of the 
+species is 5e−9 per base per generation. If the per generation mutation rate 
+is not available for the studied species, one may use the estimate from a 
+closely related species.
 
 ::
 
@@ -571,11 +575,11 @@ may use the estimates of closely related species.
  nonCpG_sites	0.391
  CpG_sites		0.134
 
-To do the scaling, firstly we need to get the predicted mutation rates for
-a specific set of sites based on a trained model. It is recommended to use
-the validation sites at the training step for calculating the scaling factor.
-The following command is for obtaining predicted mutation rates for validation
-sites of the AT model.
+To calculate the scaling factor, we need to have the predicted mutation rates for
+a set of representative sites based on a trained model. It is recommended to use
+the validation sites at the training step whose size is relatively small and 
+representative enough. For instance, the following command is for obtaining 
+predicted mutation rates for validation sites of the A/T model.
 
 ::
  
@@ -584,7 +588,7 @@ sites of the AT model.
  models/checkpoint_6/model.fdiri_cal.pkl --pred_file AT_validation.ckpt6.fdiri.tsv.gz --without_h5 --cpu_only > 
  test.out 2> test.err
 
-Next, the command ``calc_mu_scaling_factor`` will be used to get the scaling
+Next, the command ``calc_mu_scaling_factor`` will be used to compute the scaling
 factor based on the predicted rates, the proportions of A/T mutation types and 
 proportions of A/T sites in the genome, and the genome-wide per generation mutation
 rate.
@@ -592,9 +596,9 @@ rate.
 :: 
 
  calc_mu_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
- --m_proportions 0.355 --g_proportions 0.475
+ --m_proportions 0.355 --g_proportions 0.475 > scaling_factor.out
  
- #Output may look like the following:
+ # Output file 'scaling_factor.out' may look like the following:
  pred_file: AT_validation.ckpt6.fdiri.tsv.gz
  genomewide_mu: 5e-09
  n_sites: 84000
@@ -603,7 +607,7 @@ rate.
  prob_sum: 4.000e+03
  Scale factor is: 7.848e-08
  
-Finally, the obtained scaling factor ``7.848e-08`` can be used to scale all the 
+Finally, the obtained scaling factor ``7.848e-08`` is used to scale all the 
 predicted rates of all A/T sites using ``scale_mu``. You can run  ``scale_mu`` 
 separately for each chromosome.
 
