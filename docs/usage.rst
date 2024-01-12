@@ -566,15 +566,15 @@ closely related species.
 ::
 
  #proportions of different mutation types
- mutation type	proportion
- AT_mutations		0.355
- nonCpG_mutations	0.423
- CpG_mutations		0.222
+ mutation_type	proportion
+ AT_mutations       0.355
+ nonCpG_mutations   0.423
+ CpG_mutations      0.222
  
  #proportions of different site groups
- AT_sites		0.475
- nonCpG_sites	0.391
- CpG_sites		0.134
+ AT_sites       0.475
+ nonCpG_sites   0.391
+ CpG_sites      0.134
 
 To calculate the scaling factor, we need to have the predicted mutation rates for
 a set of representative sites based on a trained model. It is recommended to use
