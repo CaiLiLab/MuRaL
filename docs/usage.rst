@@ -367,7 +367,7 @@ evaluation, we need to provide a specific set of observed mutations
 (e.g. all available rare variants), which are stored in the 5th column of 
 the prediction tsv files. These observed mutations are used for
 calculating observed mutation rates. We can change the content in the 5th 
-column to evaluate model performance in different observed datasets.
+column to evaluate model performance in different observed mutation data.
    
 * Output data
 
@@ -551,7 +551,8 @@ Note that we cannot directly compare or add up raw predicted rates from
 different MuRaL models (e.g. A/T model and C/G model), but we can do
 that with scaled mutation rates. The accuray of genome-wide mutation rate
 per generation does not affect within-genome comparison but can affect
-between-species comparison. 
+between-species comparison. Whether to do or not do scaling does not affect
+the calculation of k-mer and regional mutation rate correlations.
 
 * Example 7
 Here is an example for scaling mutation rates for A/T sites. Suppose that we 
@@ -640,5 +641,5 @@ fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
 Contact
 -------
 
-For reporting issues or requests related to the package, please write to
-mural-project@outlook.com.
+For reporting issues or requests related to the package, please use GitHub Issues
+or write to mural-project@outlook.com.

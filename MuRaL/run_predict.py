@@ -137,7 +137,7 @@ def main():
     model-related files for input are 'model' and 'model.config.pkl', which 
     are generated at the training step. The file 'model.fdiri_cal.pkl', which 
     is for calibrating predicted mutation rates, is optional. If the input BED
-    file has many sites (e.g. many millions), it is recommended to spilt it
+    file has many sites (e.g. many millions), it is recommended to split it
     into smaller files (e.g. 1 million each) for parallel processing.
    
     * Output data 

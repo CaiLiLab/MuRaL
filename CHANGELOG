@@ -1,3 +1,9 @@
+1.1.1
+-----
+- fix a bug in calc_kmer_corr
+- add more doc for the scaling section
+- remove unused code
+
 1.1.0
 -----
 - add a new network model (model 3)

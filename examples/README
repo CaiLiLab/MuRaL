@@ -2,4 +2,4 @@ This folder provides example data and command lines for running MuRaL commands.
 
 The 'data/' folder contains training/validation/testing BED-formatted files and a FASTA file 'seq.fa' served as the reference genome for the BED files.
 
-The 'examples.sh' contains several command line examples. See more details in the 'examples.sh'.
+The 'examples.sh' contains several command line examples. See more details in 'examples.sh'.

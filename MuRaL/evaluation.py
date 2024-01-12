@@ -15,6 +15,9 @@ from warnings import simplefilter
 # Ignore all future warnings
 simplefilter(action='ignore', category=FutureWarning)
 
+import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 from dirichletcal.calib.vectorscaling import VectorScaling
 from dirichletcal.calib.tempscaling import TemperatureScaling
 from dirichletcal.calib.fulldirichlet import FullDirichletCalibrator
@@ -297,6 +300,7 @@ def calibrate_prob(y_prob, y, device, calibr_name='FullDiri'):
     
     Use calibrators in dirichletcal package
     """
+    
     if calibr_name == 'VectS':
         calibr = VectorScaling(logit_constant=0.0)
     elif calibr_name == 'TempS':

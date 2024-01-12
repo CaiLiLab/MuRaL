@@ -219,7 +219,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
                           help=textwrap.dedent("""
-                          Metric for ASHA schedualing; the value can be 'loss' or 'score'.
+                          Metric for ASHA schedualing; the value can be 'loss' or 'fdiri_loss'.
                           Default: 'loss'.
                           """ ).strip())
     

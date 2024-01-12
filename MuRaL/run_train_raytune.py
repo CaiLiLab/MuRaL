@@ -5,6 +5,7 @@ Code for training models with RayTune
 import warnings
 warnings.filterwarnings('ignore',category=FutureWarning)
 
+
 from pybedtools import BedTool
 
 import sys
@@ -289,7 +290,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
                           help=textwrap.dedent("""
-                          Metric for ASHA schedualing: 'loss', 'fdiri_loss', or 'score'.
+                          Metric for ASHA schedualing: 'loss', 'fdiri_loss'.
                           Default: 'loss'.
                           """ ).strip())
     

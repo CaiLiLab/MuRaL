@@ -33,4 +33,4 @@ Predicted single-nucleotide mutation rate maps for these genomes are available a
 Fang Y, Deng S, Li C. A generalizable deep learning framework for inferring fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022) [doi:10.1038/s42256-022-00574-5](https://doi.org/10.1038/s42256-022-00574-5)
 
 ### 5. Contact <a name="Contact"></a>
-For reporting issues or requests related to the package, please write to mural-project@outlook.com.
+For reporting issues or requests related to the package, please use GitHub Issues or write to mural-project@outlook.com.
