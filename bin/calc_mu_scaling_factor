@@ -102,7 +102,7 @@ def main():
         print('g_proportion:', g_proportions[i])
         print('m_proportion:', m_proportions[i])
         print('prob_sum: %.3e' % prob_sum)
-        print('Scale factor is: %.3e' % scale_factor)
+        print('scaling factor: %.3e' % scale_factor)
         
         if do_scaling:
             df['prob1'] = df['prob1'].astype(float) * scale_factor

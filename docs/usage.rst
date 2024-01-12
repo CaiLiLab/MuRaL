@@ -446,8 +446,7 @@ The following command will calculate the regional correlation for 100Kb windows 
 
 ::
 
- calc_regional_corr --pred_file testing.ckpt4.fdiri.tsv.gz \
- --window 100000 --model prob2 --out_prefix test_region_corr
+ calc_regional_corr --pred_file testing.ckpt4.fdiri.tsv.gz --window 100000 --model prob2 --out_prefix test_region_corr
 
 Visualization of correlation results
 ....................................
@@ -605,7 +604,7 @@ rate.
  g_proportion: 0.475
  m_proportion: 0.355
  prob_sum: 4.000e+03
- Scale factor is: 7.848e-08
+ scaling factor: 7.848e-08
  
 Finally, the obtained scaling factor ``7.848e-08`` is used to scale all the 
 predicted rates of all A/T sites using ``scale_mu``. You can run  ``scale_mu`` 
@@ -613,8 +612,7 @@ separately for each chromosome.
 
 ::
  
- scale_mu --pred_file AT_chr1.tsv.gz --scale_factor 7.848e-08 --out_file 
- AT_chr1.scaled.tsv.gz
+ scale_mu --pred_file AT_chr1.tsv.gz --scale_factor 7.848e-08 --out_file AT_chr1.scaled.tsv.gz
 
 Similarly, you can generate the scaled mutation rates for non-CpG and CpG sites like
 the above example. More details can be found in the MuRaL paper.
