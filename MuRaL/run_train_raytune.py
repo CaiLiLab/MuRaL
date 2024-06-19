@@ -36,11 +36,13 @@ import time
 import datetime
 import random
 
+from MuRaL.printer_utils import get_printer
 from MuRaL.nn_models import *
 from MuRaL.nn_utils import *
 from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
-from MuRaL.training import *
+from MuRaL.train_utils import run_train
+from MuRaL.training import train
 from MuRaL._version import __version__
 
 import textwrap
@@ -109,9 +111,20 @@ def parse_arguments(parser):
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
     
-    data_args.add_argument('--without_h5', default=False, action='store_true', 
+    data_args.add_argument('--with_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Do not generate HDF5 file for input BED files. Default: False.""").strip())
+                          Output distal encoding in HD5 File. This parameter can help improve the 
+                          speed of data loading in specific situations. Before use this parameter, 
+                          please first consider use the --cpu_per_trial, this is a more effect way 
+                          to accelerate training process by accelerating data loading. 
+                          
+                          If cpu_per_trial can only be set to 1, check your --distal_radius, if the value 
+                          less than 4k(this threshold may be lower for species with smaller genomes than
+                          human), it is recommended to use this parameter. Default: False.""").strip())
+    
+    parser.add_argument('--h5f_path', type=str, default=None,
+                    help=textwrap.dedent("""
+                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
@@ -140,6 +153,12 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           Number of mutation classes (or types), including the 
                           non-mutated class. Default: 4.""").strip())
+    
+    model_args.add_argument('--central_region', type=int, metavar='INT', default=300000, 
+                          help=textwrap.dedent("""
+                          The maximum encoding unit of the sequence, it involves a trade-off 
+                          between RAM memory and preprocessing speed. It is recommended to use 300k.
+                          Default: 300000.""" ).strip())
     
     model_args.add_argument('--local_radius', type=int, metavar='INT', default=[5], nargs='+',
                           help=textwrap.dedent("""
@@ -199,11 +218,23 @@ def parse_arguments(parser):
                           Default: 0.25.
                            """ ).strip())
     
+    learn_args.add_argument('--segment_number', type=int, metavar='INT', default=[10], nargs='+',  
+                          help=textwrap.dedent("""
+                          Number of segments for shuffle in DataLoaer. Sequence is encoding by
+                          segment, then drop batch from this segmenta. Default: 10.
+                          """ ).strip())
+    
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
                           help=textwrap.dedent("""
                           Size of mini batches for model training. Default: 128.
                           """ ).strip())
     
+    learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
+                          help=textwrap.dedent("""
+                          Use a custom data loader. This data loader is not supported parallelizing
+                          data loading. But in --cpu-per-trials=1, without HD5, the speed of loading
+                          data is faster than default dataloader. Default: False.
+                          """ ).strip())
 #    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
 #                          help=textwrap.dedent("""
 #                          Use ImbalancedDatasetSampler for dataloader.
@@ -266,6 +297,11 @@ def parse_arguments(parser):
                           If set, torch.backends.cudnn.benchmark will be False. 
                           Default: not set.
                           """).strip())
+    
+    raytune_args.add_argument('--use_ray', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Use ray to executing multiple trials in parallel.  Default: False.
+                          """ ).strip()) 
     
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""
@@ -375,20 +411,43 @@ def main():
     
     * Output data
     This tool saves the model information at each checkpoint, normally at the 
-    end of each training epoch of each trial. The checkpointed model files during 
-    training are saved under folders named like: 
+    end of each training epoch of each trial(default is 2). 
+        
+        * If execute multiple trials in parallel(use '--use_ray'):
+        The checkpointed model files during training are saved under folders 
+        named like:
+        
         ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
             - model
             - model.config.pkl
             - model.fdiri_cal.pkl
-    
+
     In the above folder, the 'model' file contains the learned model parameters. 
     The 'model.config.pkl' file contains configured hyperparameters of the model.
     The 'model.fdiri_cal.pkl' file (if exists) contains the calibration model 
     learned with validation data, which can be used for calibrating predicted 
     mutation rates. These files can be used in downstream analyses such as
     model prediction and transfer learning.
+         
+        * If executing multiple trials serially(default) or 
+          running only a single trial(use '--n_trial=1'):
+        The checkpointed model files during training are saved under folders 
+        named like:
+
+        ./results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+              - model
+              - model.config.pkl
+              - model.fdiri_cal.pkl
+
+    The best model per trial after training can be find in './results/your_experiment_name/
+    your_experiment_name_xxx.log'. 
     
+    Note: If the device has sufficient resources to execute multiple trials in parallel, 
+    it is recommended to add the --use_ray parameter. Using Ray allows for better resource 
+    scheduling. If executing multiple trials serially or running only a single trial, 
+    it is recommended not to use --use_ray, which can improve the runtime speed by approximately 
+    2-3 times for each trial.
+   
     Command line examples
     --------------------- 
     1. The following command will train a model by running two trials, using data in
@@ -396,10 +455,15 @@ def main():
     folder './ray_results/example1/'. Default values will be used for other
     unspecified arguments. Note that, by default, 10% of the sites sampled from 
     'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
-    
+        
+        # parallel running two trials use ray 
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --n_trials 2 --use_ray --experiment_name example1 > test1.out 2> test1.err
+
+        # serially running two trials
         mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
         --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
-    
+ 
     2. The following command will use data in 'train.sorted.bed' as training
     data and a separate 'validation.sorted.bed' as validation data. The option
     '--local_radius 10' means that length of the local sequence used for training
@@ -419,6 +483,13 @@ def main():
         --n_trials 2 --ray_ngpus 0 --gpu_per_trial 0 --experiment_name example3 \\ 
         > test3.out 2> test3.err
     
+    4. If the length of the expanded sequence used for training is large (greater than 1000),
+      data loading becomes a bottleneck in the training process. You can set the option 
+      '--cpu_per_trial' to specify how many CPUs each trial should use to accelerate data loading.
+
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --n_trials 2 --cpu_per_trial 4 --experiment_name example1 > test1.out 2> test1.err
+      
     Notes
     -----
     1. The training and validation BED file MUST BE SORTED by chromosome 
@@ -439,13 +510,27 @@ def main():
     
     args = parse_arguments(parser)
 
+    start_time = time.time()
+    current_time = datetime.datetime.now()
+    
+    # Creat tmp log file
+    timestamp = current_time.strftime("%Y%m%d_%H%M%S")
+    if not args.use_ray:
+        experiment_dir = f'results/{args.experiment_name}'
+        os.makedirs(experiment_dir, exist_ok=True)
+        tmp_log_file = f"{experiment_dir}/{args.experiment_name}_{timestamp}.log"
+    else:
+        tmp_log_file = None
+    args.tmp_log_file = tmp_log_file
+    # Ensure output can be viewed in real-time in a distributed environment
+    print = get_printer(args.use_ray, tmp_log_file)
+    
+    print('Start time:', current_time)
+    sys.stdout.flush()
+
     print(' '.join(sys.argv)) # print the command line
     for k,v in vars(args).items():
         print("{0}: {1}".format(k,v))
-    
-    start_time = time.time()
-    print('Start time:', datetime.datetime.now())
-    sys.stdout.flush()
     
     # Ray requires absolute paths
     train_file  = args.train_data = os.path.abspath(args.train_data) 
@@ -456,6 +541,8 @@ def main():
     ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
     n_h5_files = args.n_h5_files
     
+    segment_number = args.segment_number
+    central_region = args.central_region
     local_radius = args.local_radius
     local_order = args.local_order
     local_hidden1_size = args.local_hidden1_size
@@ -495,6 +582,7 @@ def main():
     ray_ngpus = args.ray_ngpus
     cpu_per_trial = args.cpu_per_trial
     gpu_per_trial = args.gpu_per_trial
+    use_ray = args.use_ray
     
     if args.split_seed < 0:
         args.split_seed = random.randint(0, 1000000)
@@ -526,55 +614,75 @@ def main():
     if len(weight_decay) == 1:
         weight_decay = weight_decay*2
     
-    # Read the train datapoints
-    train_bed = BedTool(train_file)
     
-    # Generate H5 files for storing distal regions before training, one file for each possible distal radius
-    for d_radius in distal_radius:
-        h5f_path = get_h5f_path(train_file, bw_names, d_radius, distal_order, without_bw_distal)
-        if not args.without_h5:
-            generate_h5fv2(train_bed, h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
-            #generate_h5fv2(test_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1, chunk_size)
-    
-    if valid_file:
-        valid_bed = BedTool(valid_file)
-        for d_radius in distal_radius:
-            valid_h5f_path = get_h5f_path(valid_file, bw_names, d_radius, distal_order, without_bw_distal)
-            if not args.without_h5:
-                generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, d_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
-    
-    
-    ####
-    if cuda_id == None and ray_ngpus > 0:
-        from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-        # Find a GPU with enough memory
-        nvmlInit()
-        cuda_id = '0'
-        for i in range(nvmlDeviceGetCount()):
-            h = nvmlDeviceGetHandleByIndex(i)
-            info = nvmlDeviceGetMemoryInfo(h)
-            print('free GPU memory for '+'cuda:'+str(i), info.free/(2**30), 'GB')
-            if info.free > (ray_ncpus/cpu_per_trial)*(2.5*2**30): # Reserve 2.5GB GPU memory per trial
-                cuda_id = str(i)
-                break
-
-        print('CUDA: ', torch.cuda.is_available())
-        if torch.cuda.is_available():
-            print('using'  , 'cuda:'+cuda_id)
-        #device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
-    ###
-    
-    if ray_ngpus > 0 or gpu_per_trial > 0:
+    #Use GPU
+    if gpu_per_trial > 0:
         if not torch.cuda.is_available():
             print('Error: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)
             sys.exit()
-        # Set visible GPU(s)
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = cuda_id
-        print('Ray is using GPU device', 'cuda:'+cuda_id)
+
+        from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+        nvmlInit()
+        gpu_device_number = nvmlDeviceGetCount()
+        # Find a GPU with enough memory
+        if cuda_id == None: 
+            args.cuda_id = cuda_id = '0'
+            for i in range(gpu_device_number):
+                h = nvmlDeviceGetHandleByIndex(i)
+                info = nvmlDeviceGetMemoryInfo(h)
+                print('free GPU memory for '+'cuda:'+str(i), info.free/(2**30), 'GB')
+                if info.free > (ray_ncpus/cpu_per_trial)*(2.5*2**30): # Reserve 2.5GB GPU memory per trial
+                    cuda_id = str(i)
+                    break
+            print('CUDA: ', torch.cuda.is_available())
+            print('using'  , 'cuda:'+cuda_id)
+        # Check cuda_id exists
+        else:
+            if gpu_device_number <= int(cuda_id):
+                print(f'Error: GPU Device Count = {gpu_device_number}, but cuda_id = {cuda_id}, please set cuda_id not more than  {gpu_device_number}', file=sys.stderr)
+                sys.eixt()
+        print('Train using GPU device', 'cuda:'+cuda_id)
+    # Use CPU
     else:
-        print('Ray is using only CPUs ...')
+        print('Train using only CPUs ...')
     
+    if not use_ray:
+        print("Ray not used in model training !")
+        config = {
+        'local_radius': local_radius[0],
+        'central_region': central_region,
+        'local_order': local_order[0],
+        'local_hidden1_size': local_hidden1_size[0],
+        #'local_hidden2_size': tune.choice(local_hidden2_size),
+        'local_hidden2_size': local_hidden2_size[0] if local_hidden2_size[0]>0 else local_hidden1_size[0]//2, # default local_hidden2_size = local_hidden1_size//2
+        'distal_radius': distal_radius[0],
+        'emb_dropout': emb_dropout[0],
+        'local_dropout': local_dropout[0],
+        'CNN_kernel_size': CNN_kernel_size[0],
+        'CNN_out_channels': CNN_out_channels[0],
+        'distal_fc_dropout': distal_fc_dropout[0],
+        'batch_size': batch_size[0],
+        'segment_number': segment_number[0],
+        'learning_rate': learning_rate[0],
+        #'learning_rate': tune.choice(learning_rate),
+        'optim': optim[0],
+        'lr_scheduler':lr_scheduler[0],
+        'LR_gamma': LR_gamma[0],
+        'weight_decay': weight_decay[0],
+        #'weight_decay': tune.choice(weight_decay),
+        'transfer_learning': False,
+        'use_ray' : False,
+        'custom_dataloader' : args.custom_dataloader 
+    }
+        para=False
+        run_train(train, n_trials, config, args,para)
+        #train(config, args)
+        print('Total time used: %s seconds' % (time.time() - start_time))
+        return 0
+
+    # Set visible GPU(s)
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = cuda_id
     
     if rerun_failed:
         resume_flag = 'ERRORED_ONLY'
@@ -583,13 +691,15 @@ def main():
     
     # Allocate CPU/GPU resources for this Ray job
     ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus, dashboard_host="0.0.0.0")
+    print(ray.cluster_resources())
     #ray.init(num_cpus=ray_ncpus, num_gpus=ray_ngpus)
     
     sys.stdout.flush()
-    
+
     # Configure the search space for relavant hyperparameters
     config = {
         'local_radius': tune.choice(local_radius),
+        'central_region': central_region,
         'local_order': tune.choice(local_order),
         'local_hidden1_size': tune.choice(local_hidden1_size),
         #'local_hidden2_size': tune.choice(local_hidden2_size),
@@ -601,6 +711,7 @@ def main():
         'CNN_out_channels': tune.choice(CNN_out_channels),
         'distal_fc_dropout': tune.choice(distal_fc_dropout),
         'batch_size': tune.choice(batch_size),
+        'segment_number': tune.choice(segment_number),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),
@@ -610,6 +721,8 @@ def main():
 
         #'weight_decay': tune.choice(weight_decay),
         'transfer_learning': False,
+        'use_ray' : True,
+        'custom_dataloader' : args.custom_dataloader
     }
     
 
@@ -645,14 +758,12 @@ def main():
     progress_reporter=reporter,
     resume=resume_flag,
     log_to_file=True)
-    
+
     # Shutdown Ray
     if ray.is_initialized():
         ray.shutdown() 
 
     print('Total time used: %s seconds' % (time.time() - start_time))
-            
-    
 if __name__ == '__main__':
     main()
 

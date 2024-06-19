@@ -1,3 +1,11 @@
+1.1.2
+-----
+- improve preprocessing code(reduced redundant coding and I/O operations)
+- modify data loading process
+- add support for large sequence lengths used in training(up to 64,000 bp)
+- add a new training control way (without Ray; see train_utils.py, printer_utils.py) 
+- update documentation
+
 1.1.1
 -----
 - fix a bug in calc_kmer_corr
