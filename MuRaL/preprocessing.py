@@ -1,5 +1,6 @@
 import os
 import sys
+import multiprocessing
 
 #from janggu.data import Bioseq, Cover
 import pyBigWig
@@ -33,427 +34,109 @@ def to_np(tensor):
     else:
         return tensor.detach().numpy()
 
-def get_h5f_path(bed_file, bw_names, distal_radius, distal_order, without_bw_distal):
-    """Get the H5 file path name based on input data"""
-    
-    h5f_path = bed_file + '.distal_' + str(distal_radius)
-    
-    if distal_order > 1:
-        h5f_path = h5f_path + '_' + str(distal_order)
-        
-    if len(bw_names) > 0 and (not without_bw_distal):
-        h5f_path = h5f_path + '.' + '.'.join(list(bw_names))
-    
-    h5f_path = h5f_path + '.h5'
-    
-    return h5f_path
+def bed_reader(bed_regions, central_bp):
+    """
+    Read a given BED region file and generate a new list of regions,
+    and split the regions into two lists based on their strand information.
 
-def generate_h5f(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, h5_chunk_size, chunk_size=50000, without_bw_distal=False):
-    """Generate the H5 file for storing distal data"""
-    
-    if without_bw_distal:
-        n_channels = 4**distal_order
+    Args:
+    - bed_regions: BedTool object or bed file path representing the BED region file to read.
+    - central_bp: Integer representing the length of the new regions to generate used encoding.
+
+    Yields:
+    Generator object that yields a list and a string:
+    - The list contains regions used encoding.
+    - The string represents the regions strand direction.
+    """
+    if isinstance(bed_regions, str):
+        bed_regions = BedTool(bed_regions)
     else:
-        n_channels = 4**distal_order + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r', swmr=True) as hf:
-                bed_path = bed_regions.fn
-                
-                # Check whether the existing H5 file is latest and complete
-                #if os.path.getmtime(bed_path) < os.path.getmtime(h5f_path) and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                # Check whether the existing H5 file (not following the link) is latest and complete
-                if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime and len(bed_regions) == hf["distal_X"].shape[0] and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-        except OSError:
-            print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
-            
-    # If the H5 file is unavailable or imcomplete, generate the file
-    if write_h5f:            
-        with h5py.File(h5f_path, 'w') as hf:
-            
-            print('Generating HDF5 file:', h5f_path)
-            sys.stdout.flush()
-            
-            # Total seq len
-            seq_len =  distal_radius*2+1-(distal_order-1)
-            
-            # Create distal_X dataset
-            # Note, the default dtype for create_dataset is numpy.float32
-            hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=4, chunks=(h5_chunk_size,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-            
-            # Write data in chunks
-            # chunk_size = 50000
-            seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-            for start in range(0, len(bed_regions), chunk_size):
-                end = min(start+chunk_size, len(bed_regions))
-                
-                # Extract sequence from the genome, which is in one-hot encoding format
-                seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
-                
-                # Handle distal bigWig data, return base-wise values
-                if len(bw_files) > 0 and (not without_bw_distal):
- 
-                    bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
-
-                    # Concatenate the sequence data and the bigWig data
-                    seqs = np.concatenate((seqs, bw_distal), axis=1)       
-                # Write the numpy array into the H5 file
-                hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-                hf['distal_X'][-seqs.shape[0]:] = seqs
-
-    return None
-
-
-def generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=50000, n_h5_files=1, without_bw_distal=False):
-    """Generate the H5 file for storing distal data"""
-    if without_bw_distal:
-        n_channels = 4**distal_order
-    else:    
-        n_channels = 4**distal_order + len(bw_files)
-    
-    write_h5f = True
-    if os.path.exists(h5f_path):
-        try:
-            with h5py.File(h5f_path, 'r', swmr=True) as hf:
-                bed_path = bed_regions.fn
-                
-                # Check whether the existing H5 file (not following the link) is latest and complete
-                if len(hf.keys()) ==1 \
-                and os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime \
-                and len(bed_regions) == hf["distal_X"].shape[0] \
-                and n_channels == hf["distal_X"].shape[1]:
-                    write_h5f = False
-                
-                if len(hf.keys()) > 1:
-                    try:
-                        h5_sample_size = sum([hf[key].shape[0] for key in hf.keys()])
-                        
-                        if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime \
-                        and len(bed_regions) == h5_sample_size \
-                        and n_channels == hf["distal_X1"].shape[1]:
-                            write_h5f = False
-                    except KeyError:
-                        print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
-                                       
-        except OSError:
-            print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
-
-            
-    # If the H5 file is unavailable or im complete, generate the file
-    if write_h5f:            
-        print('Genenerating the H5 file:', h5f_path)
-        sys.stdout.flush()
-        
-        args = ['gen_distal_h5', 
-                 '--ref_genome', ref_genome, 
-                 '--bed_file', bed_regions.fn, 
-                 '--distal_radius', str(distal_radius), 
-                 '--distal_order', str(distal_order), 
-                 '--n_files', str(n_h5_files), 
-                 '--chunk_size', str(chunk_size)]
-        if bw_paths != None:
-            args.append('--bw_paths')
-            args.append(bw_paths)
-        if without_bw_distal:
-            args.append('--without_bw_distal')
-        p = subprocess.Popen(args)
-        p.wait()
-            
-    return None
-
-
-
-def generate_h5f_singlev1(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_files, chunk_size, without_bw_distal):
-    """generate an HDF file for specific regions"""
-    #bed_regions = BedTool(bed_file)
-    if without_bw_distal:
-        n_channels = 4**distal_order
-    else:
-        n_channels = 4**distal_order + len(bw_files)
-    
-    with h5py.File(h5f_path, 'w') as hf:
-
-        print('Generating HDF5 file:', h5f_path)
-        sys.stdout.flush()
-
-        # Total seq len
-        seq_len =  distal_radius*2+1-(distal_order-1)
-
-        # Create distal_X dataset
-        # Note, the default dtype for create_dataset is numpy.float32
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=4, chunks=(1,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-
-        # Write data in chunks
-        #chunk_size = 50000
-        
-        seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-        for start in range(0, len(bed_regions), chunk_size):
-            end = min(start+chunk_size, len(bed_regions))
-
-            # Extract sequence from the genome, which is in one-hot encoding format
-            seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
-            
-            # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0 and (not without_bw_distal):
-                bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
-
-                # Concatenate the sequence data and the bigWig data
-                #seqs = np.concatenate((seqs, bw_distal), axis=1)
-                seqs = np.concatenate((seqs, bw_distal), axis=1).round(decimals=2)       
-            # Write the numpy array into the H5 file
-            hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-            hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-    return h5f_path
-
-def generate_h5f_singlev2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, binsize, bw_files, chunk_size, without_bw_distal):
-    
-    #bed_regions = BedTool(bed_file)
-    if without_bw_distal:
-        n_channels = 4**distal_order
-    else:
-        n_channels = 4**distal_order + len(bw_files)
-    
-    with h5py.File(h5f_path, 'w') as hf:
-
-        print('Generating HDF5 file:', h5f_path)
-        sys.stdout.flush()
-
-        # Total seq len
-        seq_len_orig =  distal_radius*2+1-(distal_order-1)
-        seq_len = int(np.ceil(seq_len_orig/binsize))
-        pad_left = 0
-        pad_right = 0
-        if seq_len_orig % binsize:
-            pad_len = binsize - (seq_len_orig % binsize)
-            pad_left = pad_len//2
-            pad_right = pad_len - pad_left
-
-        # Create distal_X dataset
-        # Note, the default dtype for create_dataset is numpy.float32
-        hf.create_dataset(name='distal_X', shape=(0, n_channels, seq_len), compression="gzip", compression_opts=4, chunks=(1,n_channels, seq_len), maxshape=(None,n_channels, seq_len)) 
-
-        # Write data in chunks
-        #chunk_size = 50000
-        
-        seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-        for start in range(0, len(bed_regions), chunk_size):
-            end = min(start+chunk_size, len(bed_regions))
-
-            # Extract sequence from the genome, which is in one-hot encoding format
-            seqs = get_digitalized_seq_ohe(seq_records, bed_regions.at(range(start, end)), distal_radius)
-            
-            # Handle distal bigWig data, return base-wise values
-            if len(bw_files) > 0 and (not without_bw_distal):
-                bw_distal = get_bw_for_bed(bw_files, bed_regions.at(range(start, end)), distal_radius)
-
-                # Concatenate the sequence data and the bigWig data
-                #seqs = np.concatenate((seqs, bw_distal), axis=1)
-                seqs = np.concatenate((seqs, bw_distal), axis=1).round(decimals=2)        
-            
-            ######
-            #print('seqs[0]:', seqs[0])
-            #print('seqs before: ', seqs.shape)
-            seqs = np.pad(seqs, ((0,0), (0,0), (pad_left,pad_right))).reshape(seqs.shape[0], seqs.shape[1],-1,binsize).mean(axis=3).round(decimals=2)
-            #print('seqs after: ', seqs.shape)
-            #print('seqs[0]:', seqs[0])
-            
-            assert seqs.shape[2] == seq_len
-            ######
-            # Write the numpy array into the H5 file
-            hf['distal_X'].resize((hf['distal_X'].shape[0] + seqs.shape[0]), axis = 0)
-            hf['distal_X'][-seqs.shape[0]:] = seqs
-    
-    return h5f_path
-
-
-def get_digitalized_seq(ref_genome, bed_regions, radius, order):
-    seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-
-    digit_encoder = {'A':0,'C':1,'G':2,'T':3,
-               'R':-1, #A,G
-               'Y':-1, #C,T
-               'M':-1, #A,C
-               'S':-1, #C,G
-               'W':-1, #A,T
-               'K':-1, #G,T
-               'B':-1, #not A
-               'D':-1, #not C
-               'H':-1, #not G
-               'V':-1, #not T
-               'N':-1}
-
-    digit_encoder_rc = {'A':3, 'C':2, 'G':1, 'T':0,
-               'R':-1, #A,G
-               'Y':-1, #C,T
-               'M':-1, #A,C
-               'S':-1, #C,G
-               'W':-1, #A,T
-               'K':-1, #G,T
-               'B':-1, #not A
-               'D':-1, #not C
-               'H':-1, #not G
-               'V':-1, #not T
-               'N':-1}
-
-    #self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-
-    digit_seqs = []
+        if not isinstance(bed_regions, BedTool):
+            print(f"Error: bed_regions should be <str> or <Bedtools>, but input is {bed_regions.__class__}!")
+            sys.exit()
+    init = 0
     for region in bed_regions:
-        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
-
-        #long_seq_record = self.records[chrom]
-
-        long_seq = str(seq_records[chrom].seq)
-        long_seq_len = len(long_seq)
-
-        start1 = np.max([int(start)-radius, 0])
-        stop1 = np.min([int(stop)+radius, long_seq_len])
-        short_seq = long_seq[start1:stop1].upper()
-
-        seq_len = 2*radius + 1 
-
-        if(len(short_seq) < seq_len):
-            #print('warning:', chrom, start1, stop1, long_seq_len)
-            if start1 == 0:
-                short_seq = (seq_len - len(short_seq))*'N' + short_seq
-                #print(short_seq)
-            else:
-                short_seq = short_seq + (seq_len - len(short_seq))*'N'
-                #print(short_seq)
-        #a = np.concatenate([digit_encoder[c] for c in short_seq], axis=1)
+        if not init:
+            init += 1
+            chrom, start0 = str(region.chrom), region.start
+            end0 = start0 + central_bp 
+            pos_strand_region = []
+            neg_strand_region = []
+            
+        chrom2, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
+            
+        if chrom2 != chrom:
+            if pos_strand_region:
+                yield pos_strand_region, '+'
+                pos_strand_region = []
+            if neg_strand_region:
+                yield neg_strand_region, '-'
+                neg_strand_region = []    
+            chrom = chrom2
+            start0 = 1
+            end0 = 1 + central_bp 
+            
         if strand == '+':
-            digit_seq = np.array([digit_encoder[c] for c in short_seq])
+            pos_strand_region.append(region)
+
         else:
-            #a = [digit_encoder_rc[c] for c in short_seq[::-1]]
-            #a.reverse()
-            digit_seq = np.array([digit_encoder_rc[c] for c in short_seq[::-1]])
+            neg_strand_region.append(region)
             
-        if order > 1:
-            new_seq = []
-            for i in range(seq_len - order +1):
-                kmer = digit_seq[i:i+order]
-                if min(kmer) < 0:
-                    new_seq.append(-1)
-                else:
-                    digit = sum([kmer[d]*4**(order-d-1) for d in range(order)])
-                    new_seq.append(digit)
+        if start > end0:
+            if pos_strand_region:
+                yield pos_strand_region, '+'
+                pos_strand_region = []
+
+            if neg_strand_region:
+                yield neg_strand_region, '-'
+                neg_strand_region = []
+
+            start0 = end0
+            end0 += central_bp
             
-            digit_seq = np.array(new_seq)
-        
-        if len(digit_seq) != seq_len - order +1:
-            print('digit_seq.shape:', digit_seq.shape, chrom, start, stop)
-            print('short_seq:', short_seq)
-        digit_seqs.append(digit_seq)
+    if pos_strand_region:
+        yield pos_strand_region, '+'
+    if neg_strand_region:
+        yield neg_strand_region, '-'
+
+def get_position_info(test_bed, central_radius):
+    """
+    Get validation position information
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the chromosome, start, end, and strand 
+                  information with columns ['chrom', 'start', 'end', 'strand'].
+    """
+    bed_generator = bed_reader(test_bed, central_radius)
+    info = []
+    for batch, stand in bed_generator:
+        info.extend([[nucleo.chrom, nucleo.start, nucleo.end, stand] for nucleo in batch])
+    info = pd.DataFrame(info, columns=['chrom', 'start', 'end', 'stand'])
+    return info
+
+def get_position_info_by_trainset(test_bed, central_radius):
+    """
+    Get validation position information from the test bed file.
+
+    This function reads a BED file and processes its entries in batches.
+    It returns a MultiIndex DataFrame where the first level index is the 
+    batch number and the second level index is the sample number within each batch.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the chromosome, start, end, and strand 
+                  information with a MultiIndex (batch_num, sample_num).
+    """
+    bed_generator = bed_reader(test_bed, central_radius)
+    info = []
+
+    for batch_num, (batch, stand) in enumerate(bed_generator):
+        batch_info = [[batch_num, i, nucleo.chrom, nucleo.start, nucleo.end, stand] for i, nucleo in enumerate(batch)]
+        info.extend(batch_info)
     
-    digit_seqs = np.array(digit_seqs, dtype=np.int32)
+    info_df = pd.DataFrame(info, columns=['batch_num', 'sample_num', 'chrom', 'start', 'end', 'stand'])
+    info_df.set_index(['batch_num', 'sample_num'], inplace=True)
     
-    return digit_seqs
-
-def get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions):
-
-    bw_fh = []
-    for file in bw_files:
-        bw_fh.append(pyBigWig.open(file))
-    
-    bw_data = np.zeros((len(bed_regions), len(bw_fh)), dtype=float)
-    
-    if len(bw_fh) > 0:
-        
-        for i, region in enumerate(bed_regions):
-            chrom, start, stop = str(region.chrom), region.start, region.stop
-            #bw_values = []
-            #seq_len = [bw.chroms(chrom) for bw in bw_fh]
-            
-            for j, bw in enumerate(bw_fh):
-                            
-                start1 = max([int(start)-bw_radii[j], 0])
-                stop1 = min([int(stop)+bw_radii[j], bw.chroms(chrom)])
-                bw_data[i,j] = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True)).mean()
-                
-
-        bw_data = pd.DataFrame(bw_data, columns=bw_names)
-    
-    return bw_data
-
-def get_digitalized_seq_ohe(seq_records, bed_regions, distal_radius):
-
-    one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
-               'C':np.array([[0,1,0,0]], dtype=np.float32).T,
-               'G':np.array([[0,0,1,0]], dtype=np.float32).T,
-               'T':np.array([[0,0,0,1]], dtype=np.float32).T,
-               'R':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #A,G
-               'Y':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #C,T
-               'M':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #A,C
-               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
-               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
-               'K':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #G,T
-               'B':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not A
-               'D':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not C
-               'H':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not G
-               'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
-               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
-
-    one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
-               'C':np.array([[0,0,1,0]], dtype=np.float32).T,
-               'G':np.array([[0,1,0,0]], dtype=np.float32).T,
-               'T':np.array([[1,0,0,0]], dtype=np.float32).T,
-               'R':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #A,G
-               'Y':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #C,T
-               'M':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #A,C
-               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
-               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
-               'K':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #G,T
-               'B':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not A
-               'D':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not C
-               'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
-               'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
-               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
-
-    #self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
-
-    distal_seqs = []
-    for region in bed_regions:
-        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
-
-        #long_seq_record = self.records[chrom]
-
-        long_seq = str(seq_records[chrom].seq)
-        long_seq_len = len(long_seq)
-
-        start1 = np.max([int(start)-distal_radius, 0])
-        stop1 = np.min([int(stop)+distal_radius, long_seq_len])
-        short_seq = long_seq[start1:stop1].upper()
-
-        seq_len = 2*distal_radius + 1 
-
-        if(len(short_seq) < seq_len):
-            #print('warning:', chrom, start1, stop1, long_seq_len)
-            if start1 == 0:
-                short_seq = (seq_len - len(short_seq))*'N' + short_seq
-                #print(short_seq)
-            else:
-                short_seq = short_seq + (seq_len - len(short_seq))*'N'
-                #print(short_seq)
-        #a = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
-        if strand == '+':
-            distal_seq = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
-        else:
-            #a = [one_hot_encoder_rc[c] for c in short_seq[::-1]]
-            #a.reverse()
-            distal_seq = np.concatenate([one_hot_encoder_rc[c] for c in short_seq[::-1]], axis=1)
-        if distal_seq.shape[1] != seq_len:
-            print('distal_seq.shape:', distal_seq.shape, chrom, start, stop)
-            print('short_seq:', short_seq)
-        distal_seqs.append(distal_seq)
-    
-    distal_seqs = np.array(distal_seqs)
-    
-    return distal_seqs
-    
+    return info_df
 
 def get_bw_for_bed(bw_files, bed_regions, radius):
 
@@ -495,173 +178,523 @@ def get_bw_for_bed(bw_files, bed_regions, radius):
         bw_data = np.array(bw_data).astype(np.float32)
     
     return bw_data
+#########################################################################
+#                          gene HD5
+#  use HD5 for saving distal Encoding(One-Hot)
+#########################################################################
+def get_h5f_path(bed_file, bw_names, central_radius, distal_radius, distal_order, without_bw_distal):
+    """Get the H5 file path name based on input data"""
+    
+    h5f_path = bed_file + '.distal_' + str(distal_radius) + '.segment_' + str(central_radius) + '_segshare'
+    
+    if distal_order > 1:
+        h5f_path = h5f_path + '_' + str(distal_order)
+        
+    if len(bw_names) > 0 and (not without_bw_distal):
+        h5f_path = h5f_path + '.' + '.'.join(list(bw_names))
+    
+    h5f_path = h5f_path + '.h5'
+    
+    return h5f_path
 
-def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only):
+def change_h5f_path(h5f_path, bed_file, bw_names, central_radius, distal_radius, distal_order, without_bw_distal):
+    name = get_h5f_path(bed_file, bw_names, central_radius, distal_radius, distal_order, without_bw_distal)
+    name = name.split('/')[-1]
+    h5f_path_new = os.path.join(h5f_path, name) 
+
+    if not os.path.isdir(h5f_path):
+        print(f"Warming : input h5f_path not dir, h5f path generate to {h5f_path_new} !")
+    return h5f_path_new
+
+def generate_h5f(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_files, h5_chunk_size=1, chunk_size=50000, without_bw_distal=True):
+    """Generate the H5 file for storing distal data"""
+
+    print('Generating HDF5 file:', h5f_path)
+    sys.stdout.flush()
+    # recode overlap realtion ship of sample in each segment
+    seq_records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
+    seq_list, batch_shape = get_distal_seqs_by_region(bed_regions, seq_records, distal_radius, central_radius)
+    
+    with h5py.File(h5f_path, 'w') as hf:
+        for idx in range(len(batch_shape)):
+            # Creat group And Wirte in HD5 for each segment
+            create_group_and_store(hf, idx, seq_list[idx], seq_records, distal_radius)
+    
+    return None
+
+def create_group_and_store(hf, idx, seqs_info, seq_records, distal_radius):
+    """Create a group for each segment and store encoded data"""
+    group = hf.create_group(f'segment_{idx}')
+    stand = seqs_info[0][3]
+    group.attrs['stand'] = stand
+    # Split segment into multi sample share sub-segment 
+    iter_segment_info = get_segment_info(seqs_info, seq_records, distal_radius)
+    
+    store_encodings(group, iter_segment_info)
+
+def store_encodings(group, iter_segment_info):
+    """Store encoding sample share sub-segment into the HDF5 group"""
+    for sample_num, (long_seq, start, stop, chrom, strand, radius, index, end) in enumerate(iter_segment_info):
+        encoding = segment_ohe_encoder(long_seq, start, stop, strand, radius, end)
+        sample_dset = group.create_dataset(f'sample_{sample_num}', data=encoding, compression="gzip", compression_opts=4)
+        sample_dset.attrs['index'] = index # recode sample index in sub-segment
+
+def get_segment_info(seqs, seq_records, radius):
+    init = True
+    for start0, stop0, chrom, strand, index, end in seqs:
+        if init:
+            init = False
+            long_seq = str(seq_records[chrom].seq)
+            c = chrom
+        assert chrom == c
+        yield long_seq, start0, stop0, chrom, strand, radius, index, end
+
+def segment_ohe_encoder(long_seq, start, stop, strand, radius, end=False):
+
+    one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'C':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'G':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'T':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'R':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #C,T
+               'M':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #G,T
+               'B':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+
+    one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
+               'C':np.array([[0,0,1,0]], dtype=np.float32).T,
+               'G':np.array([[0,1,0,0]], dtype=np.float32).T,
+               'T':np.array([[1,0,0,0]], dtype=np.float32).T,
+               'R':np.array([[0,0.5,0,0.5]], dtype=np.float32).T, #A,G
+               'Y':np.array([[0.5,0,0.5,0]], dtype=np.float32).T, #C,T
+               'M':np.array([[0,0,0.5,0.5]], dtype=np.float32).T, #A,C
+               'S':np.array([[0,0.5,0.5,0]], dtype=np.float32).T, #C,G
+               'W':np.array([[0.5,0,0,0.5]], dtype=np.float32).T, #A,T
+               'K':np.array([[0.5,0.5,0,0]], dtype=np.float32).T, #G,T
+               'B':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not A
+               'D':np.array([[1/3,1/3,0,1/3]], dtype=np.float32).T, #not C
+               'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
+               'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
+               'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
+        
+    #imput 
+    short_seq = ['', '','']
+    if start < 0:
+        left_impute = 0 - start 
+        start = 0
+        short_seq[0] = left_impute * 'N'
+        
+    if end:
+        long_seq_len = len(long_seq)
+        right_impute = stop - long_seq_len
+        short_seq[2] = right_impute * 'N'
+
+    short_seq[1] = long_seq[start:stop].upper()
+
+    short_seq = ''.join(short_seq)
+
+    
+   # return short_seq
+    if strand == '+':
+        distal_ecoding = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
+        
+    else:
+        distal_ecoding = np.concatenate([one_hot_encoder_rc[c] for c in short_seq[::-1]], axis=1)
+        
+    return distal_ecoding
+
+def generate_h5fv2(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_paths, bw_files, chunk_size=50000, n_h5_files=1, without_bw_distal=False):
+    """Generate the H5 file for storing distal data"""
+    write_h5f = True
+    if os.path.exists(h5f_path):
+        try:
+            with h5py.File(h5f_path, 'r', swmr=True) as hf:
+                bed_path = bed_regions.fn
+                h5_sample_size = check_h5f_sample_size(hf)
+                try:
+                    if os.lstat(bed_path).st_mtime < os.lstat(h5f_path).st_mtime \
+                    and len(bed_regions) == h5_sample_size:
+                        write_h5f = False
+                except KeyError:
+                    print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
+                                       
+        except OSError:
+            print('Warning: re-genenerating the H5 file, because the file is empty or imcomplete:', h5f_path)
+
+            
+    # If the H5 file is unavailable or incomplete, generate the file
+    if write_h5f:            
+        p = multiprocessing.Process(target=generate_h5f,\
+                                    args=(bed_regions,h5f_path,ref_genome,central_radius, \
+                                          distal_radius,distal_order,bw_files)\
+                                   )       
+    
+        return p
+    return 0
+
+def check_h5f_sample_size(h5f):
+    h5_sample_size = 0
+    for key in h5f.keys():
+        segment = h5f[key]
+        h5_sample_size += sum([len(segment[key].attrs['index']) for key in segment.keys()])
+    return h5_sample_size
+
+#########################################################################
+#                           Local Embeding 
+#########################################################################
+def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, central_radius, local_radius, local_order, seq_only):
     """Prepare local data for given regions"""
-    
+    """  
+        Args:
+            bed_regions: <Bedtools> 
+            ref_genome:  <SeqRecord> ref genome
+    """
     # Read the seq data
-    local_seq_cat = get_digitalized_seq(ref_genome, bed_regions, local_radius, order=1)    
-    
-    # Check whether the data is correctly extracted (e.g. not all sites are A/T; incorrect padding in the beginning of a chromosome)
-    if np.unique(local_seq_cat[:,local_radius], axis=0).shape[0] != 1:
-        print('ERROR: The positions in input BED file have different bases (A/T and C/G mixed)! The ref_genome or input BED file could be wrong.', file=sys.stderr)
-        sys.exit()
-  
-    # NOTE: replace negatives with 0, meaning replacing 'N' with 'A'
-    local_seq_cat = np.where(local_seq_cat>=0, local_seq_cat, 0)
-    
-    # Assign column names and convert to DataFrame
+    local_seq_cat,y = local_digitalized_seqs_by_region(bed_regions, ref_genome, central_radius, local_radius, local_order=1)    
+    #local_seq_cat = pd.concat([pd.DataFrame(x,columns = seq_cols) for x in local_seq_cat],keys=range(len(local_seq_cat)))
+    local_seq_cat = pd.concat(local_seq_cat,keys=range(len(local_seq_cat)))
+
     seq_cols = ['us'+str(local_radius - i) for i in range(local_radius)] + ['mid'] + ['ds'+str(i+1) for i in range(local_radius)]
     local_seq_cat = pd.DataFrame(local_seq_cat, columns = seq_cols)
-    
     if local_order > 1:
-        local_seq_cat2 = get_digitalized_seq(ref_genome, bed_regions, local_radius, order=local_order)
-        
-        # NOTE: use np.int64 because nn.Embedding needs a Long type
-        local_seq_cat2 = local_seq_cat2.astype(np.int64)
+        local_seq_cat2,y = local_digitalized_seqs_by_region(bed_regions, ref_genome, central_radius, local_radius, local_order=local_order)
         
         # NOTE: replace k-mers with 'N' with a large number; the padding numbers at the two ends of the chromosomes are also large numbers   
-        local_seq_cat2 = np.where(np.logical_and(local_seq_cat2>=0, local_seq_cat2<=4**local_order), local_seq_cat2, 4**local_order)
-        
+        #local_seq_cat2 = np.where(np.logical_and(local_seq_cat2>=0, local_seq_cat2<=4**local_order), local_seq_cat2, 4**local_order)
         # Names of the categorical variables
         cat_n = local_radius*2 +1 - (local_order-1)
         categorical_features  = ['cat'+str(i+1) for i in range(cat_n)]
-        
-        local_seq_cat2 = pd.DataFrame(local_seq_cat2, columns = categorical_features)
+        #local_seq_cat = pd.concat([pd.DataFrame(x,columns = categorical_features) for x in local_seq_cat2],keys=range(len(local_seq_cat)))
+        local_seq_cat2 = pd.concat(local_seq_cat2,keys=range(len(local_seq_cat2)))
         local_seq_cat2 = pd.concat([local_seq_cat, local_seq_cat2], axis=1)
     else:
-        local_seq_cat2 = local_seq_cat.astype(np.int64)
         categorical_features = seq_cols
     
     print('local_seq_cat2 shape and columns:', local_seq_cat2.shape, local_seq_cat2.columns)
     print('categorical_features:', categorical_features)
     
     # The 'score' field in the BED file stores the label/class information
-    y = np.array([float(loc.score) for loc in bed_regions], ndmin=2).reshape((-1,1)) # shape: (n_row, 1)
-    y = pd.DataFrame(y, columns=['mut_type'])
+    y = pd.concat(y,keys=range(len(y)))
     output_feature = 'mut_type'
     
     # Add feature data in bigWig files
     if len(bw_files) > 0 and seq_only == False:
         # Use the mean value of the region of 2*radius+1 bp around the focal site
         bw_data = get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions)
- 
         data_local = pd.concat([local_seq_cat2, bw_data, y], axis=1)
     else:
         data_local = pd.concat([local_seq_cat2, y], axis=1)
 
     return data_local, seq_cols, categorical_features, output_feature
 
+def local_digitalized_seqs_by_region(bed_regions, seq_records, central_bp, local_radius, local_order=1):
 
-
+    if 'items' not in dir(seq_records):
+        _ = type(seq_records)
+        sys.exit(f'seq_records need be dict, but input is {_} !')
     
-class CombinedDatasetH5(Dataset):
-    """Combine local data and distal into Dataset, with H5"""
-    def __init__(self, data, seq_cols, cat_cols, output_col, h5f_path, n_channels):
-        """  
+    cat_n = local_radius*2 +1 - (local_order-1) 
+    outlier_process = preocess_local_seq_outlier(local_order, local_radius)
+    
+    if local_order == 1:
+        seq_cols = ['us'+str(local_radius - i) for i in range(local_radius)] + ['mid'] + ['ds'+str(i+1) for i in range(local_radius)]
+        
+    else:
+        seq_cols  = ['cat'+str(i+1) for i in range(cat_n)]
+    
+    bed_generator = bed_reader(bed_regions, central_bp)
+    digit_dataset = []
+    y = []
+    init = False
+    for batch,stand in bed_generator:
+        if not init:
+            chrom = batch[0].chrom
+            long_seq = str(seq_records[chrom].seq)
+            init = True
+        else:
+            if chrom != batch[0].chrom:
+                chrom = batch[0].chrom
+                long_seq = str(seq_records[chrom].seq)
+        
+        batch_local_encoding = np.empty((len(batch),cat_n), dtype=np.int64)
+        seqs = get_seqs_to_digitalized(long_seq, batch, local_radius, stand)
+        digit_seqs = local_encoding_seqs(long_seq, seqs, local_radius, batch_local_encoding, local_order=local_order)
+        digit_seqs = outlier_process(digit_seqs)
+        digit_dataset.append(pd.DataFrame(digit_seqs,columns=seq_cols))
+        
+        label = get_label(batch)
+        y.append(pd.DataFrame(label.reshape((-1,1)),columns = ['mut_type']))
+
+        
+    #digit_dataset = np.concatenate(digit_dataset)
+    return digit_dataset,y 
+
+def preocess_local_seq_outlier(local_order,local_radius):
+    """
+    Generate a function to process local sequence outliers based on the given local order and radius.
+
+    Returns:
+    A function that processes local sequence outliers.
+
+    Raises:
+    - SystemExit: If local_order is not greater than 0.
+    """
+    if local_order == 1:
+        def process_local_seq(local_seq_cat,local_radius=local_radius):
+            """
+            Process the local sequence for local order 1.
+            """
+            if np.unique(local_seq_cat[:,local_radius], axis=0).shape[0] != 1:
+                print('ERROR: The positions in input BED file have different bases (A/T and C/G mixed)! The ref_genome or input BED file could be wrong.', file=sys.stderr)
+                sys.exit()
+            return np.where(local_seq_cat>=0, local_seq_cat, 0)
+        return process_local_seq
+    
+    elif local_order > 1:
+        v = 4**local_order
+        def process_local_seq(local_seq_cat,v=v):
+            """
+            Process the local sequence for local order greater than 1.
+            """
+            return np.where(np.logical_and(local_seq_cat >= 0, local_seq_cat <= v), local_seq_cat, v)
+        return process_local_seq
+    else:
+        sys.exit("local_oreder need larger than 0!")
+
+def get_seqs_to_digitalized(long_seq, regions, radius, seq_strand):
+    """
+    Check relationship of regions by radius and save the information for encoding.
+
+    Yields:
+    A tuple containing start position of encoding, stop position of encoding, chromosome,
+             strand, index list, and a boolean indicating if imputation is needed
+    - The index list used to find samples from encoding segment.
+
+    """
+    #seqs = []
+    end=True
+    init = False
+    index = [0]
+    for region in regions:
+        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
+        
+        assert seq_strand == strand
+        
+        # init 
+        if not init:
+            init = True
+            chrom_init = chrom
+            start0 = int(start) - radius
+            stop0 = int(stop) + radius
+            leng_seq = len(long_seq)
+            continue
+            
+        start1 = int(start) - radius
+        stop1 = int(stop) + radius
+        
+        if start1 > stop0:
+            # one-hot encoding
+            impute = False
+            yield (start0, stop0, chrom, strand, index, impute)
+            start0, stop0 = start1, stop1
+            index = [0]
+        else:
+            stop0 = stop1
+            index.append(start1-start0)
+    if stop0 > leng_seq:
+        impute = True
+    else:
+        impute = False
+    yield (start0, stop0, chrom, strand, index, impute)
+
+def local_encoding_seqs(long_seq, seqs, radius, batch_local_encoding, local_order):
+    if '__iter__' not in dir(seqs):
+        sys.exit("Error : input seqs is not <generator>!")
+
+    if not isinstance(batch_local_encoding, np.ndarray):
+        sys.exit("Error: one-hot Encoding Need provided an array to save batch infomation!")
+        
+    batch_index = 0
+    for start0, stop0, chrom, strand, index, end in seqs:
+        sub_batch_num = len(index)
+        sub_batch = seq_digit_encoder(long_seq, start0, stop0, chrom, strand, radius,index, local_order, end)
+        batch_local_encoding[batch_index:batch_index+sub_batch_num] = sub_batch
+        batch_index += sub_batch_num
+    return batch_local_encoding 
+
+def seq_digit_encoder(long_seq, start, stop, chrom, strand, radius, index, local_order, end=False):
+    digit_encoder = {'A':0,'C':1,'G':2,'T':3,
+               'R':-1, #A,G
+               'Y':-1, #C,T
+               'M':-1, #A,C
+               'S':-1, #C,G
+               'W':-1, #A,T
+               'K':-1, #G,T
+               'B':-1, #not A
+               'D':-1, #not C
+               'H':-1, #not G
+               'V':-1, #not T
+               'N':-1}
+
+    digit_encoder_rc = {'A':3, 'C':2, 'G':1, 'T':0,
+               'R':-1, #A,G
+               'Y':-1, #C,T
+               'M':-1, #A,C
+               'S':-1, #C,G
+               'W':-1, #A,T
+               'K':-1, #G,T
+               'B':-1, #not A
+               'D':-1, #not C
+               'H':-1, #not G
+               'V':-1, #not T
+               'N':-1}
+    
+    #impute
+    short_seq = ['', '','']
+    if start < 0:
+        #left_imput = 0 - start + 1
+        left_impute = 0 - start
+        start = 0
+        short_seq[0] = left_impute * 'N'
+        
+    if end:
+        long_seq_len = len(long_seq)
+        right_impute = stop - long_seq_len
+        short_seq[2] = right_impute * 'N'
+
+    short_seq[1] = long_seq[start:stop].upper()
+    short_seq = ''.join(short_seq)
+  #  return short_seq
+    if strand == '+':
+        digit_seq = np.array([digit_encoder[c] for c in short_seq])
+    else:
+        digit_seq = np.array([digit_encoder_rc[c] for c in short_seq[::-1]])
+
+    if local_order > 1:
+        seq_len = len(digit_seq)
+        new_seq = []
+        for i in range(seq_len - local_order +1):
+            kmer = digit_seq[i:i+local_order]
+            if min(kmer) < 0:
+                new_seq.append(-1)
+            else:
+                digit = sum([kmer[d]*4**(local_order-d-1) for d in range(local_order)])
+                new_seq.append(digit)
+        digit_seq = np.array(new_seq)
+        window_size = 2 * radius + 1 - local_order + 1
+    else:
+        window_size = 2 * radius + 1
+
+    if strand == '+':
+        digit_seq = np.asarray([digit_seq[start1:start1 + window_size] for start1 in index], dtype=np.int64)         
+    else:
+        digit_seq = np.asarray([digit_seq[-start1-window_size:-start1] if start1 else digit_seq[-start1-window_size:] for start1 in index], dtype=np.int64)
+    
+    digit_seq = np.where(np.logical_and(digit_seq>=0, digit_seq<=4**local_order), digit_seq, 4**local_order)
+    return digit_seq
+
+def get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions):
+
+    bw_fh = []
+    for file in bw_files:
+        bw_fh.append(pyBigWig.open(file))
+    
+    bw_data = np.zeros((len(bed_regions), len(bw_fh)), dtype=float)
+    
+    if len(bw_fh) > 0:
+        
+        for i, region in enumerate(bed_regions):
+            chrom, start, stop = str(region.chrom), region.start, region.stop
+            #bw_values = []
+            #seq_len = [bw.chroms(chrom) for bw in bw_fh]
+            
+            for j, bw in enumerate(bw_fh):
+                            
+                start1 = max([int(start)-bw_radii[j], 0])
+                stop1 = min([int(stop)+bw_radii[j], bw.chroms(chrom)])
+                bw_data[i,j] = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True)).mean()
+                
+
+        bw_data = pd.DataFrame(bw_data, columns=bw_names)
+    
+    return bw_data 
+
+def get_label(bed_regions):
+    y = np.array([float(loc.score) for loc in bed_regions])
+    return y
+#########################################################################
+#                          Construct Dataset Without HDF5 
+# 
+# Note: When sample redundancy is high, I/O in preprocessing can become a bottleneck
+#       in model training. This method computes distal encoding dirctly from the reference  
+#       genome, reducing the disk IO. 
+#
+# Suggestion: For human data, if the distal region is greater than 8k,
+#             it is recommended to use this method.
+#########################################################################
+def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii,central_radius=30000, local_radius=5, local_order=1, distal_radius=50, distal_order=1, seq_only=False, without_bw_distal=False):
+    """Prepare the datasets for given regions, without an H5 file"""
+    """  
         Args:
-            data: DataFrame containing local seq data and categorical data
-            seq_cols: names of local seq columns
-            cat_cols: names of categorical columns used for training
-            output_col: name of the label column
-            h5f_path: H5 file storing the distal data
-            n_channels: number of columns (channels) in distal data to be extracted
-        """
-        # Store the local seq data and label for later use
-        self.data_local = data[seq_cols+[output_col]]
-        
-        self.n = data.shape[0]
-        
-        # Output column
-        if output_col:
-            self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
-        else:
-            self.y = np.zeros((self.n, 1))
-        
-        # Names of categorical columns
-        self.cat_cols = cat_cols
-        
-        # Set biggest dimension for each categorical column
-        self.cat_dims = [np.max(data[col]) + 1 for col in cat_cols]
-        
-        # Find the continuous columns
-        self.cont_cols = [col for col in data.columns if col not in self.cat_cols + seq_cols + [output_col]]
-        
-        # Assign the continuous data to cont_X
-        if self.cont_cols:
-            self.cont_X = data[self.cont_cols].astype(np.float32).values
-        else:
-            self.cont_X = np.zeros((self.n, 1)) 
-        
-        # Assign the categorical data to cat_X
-        if len(self.cat_cols) > 0:
-            self.cat_X = data[cat_cols].astype(np.int64).values
-        else:
-            print("Error: no categorical data, something is wrong!", file=sys.stderr)
-            sys.exit()
-        
-        # For distal data
-        self.h5f_path = h5f_path
-        self.h5f = None
-        self.single_h5_size = 0
-        self.n_channels = n_channels
-        print('Number of channels to be used for distal data:', self.n_channels)
-        
+            bed_regions: <Bedtools> 
+            ref_genome:  <str> path of ref genome
+    """
+    # Prepare local data
+    ref_genome = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, central_radius, local_radius, local_order, seq_only)
 
-    def __len__(self):
-        """ Denote the total number of samples. """
-        return self.n
-
-    def __getitem__(self, idx):
-        """ Generate one sample of data. """
-        if self.h5f is None:
-            
-            # Open the H5 file once
-            self.h5f = h5py.File(self.h5f_path, 'r', swmr=True)
-            
-            if len(self.h5f.keys()) > 1:
-                self.single_h5_size = self.h5f['distal_X1'].shape[0]
-            #print('open h5f file:', self.h5f_path)     
-        if self.single_h5_size > 0:
-            file_i = (idx // self.single_h5_size) + 1
-            idx1 = idx % self.single_h5_size
-            return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.h5f['distal_X'+str(file_i)][idx1, 0:self.n_channels, :])
-        
-        else:
-            return self.y[idx], self.cont_X[idx], self.cat_X[idx], np.array(self.h5f['distal_X'][idx, 0:self.n_channels, :])
+    # If seq_only flag was set, bigWig files will be ignored
+    if seq_only or without_bw_distal:
+        n_channels = 4**distal_order
+        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
+    else:
+        n_channels = 4**distal_order + len(bw_files)
     
-    def get_labels(self): 
-        return np.squeeze(self.y)
-    
-    def _get_labels(self, dataset, idx):
-        return dataset.__getitem__(idx)[1]
-
-
-
+    # Combine local data and distal into Dataset objects  
+    dataset = CombinedDatasetNP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, central_radius=central_radius, distal_radius=distal_radius, n_channels=n_channels, bw_files=bw_files, seq_only=seq_only, without_bw_distal=without_bw_distal)
+    return dataset
 
 class CombinedDatasetNP(Dataset):
     """Combine local data and distal into Dataset, using NumPy funcions"""
-    def __init__(self, data, seq_cols, cat_cols, output_col, ref_genome, bed_regions, distal_radius, n_channels, bw_files, seq_only, without_bw_distal):
+    def __init__(self, data, seq_cols, cat_cols, output_col, \
+                 ref_genome, bed_regions, central_radius, distal_radius, \
+                 n_channels, bw_files, seq_only, without_bw_distal):
         """  
         Args:
             data: DataFrame containing local seq data and categorical data
             seq_cols: names of local seq columns
             cat_cols: names of categorical columns used for training
             output_col: name of the label column
-            h5f_path: H5 file storing the distal data
             n_channels: number of columns (channels) in distal data to be extracted
         """
+        # check input
+        if not isinstance(bed_regions, BedTool):
+            print(f"Error: bed_regions should be  <Bedtools>, but input is {bed_regions.__class__}!")
+            sys.exit()
+
+        if not isinstance(ref_genome, dict):
+            print(f"Error : ref_genome should be <dict>, but input is {ref_genome.__class__}!")
+            sys.exit()
+
         # Store the local seq data and label for later use
         self.data_local = data[seq_cols+[output_col]]
         
         # Sample size
-        self.n = data.shape[0]
-        
+        #self.n = data.shape[0]# sample size
+        self.n = data.index[-1][0] + 1# batch number
         # Output column
         if output_col:
-            self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
+             self.y = data[output_col].astype(np.float32)
+            #self.y = data[output_col].astype(np.float32).values.reshape(-1, 1)
         else:
-            self.y = np.zeros((self.n, 1))
+            sys.exit(f"Error: {output_col}")
+            #self.y = np.zeros((self.n, 1))
         
         # Names of categorical columns
         self.cat_cols = cat_cols
@@ -680,7 +713,8 @@ class CombinedDatasetNP(Dataset):
         
         # Assign the categorical data to cat_X
         if len(self.cat_cols) > 0:
-            self.cat_X = data[cat_cols].astype(np.int64).values
+            self.cat_X = data[cat_cols]
+            #self.cat_X = data[cat_cols].astype(np.int64).values
         else:
             print("Error: no categorical data, something is wrong!", file=sys.stderr)
             sys.exit()
@@ -701,13 +735,86 @@ class CombinedDatasetNP(Dataset):
         print('Number of channels to be used for distal data:', self.n_channels)
         
         self.distal_radius = distal_radius
-        self.seq_len = 2*distal_radius + 1 
-        
-        self.bed_regions = bed_regions
-        self.bed_pd = pd.read_csv(bed_regions.fn, sep='\t', header=None, memory_map=True)
-        self.bed_pd.columns = ['chrom', 'start', 'stop', 'name', 'score', 'strand']
+        #self.seq_len = distal_radius*2+ central_radius - (distal_order-1) 
 
-        self.one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
+        self.central_radius = central_radius
+        self.bed_regions = bed_regions
+        self.records = ref_genome
+
+        self.distal_info = False
+    def __len__(self):
+        """ Denote the total number of samples. """
+        return self.n
+
+    def __getitem__(self, index):
+        """ Generate one batch of data. """
+        assert index < self.n
+        seqs = iter(self.seqs_list[index])
+        batch_distal = distal_encoding_by_region(seqs, self.batch_shape[index], self.distal_radius,self.records)
+        #assert np.sum(self.y.loc[index] == label) == len(label)
+        
+        return self.y.loc[index].values.reshape(-1, 1), self.cont_X[index], self.cat_X.loc[index].values, batch_distal
+
+    def get_distal_encoding_infomation(self):
+        self.seqs_list,self.batch_shape = get_distal_seqs_by_region(self.bed_regions, self.records, self.distal_radius, self.central_radius)
+        self.distal_info = True
+        
+    def get_labels(self): 
+        return np.squeeze(self.y)
+    
+    def _get_labels(self, dataset, idx):
+        return dataset.__getitem__(idx)[1]
+    
+def get_distal_seqs_by_region(bed_regions, seq_records, radius, central_bp):
+    seqs_list = []
+    batch_shape = []
+    bed_generator = bed_reader(bed_regions, central_bp)
+    init = False
+    for batch,stand in bed_generator:
+        if not init:
+            chrom = batch[0].chrom
+            long_seq = str(seq_records[chrom].seq)
+            init = True
+        else:
+            if chrom != batch[0].chrom:
+                chrom = batch[0].chrom
+                long_seq = str(seq_records[chrom].seq)
+
+        # Create an array to store batch after ohe encoding
+       # batch_ohe_encoding = np.empty((len(batch),4,2*radius + 1), dtype='float32')
+                       
+        seqs = get_seqs_to_digitalized(long_seq, batch, radius, stand)
+        seqs_list.append([i for i in seqs])
+        batch_shape.append(len(batch))
+        #digit_seqs = get_encoding_seqs(long_seq, seqs, radius, encoding, local_order, batch_ohe_encoding)
+
+    return seqs_list,batch_shape
+
+def distal_encoding_by_region(seqs, batch_shape, radius,seq_records):
+    if '__iter__' not in dir(seqs):
+        sys.exit("Error : input seqs is not <generator>!")
+        
+    # Create an array to store batch after ohe encoding
+    batch_ohe_encoding = np.empty((batch_shape,4,2*radius + 1), dtype='float32')
+    batch_index = 0
+    init = True
+    for start0, stop0, chrom, strand, index, end in seqs:
+        if init:
+            init = False
+            long_seq = str(seq_records[chrom].seq)
+            c = chrom
+        assert chrom == c
+        sub_batch_num = len(index)
+        sub_batch = seq_ohe_encoder(long_seq, start0, stop0, chrom, strand, radius, index, end)
+
+        batch_ohe_encoding[batch_index:batch_index+sub_batch_num] = sub_batch
+        batch_index += sub_batch_num
+    
+    return batch_ohe_encoding
+
+def seq_ohe_encoder(long_seq, start, stop, chrom, strand, radius, index, end=False):
+
+    one_hot_encoder = {'A':np.array([[1,0,0,0]], dtype=np.float32).T,
                'C':np.array([[0,1,0,0]], dtype=np.float32).T,
                'G':np.array([[0,0,1,0]], dtype=np.float32).T,
                'T':np.array([[0,0,0,1]], dtype=np.float32).T,
@@ -723,7 +830,7 @@ class CombinedDatasetNP(Dataset):
                'V':np.array([[1/3,1/3,1/3,0]], dtype=np.float32).T, #not T
                'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
 
-        self.one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
+    one_hot_encoder_rc = {'A':np.array([[0,0,0,1]], dtype=np.float32).T,
                'C':np.array([[0,0,1,0]], dtype=np.float32).T,
                'G':np.array([[0,1,0,0]], dtype=np.float32).T,
                'T':np.array([[1,0,0,0]], dtype=np.float32).T,
@@ -738,109 +845,249 @@ class CombinedDatasetNP(Dataset):
                'H':np.array([[1/3,0,1/3,1/3]], dtype=np.float32).T, #not G
                'V':np.array([[0,1/3,1/3,1/3]], dtype=np.float32).T, #not T
                'N':np.array([[0.25,0.25,0.25,0.25]], dtype=np.float32).T}
-            
-        self.records = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
         
+    #imput 
+    short_seq = ['', '','']
+    if start < 0:
+        left_impute = 0 - start 
+        start = 0
+        short_seq[0] = left_impute * 'N'
+        
+    if end:
+        long_seq_len = len(long_seq)
+        right_impute = stop - long_seq_len
+        short_seq[2] = right_impute * 'N'
+
+    short_seq[1] = long_seq[start:stop].upper()
+
+    short_seq = ''.join(short_seq)
+   
+   # return short_seq
+    window_size = 2 * radius + 1
+    if strand == '+':
+        distal_seq = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
+        distal_seq = [distal_seq[:,start1:start1 + window_size] for start1 in index]
+        #distal_seq = np.expand_dims(distal_seq, 0)
+    else:
+        distal_seq = np.concatenate([one_hot_encoder_rc[c] for c in short_seq[::-1]], axis=1)
+        distal_seq = [distal_seq[:,-start1-window_size:-start1] if start1 else distal_seq[:,-start1-window_size:] for start1 in index]    
+        #distal_seq = np.expand_dims(distal_seq, 0)
+    return distal_seq
+
+#########################################################################
+#                          Construct Dataset With HDF5 
+# 
+# Note: When sample redundancy is low, computation in preprocessing become 
+#       a bottleneck im model training. This method used HD5 file to save 
+#       non-redundancy distal encoding, enabling the reuse of encoding. 
+#
+# Suggestion: For human data, if the distal region is less than 4k,
+#             it is recommended to use this method.
+# 
+# Dependency: h5py==3.10.0; h5py==2.10.0 can not run in multi process in this code.
+#########################################################################
+def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw_radii,central_radius, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path=None, chunk_size=5000, seq_only=True, n_h5_files=1, without_bw_distal=True):
+    """Prepare the datasets for given regions, using H5 file"""
+ 
+    # get h5f_path 
+    bed_file = bed_regions.fn
+    if not h5f_path:
+        h5f_path = get_h5f_path(bed_file, bw_names, central_radius, distal_radius, distal_order, without_bw_distal)
+    else:
+        h5f_path = change_h5f_path(h5f_path, bed_file, bw_names, central_radius, distal_radius, distal_order, without_bw_distal)
+    # Generate H5 file for distal data
+    bed_file = bed_regions.fn
+    process = generate_h5fv2(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_paths, bw_files, chunk_size, n_h5_files, without_bw_distal)
+    if process:
+        process.start()
+    
+    # Prepare local data
+    ref_genome = SeqIO.to_dict(SeqIO.parse(open(ref_genome, 'r'), 'fasta'))
+    start_time = time.time()
+    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, central_radius, local_radius, local_order, seq_only)
+    print(f"local preprocess used time: {time.time() -start_time}")
+    # If seq_only flag was set, bigWig files will be ignored
+    if seq_only or without_bw_distal:
+        n_channels = 4**distal_order
+        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
+    else:
+        n_channels = 4**distal_order + len(bw_files)
+    
+    if process:
+        process.join()
+    
+    # Combine local data and distal into Dataset objects
+    dataset = CombinedDatasetH5(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path, distal_radius=distal_radius, n_channels=n_channels)
+    
+    #return dataset, data_local, categorical_features
+    return dataset
+
+class CombinedDatasetH5(Dataset):
+    """Combine local data and distal into Dataset, with H5"""
+    def __init__(self, data, seq_cols, cat_cols, output_col, h5f_path, distal_radius, n_channels):
+        """  
+        Args:
+            data: DataFrame containing local seq data and categorical data
+            seq_cols: names of local seq columns
+            cat_cols: names of categorical columns used for training
+            output_col: name of the label column
+            h5f_path: H5 file storing the distal data
+            n_channels: number of columns (channels) in distal data to be extracted
+        """
+        # Store the local seq data and label for later use
+        self.data_local = data[seq_cols+[output_col]]
+        
+        self.n = data.index[-1][0] + 1
+        
+        # Output column
+        if output_col:
+            self.y = data[output_col].astype(np.float32)
+        else:
+            sys.exit(f"Error: {output_col}")
+        
+        # Names of categorical columns
+        self.cat_cols = cat_cols
+        
+        # Set biggest dimension for each categorical column
+        self.cat_dims = [np.max(data[col]) + 1 for col in cat_cols]
+        
+        # Find the continuous columns
+        self.cont_cols = [col for col in data.columns if col not in self.cat_cols + seq_cols + [output_col]]
+        
+        # Assign the continuous data to cont_X
+        if self.cont_cols:
+            self.cont_X = data[self.cont_cols].astype(np.float32).values
+        else:
+            self.cont_X = np.zeros((self.n, 1)) 
+        
+        # Assign the categorical data to cat_X
+        if len(self.cat_cols) > 0:
+            self.cat_X = data[cat_cols]
+        else:
+            print("Error: no categorical data, something is wrong!", file=sys.stderr)
+            sys.exit()
+        
+        # For distal data
+        self.h5f = h5py.File(h5f_path, 'r', swmr=True)
+        self.distal_radius = distal_radius
 
     def __len__(self):
         """ Denote the total number of samples. """
         return self.n
 
-    def __getitem__(self, idx):
+    def __getitem__(self, index):
         """ Generate one sample of data. """
-
-        region = self.bed_pd.iloc[idx]
-        chrom, start, stop, strand = str(region.chrom), region.start, region.stop, region.strand
+        y_values = self.y.loc[index].values.reshape(-1, 1)
+        cont_X = self.cont_X[index]
+        cat_X_values = self.cat_X.loc[index].values
+        distal_encoding = self._read_distal(index)
         
-        #long_seq_record = self.records[chrom]
+        return y_values, cont_X, cat_X_values, distal_encoding
 
-        long_seq = str(self.records[chrom].seq)
-        long_seq_len = len(long_seq)
-
-        start1 = np.max([int(start)-self.distal_radius, 0])
-        stop1 = np.min([int(stop)+self.distal_radius, long_seq_len])
-        short_seq = long_seq[start1:stop1].upper()
-
-        if(len(short_seq) < self.seq_len):
-            #print('warning:', chrom, start1, stop1, long_seq_len)
-            if start1 == 0:
-                short_seq = (self.seq_len - len(short_seq))*'N' + short_seq
-                #print(short_seq)
-            else:
-                short_seq = short_seq + (self.seq_len - len(short_seq))*'N'
-                #print(short_seq)
-        #a = np.concatenate([one_hot_encoder[c] for c in short_seq], axis=1)
-        if strand == '+':
-            distal_seq = np.concatenate([self.one_hot_encoder[c] for c in short_seq], axis=1)
-        else:
-            #a = [one_hot_encoder_rc[c] for c in short_seq[::-1]]
-            #a.reverse()
-            distal_seq = np.concatenate([self.one_hot_encoder_rc[c] for c in short_seq[::-1]], axis=1)
-        if distal_seq.shape[1] != self.seq_len:
-            print('distal_seq.shape:', distal_seq.shape, chrom, start, stop)
-            print('short_seq:', short_seq)
-
-        # Handle distal bigWig data
-        if len(self.bw_fh) > 0 and (not self.seq_only) and (not self.without_bw_distal):
-            for bw in self.bw_fh:
-                bw_values = np.nan_to_num(bw.values(chrom, start1, stop1, numpy=True))
-                if(len(bw_values) < self.seq_len):
-                    if start1 == 0:
-                        bw_values = np.concatenate([(self.seq_len - len(bw_values))*[0], bw_values])
-                    else:
-                        bw_values = np.concatenate([bw_values, (self.seq_len - len(bw_values))*[0]])
-                
-                if strand == '-':
-                    bw_values = np.flip(bw_values)
-                
-                distal_seq = np.concatenate((distal_seq, [bw_values]), axis=0).astype(np.float32)
-
+    def _read_distal(self, index):
+        segment_encoding = self.h5f[f"segment_{index}"] # get segment
+        stand = segment_encoding.attrs['stand']
         
-        return self.y[idx], self.cont_X[idx], self.cat_X[idx], distal_seq
-    
-    def get_labels(self): 
-        return np.squeeze(self.y)
-    
-    def _get_labels(self, dataset, idx):
-        return dataset.__getitem__(idx)[1]
+        batch_ohe_encoding = []
+        for sample_num in range(len(segment_encoding)):
+            sample_dset = segment_encoding[f"sample_{sample_num}"]
+            distal_seq = sample_dset[:]
+            sub_index = sample_dset.attrs['index']
+            sub_batch = get_sample_from_segment(distal_seq, sub_index, stand,self.distal_radius)
+            batch_ohe_encoding.append(sub_batch)
+        
+        batch_ohe_encoding = np.concatenate(batch_ohe_encoding)
 
-def prepare_dataset_h5(bed_regions, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', chunk_size=5000, seq_only=False, n_h5_files=1, without_bw_distal=False):
-    """Prepare the datasets for given regions, using H5 file"""
- 
-    # Generate H5 file for distal data
-    generate_h5fv2(bed_regions, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size, n_h5_files, without_bw_distal)
+        return batch_ohe_encoding
     
-    # Prepare local data
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
-
-    # If seq_only flag was set, bigWig files will be ignored
-    if seq_only or without_bw_distal:
-        n_channels = 4**distal_order
-        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
+def get_sample_from_segment(distal_seq, sub_index, stand,radius):
+    window_size = 2 * radius + 1
+    if stand == '+':
+        distal_seq = [distal_seq[:,start1:start1 + window_size] for start1 in sub_index]
+        #distal_seq = np.expand_dims(distal_seq, 0)
     else:
-        n_channels = 4**distal_order + len(bw_files)
-    
-    # Combine local data and distal into Dataset objects
-    dataset = CombinedDatasetH5(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, h5f_path=h5f_path, n_channels=n_channels)
-    
-    #return dataset, data_local, categorical_features
-    return dataset
+        distal_seq = [distal_seq[:,-start1-window_size:-start1] if start1 else distal_seq[:,-start1-window_size:] for start1 in sub_index]    
+    return distal_seq
 
-
-def prepare_dataset_np(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius=5, local_order=1, distal_radius=50, distal_order=1, seq_only=False, without_bw_distal=False):
-    """Prepare the datasets for given regions, without an H5 file"""
+#########################################################################
+#                          Construct DataLoader 
+#########################################################################
+def generate_data_batches(segmentLoader_train, batch_segment, batch_size, shuffle=True, sample_workers=0):
+    iter_seg_share_dataset = get_seg_share_dataset(segmentLoader_train, batch_segment)
+    # init
+    seg_dataset = next(iter_seg_share_dataset)
     
-    # Prepare local data
-    data_local, seq_cols, categorical_features, output_feature = prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, seq_only)
+    merge = False
+    drop_last = False
+    # gene batch to train
+    while True:
+        dataloader = DataLoader(seg_dataset, batch_size, shuffle=shuffle, num_workers=sample_workers, pin_memory=False)
+        for y, cont_x, cat_x, distal_x in dataloader:
+            # if sample less than batch number, merge to next segment
+            if y.shape[0] < batch_size:
+                merge = True
+                break
 
-    # If seq_only flag was set, bigWig files will be ignored
-    if seq_only or without_bw_distal:
-        n_channels = 4**distal_order
-        print('NOTE: seq_only/without_bw_distal was set, so skip bigwig tracks for distal regions!')
-    else:
-        n_channels = 4**distal_order + len(bw_files)
+            yield y, cont_x, cat_x, distal_x
+        # check end and read next segment
+        try:
+            seg_dataset = next(iter_seg_share_dataset)
+        except StopIteration:
+            # merge=True, indicate last batch not output. 
+            if merge and not drop_last:
+                yield y, cont_x, cat_x, distal_x
+            return
+                
+        # if merge, merge to next segment
+        if merge:
+            merge = False
+            seg_dataset.merge(y, cont_x, cat_x, distal_x)
+
+def get_seg_share_dataset(segmentLoader, batch_segment):
+    count = 0
+    segment_saver = []
+    for segment in segmentLoader:
+        segment_saver.append(segment)
+        count += 1
     
-    # Combine local data and distal into Dataset objects  
-    dataset = CombinedDatasetNP(data=data_local, seq_cols=seq_cols, cat_cols=categorical_features, output_col=output_feature, ref_genome=ref_genome, bed_regions=bed_regions, distal_radius=distal_radius, n_channels=n_channels, bw_files=bw_files, seq_only=seq_only, without_bw_distal=without_bw_distal)
-    #return dataset, data_local, categorical_features
-    return dataset
+        if count >= batch_segment:
+            segment_dataset = Create_DatasetSegment(segment_saver)
+            yield segment_dataset
+            count = 0
+            segment_saver = []
+
+    if segment_saver:
+        segment_dataset = Create_DatasetSegment(segment_saver)
+        yield segment_dataset
+
+class Create_DatasetSegment(Dataset):
+    """     """
+    def __init__(self, data_batch):
+        """  
+        Args:
+          
+        """
+        
+        self.y = torch.cat([batch[0].squeeze(0) for batch in data_batch])
+        self.cat_X = torch.cat([batch[2].squeeze(0) for batch in data_batch])
+        self.distal_x = torch.cat([batch[3].squeeze(0) for batch in data_batch])
+        
+        self.n = self.y.shape[0]
+        self.cont_X = np.zeros((self.n, 1))  
+    def __len__(self):
+        """ Denote the total number of samples. """
+        return self.n
+
+    def __getitem__(self, index):
+        """ Generate one batch of data. """
+        
+        return self.y[index], self.cont_X[index], self.cat_X[index], self.distal_x[index]
+    
+    def merge(self, y, cont_x, cat_x, distal_x):
+        """ Add one batch of data"""
+        self.y = torch.cat([y, self.y])
+        self.cat_X = torch.cat([cat_x, self.cat_X])
+        self.distal_x = torch.cat([distal_x, self.distal_x])
+
+        self.n = self.y.shape[0]
+        self.cont_X = np.zeros((self.n, 1)) 
