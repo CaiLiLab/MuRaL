@@ -154,7 +154,7 @@ def parse_arguments(parser):
                           Number of mutation classes (or types), including the 
                           non-mutated class. Default: 4.""").strip())
     
-    model_args.add_argument('--central_region', type=int, metavar='INT', default=300000, 
+    model_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
                           The maximum encoding unit of the sequence, it involves a trade-off 
                           between RAM memory and preprocessing speed. It is recommended to use 300k.
@@ -218,7 +218,7 @@ def parse_arguments(parser):
                           Default: 0.25.
                            """ ).strip())
     
-    learn_args.add_argument('--segment_number', type=int, metavar='INT', default=[10], nargs='+',  
+    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',  
                           help=textwrap.dedent("""
                           Number of segments for shuffle in DataLoaer. Sequence is encoding by
                           segment, then drop batch from this segmenta. Default: 10.
@@ -541,8 +541,8 @@ def main():
     ref_genome = args.ref_genome =  os.path.abspath(args.ref_genome)
     n_h5_files = args.n_h5_files
     
-    segment_number = args.segment_number
-    central_region = args.central_region
+    sampled_segments = args.sampled_segments
+    segment_center = args.segment_center
     local_radius = args.local_radius
     local_order = args.local_order
     local_hidden1_size = args.local_hidden1_size
@@ -650,7 +650,7 @@ def main():
         print("Ray not used in model training !")
         config = {
         'local_radius': local_radius[0],
-        'central_region': central_region,
+        'segment_center': segment_center,
         'local_order': local_order[0],
         'local_hidden1_size': local_hidden1_size[0],
         #'local_hidden2_size': tune.choice(local_hidden2_size),
@@ -662,7 +662,7 @@ def main():
         'CNN_out_channels': CNN_out_channels[0],
         'distal_fc_dropout': distal_fc_dropout[0],
         'batch_size': batch_size[0],
-        'segment_number': segment_number[0],
+        'sampled_segments': sampled_segments[0],
         'learning_rate': learning_rate[0],
         #'learning_rate': tune.choice(learning_rate),
         'optim': optim[0],
@@ -699,7 +699,7 @@ def main():
     # Configure the search space for relavant hyperparameters
     config = {
         'local_radius': tune.choice(local_radius),
-        'central_region': central_region,
+        'segment_center': segment_center,
         'local_order': tune.choice(local_order),
         'local_hidden1_size': tune.choice(local_hidden1_size),
         #'local_hidden2_size': tune.choice(local_hidden2_size),
@@ -711,7 +711,7 @@ def main():
         'CNN_out_channels': tune.choice(CNN_out_channels),
         'distal_fc_dropout': tune.choice(distal_fc_dropout),
         'batch_size': tune.choice(batch_size),
-        'segment_number': tune.choice(segment_number),
+        'sampled_segments': tune.choice(sampled_segments),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         #'learning_rate': tune.choice(learning_rate),
         'optim': tune.choice(optim),

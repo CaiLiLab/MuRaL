@@ -299,12 +299,12 @@ under the 'examples/' folder in the package.
 If RAM memory or GPU memory limits the usage of ``mural_train`` (which may happen with large 
 expanded sequences used for training), the following suggestions may be helpful.
 
-For RAM memory, consider reducing the parameters ``--central_region`` and ``--segment_number``. 
-First, adjust ``--central_region`` (default is 300,000 bp, means maximum encoding unit of the 
+For RAM memory, consider reducing the parameters ``--segment_center`` and ``--sampled_segments``. 
+First, adjust ``--segment_center`` (default is 300,000 bp, means maximum encoding unit of the 
 sequence is 300000+2*distal_radius bp), which is the key parameter 
 for trade-off between RAM memory usage and data preprocessing speed. You can reduce this 
 to 50,000 bp at the cost of an acceptable loss in data preprocessing speed. 
-The second consider is reduce ``--segment_number`` to 4. If do this, you should carefully 
+The second consider is reduce ``--sampled_segments`` to 4. If do this, you should carefully 
 check the performance of trained model, because this parallel may influnce model performance 
 sometimes. The influnce of the two parameters see the figure:
 
@@ -322,8 +322,8 @@ example under the 'examples/' folder in the package.
               --train_data data/training.sorted.bed \
               --validation_data data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
-              --distal_radius 64000 --central_region 100000 \
-              --segment_number 4 --experiment_name example4 \
+              --distal_radius 64000 --segment_center 100000 \
+              --sampled_segments 4 --experiment_name example4 \
               > test4.out 2> test4.err
 
    # For GPU memory limit
@@ -338,7 +338,7 @@ example under the 'examples/' folder in the package.
 .. note::
 
   The RAM memory usage is approximately proportional to 
-  ``segment_number * central_region * 4 * (2 * distal_radius + 1) * 4 / 2^30`` + a (GB), 
+  ``sampled_segments * segment_center * 4 * (2 * distal_radius + 1) * 4 / 2^30`` + a (GB), 
   where a is a constant term ranging between 5 and 12 GB. Due to insufficient RAM memory, 
   using this formula to estimate RAM usage might help in finding suitable parameters.
 

@@ -144,11 +144,11 @@ def parse_arguments(parser):
                           Use ray for parameter search.  Default: False.
                           """ ).strip())                        
     
-    learn_args.add_argument('--central_region', type=int, metavar='INT', default=300000, 
+    learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
                           Length of the segment to be considered in the model.  Default: 300000""" ).strip())                         
     
-    learn_args.add_argument('--segment_number', type=int, metavar='INT', default=10,  
+    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=10,  
                           help=textwrap.dedent("""
                           Size of segments for shuffle in DataLoaer. Default: 1.
                           """ ).strip())
@@ -362,8 +362,8 @@ def main():
     if sample_weights:
         args.sample_weights = os.path.abspath(args.sample_weights)
     #ImbSampler = args.ImbSampler
-    central_region = args.central_region
-    segment_number = args.segment_number
+    segment_center = args.segment_center
+    sampled_segments = args.sampled_segments
     batch_size = args.batch_size
     custom_dataloader = args.custom_dataloader
     #n_class = args.n_class
@@ -433,11 +433,11 @@ def main():
         else:
             args.without_bw_distal = without_bw_distal = False
         
-        if not central_region:
-            central_region = args.central_region = para_read_from_config('central_region',config)
+        if not segment_center:
+            segment_center = args.segment_center = para_read_from_config('segment_center',config)
 
-        if not segment_number:
-            segment_number = args.segment_number = para_read_from_config('segment_number', config)
+        if not sampled_segments:
+            sampled_segments = args.sampled_segments = para_read_from_config('sampled_segments', config)
         
         args.seq_only = config['seq_only']
     
@@ -483,7 +483,7 @@ def main():
         print("Ray not used in model training !")
         config = {
         'local_radius': local_radius,
-        'central_region': central_region,
+        'segment_center': segment_center,
         'local_order': local_order,
         'local_hidden1_size': local_hidden1_size,
         #'local_hidden2_size': tune.choice(local_hidden2_size),
@@ -495,7 +495,7 @@ def main():
         'CNN_out_channels': CNN_out_channels,
         'distal_fc_dropout': distal_fc_dropout,
         'batch_size': batch_size[0],
-        'segment_number': segment_number,
+        'sampled_segments': sampled_segments,
         'learning_rate': learning_rate[0],
         #'learning_rate': tune.choice(learning_rate),
         'optim': optim[0],
@@ -532,7 +532,7 @@ def main():
     config_ray = {
         'local_radius': local_radius,
         'local_order': local_order,
-        'central_region': central_region,
+        'segment_center': segment_center,
         'local_hidden1_size': local_hidden1_size,
         'local_hidden2_size': local_hidden2_size,
         'distal_radius': distal_radius,
@@ -542,7 +542,7 @@ def main():
         'CNN_out_channels': CNN_out_channels,
         'distal_fc_dropout': distal_fc_dropout,
         'batch_size': tune.choice(batch_size),
-        'segment_number': segment_number,
+        'sampled_segments': sampled_segments,
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         'lr_scheduler':tune.choice(lr_scheduler),
         #'learning_rate': tune.choice(learning_rate),

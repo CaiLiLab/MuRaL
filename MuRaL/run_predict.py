@@ -107,13 +107,13 @@ def parse_arguments(parser):
     #                       Specify the way to construct DataLoaer, while allocw mutlti cpu for one trial, add this paramater. Default: False.
     #                       """ ).strip())
     
-    optional.add_argument('--central_region', type=int, metavar='INT', default=300000, 
+    optional.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
                           The maximum encoding unit of the sequence, it involves a trade-off 
                           between RAM and execution speed. It is recommended to use 300k.
                           Default: 300000.""").strip())
 
-    optional.add_argument('--segment_number', metavar='INT', default=1, 
+    optional.add_argument('--sampled_segments', metavar='INT', default=1, 
                           help=textwrap.dedent("""
                           Size of segments for shuffle in DataLoaer. Default: 1.
                           """ ).strip())
@@ -207,7 +207,7 @@ def main():
     ref_genome= args.ref_genome
 
     pred_batch_size = args.pred_batch_size
-    segment_number = args.segment_number
+    sampled_segments = args.sampled_segments
     # Output file path
     pred_file = args.pred_file
     
@@ -253,11 +253,11 @@ def main():
     else:
         without_bw_distal = False
     
-    # set central_region   
-    if not args.central_region:
-        args.central_region = central_region = config['central_region']
+    # set segment_center   
+    if not args.segment_center:
+        args.segment_center = segment_center = config['segment_center']
     else:
-        central_region = args.central_region
+        segment_center = args.segment_center
 
     seq_only = config['seq_only']
     # custom_dataloader = args.custom_dataloader
@@ -297,13 +297,13 @@ def main():
     if with_h5:
         print("Warming: recommend don`t used --with_h5", file=sys.stderr)
         dataset = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
-                                    central_region, local_radius, local_order, distal_radius, distal_order, \
+                                    segment_center, local_radius, local_order, distal_radius, distal_order, \
                                     h5f_path=h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files, \
                                     without_bw_distal=without_bw_distal)
     else:
         print('using numpy/pandas for distal_seq ...')
         dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, bw_radii, \
-                                     central_region, local_radius, local_order, distal_radius, distal_order, seq_only=seq_only)
+                                     segment_center, local_radius, local_order, distal_radius, distal_order, seq_only=seq_only)
         if not dataset_test.distal_info:
             dataset_test.get_distal_encoding_infomation()
     print("test set preprocess time:", (time.time() - start_time))
@@ -372,10 +372,10 @@ def main():
 
     # Dataloader for testing data    
     # if custom_dataloader:
-        # dataloader = MyDataLoader(dataset_test, segment_number, batch_size2=pred_batch_size, shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)   
+        # dataloader = MyDataLoader(dataset_test, sampled_segments, batch_size2=pred_batch_size, shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)   
     
     segmentLoader_test = DataLoader(dataset_test, 1, shuffle=False, pin_memory=False)
-    dataloader= generate_data_batches(segmentLoader_test, segment_number, pred_batch_size, shuffle=False)
+    dataloader= generate_data_batches(segmentLoader_test, sampled_segments, pred_batch_size, shuffle=False)
         
 
     # Do the prediction
@@ -406,7 +406,7 @@ def main():
 
     # Write the prediction
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
-    chr_pos = get_position_info(test_bed, central_region)
+    chr_pos = get_position_info(test_bed, segment_center)
     pred_df = pd.concat((chr_pos, test_pred_df), axis=1)
     pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] +  prob_names
     pred_df.sort_values(['chrom', 'start'], inplace=True)

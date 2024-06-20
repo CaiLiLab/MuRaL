@@ -146,7 +146,7 @@ def train(config, args, checkpoint_dir=None):
         print('using numpy/pandas for distal_seq ...')
         step_stime = time.time()
         dataset = prepare_dataset_np(train_bed, ref_genome, bw_files, bw_names, bw_radii, \
-                                     config['central_region'], config['local_radius'], config['local_order'], \
+                                     config['segment_center'], config['local_radius'], config['local_order'], \
                                         config['distal_radius'], distal_order, seq_only=seq_only)
         if not dataset.distal_info:
             dataset.get_distal_encoding_infomation()
@@ -154,7 +154,7 @@ def train(config, args, checkpoint_dir=None):
     else:
         step_stime = time.time()
         dataset = prepare_dataset_h5(train_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
-                                     config['central_region'], config['local_radius'], config['local_order'], \
+                                     config['segment_center'], config['local_radius'], config['local_order'], \
                                         config['distal_radius'], distal_order, h5f_path=h5f_path, chunk_size=5000, \
                                             seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
         print("training set preprocess with H5 used time:", time.time() - step_stime)
@@ -180,14 +180,14 @@ def train(config, args, checkpoint_dir=None):
         if not with_h5:
             step_time = time.time()
             dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, bw_radii, \
-                                               config['central_region'], config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+                                               config['segment_center'], config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
             if not dataset_valid.distal_info:
                 dataset_valid.get_distal_encoding_infomation()
             print("validation set preprocess time without H5 used time:", (time.time() - step_time))
         else:
             step_stime = time.time()
             dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
-                                         config['central_region'], config['local_radius'], config['local_order'], \
+                                         config['segment_center'], config['local_radius'], config['local_order'], \
                                             config['distal_radius'], distal_order, h5f_path=h5f_path, chunk_size=5000, \
                                                 seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
             print("validation set preprocess with H5 used time:", time.time() - step_stime)
@@ -237,14 +237,14 @@ def train(config, args, checkpoint_dir=None):
         print("Warning: sample_weights be dropped, the program will run with sample_weights=None!")
     if custom_dataloader:
         # Dataloader for train and validation
-        dataloader_train = MyDataLoader(dataset_train, config['segment_number'], config['batch_size'], shuffle=True, shuffle2=True, num_workers=0, pin_memory=False)
-        dataloader_valid = MyDataLoader(dataset_valid, config['segment_number'], config['batch_size'], shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)
+        dataloader_train = MyDataLoader(dataset_train, config['sampled_segments'], config['batch_size'], shuffle=True, shuffle2=True, num_workers=0, pin_memory=False)
+        dataloader_valid = MyDataLoader(dataset_valid, config['sampled_segments'], config['batch_size'], shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)
     else:
         segmentLoader_train = DataLoader(dataset_train, 1, shuffle=True, num_workers=segment_workers, pin_memory=False)
-        dataloader_train = generate_data_batches(segmentLoader_train, config['segment_number'], config['batch_size'], shuffle=True)
+        dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
         
         segmentLoader_valid = DataLoader(dataset_valid, 1, shuffle=False, num_workers=segment_workers, pin_memory=False)
-        dataloader_valid = generate_data_batches(segmentLoader_valid, config['segment_number'], config['batch_size'], shuffle=False)
+        dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
 
     if config['transfer_learning']:
         emb_dims = config['emb_dims']
@@ -551,10 +551,10 @@ def train(config, args, checkpoint_dir=None):
             
             # Output genomic positions and predicted probabilities
             if not valid_file:
-                chr_pos = get_position_info_by_trainset(train_bed, config['central_region'])
+                chr_pos = get_position_info_by_trainset(train_bed, config['segment_center'])
                 chr_pos = chr_pos.loc[dataset_valid.indices].reset_index(drop=True)
             else:
-                chr_pos = get_position_info(valid_bed, config['central_region'])
+                chr_pos = get_position_info(valid_bed, config['segment_center'])
                 
             valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
             valid_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
@@ -627,8 +627,8 @@ def train(config, args, checkpoint_dir=None):
 
         
         if not custom_dataloader:
-            dataloader_train = generate_data_batches(segmentLoader_train, config['segment_number'], config['batch_size'], shuffle=True)
-            dataloader_valid = generate_data_batches(segmentLoader_valid, config['segment_number'], config['batch_size'], shuffle=False)
+            dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
+            dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
 
 
     print(f"dital_radius: {distal_radius} training finish, {epoch} epochs total time:{time.time()-start_time} min!")
