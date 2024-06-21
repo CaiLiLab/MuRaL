@@ -26,6 +26,9 @@ from MuRaL.preprocessing import *
 from MuRaL.evaluation import *
 from MuRaL._version import __version__
 
+# from MuRaL.custom_dataloader import MyDataLoader
+from MuRaL.preprocessing import prepare_dataset_np, get_position_info, generate_data_batches
+
 from pynvml import *
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -80,15 +83,40 @@ def parse_arguments(parser):
                           Default: 1.
                           """ ).strip())
     
-    optional.add_argument('--without_h5', default=False, action='store_true',  
+    optional.add_argument('--pred_time_view', default=False, action='store_true',  
                           help=textwrap.dedent("""
-                          Do not generate HDF5 file for the BED file. Default: False.
+                          Check pred time of each part. Default: False.
                           """).strip())
     
+    optional.add_argument('--with_h5', default=False, action='store_true',  
+                          help=textwrap.dedent("""
+                          Generate HDF5 file for the BED file. Default: False.
+                          """).strip())
+
+    optional.add_argument('--h5f_path', type=str, default=None,
+                    help=textwrap.dedent("""
+                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+
     optional.add_argument('--cpu_only', default=False, action='store_true',  
                           help=textwrap.dedent("""
                           Only use CPU computing. Default: False.
                           """).strip())
+    
+    # optional.add_argument('--custom_dataloader', default=False, action='store_true',  
+    #                       help=textwrap.dedent("""
+    #                       Specify the way to construct DataLoaer, while allocw mutlti cpu for one trial, add this paramater. Default: False.
+    #                       """ ).strip())
+    
+    optional.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+                          help=textwrap.dedent("""
+                          The maximum encoding unit of the sequence, it involves a trade-off 
+                          between RAM and execution speed. It is recommended to use 300k.
+                          Default: 300000.""").strip())
+
+    optional.add_argument('--sampled_segments', metavar='INT', default=1, 
+                          help=textwrap.dedent("""
+                          Size of segments for shuffle in DataLoaer. Default: 1.
+                          """ ).strip())
         
     optional.add_argument('--pred_batch_size', metavar='INT', default=16, 
                           help=textwrap.dedent("""
@@ -159,7 +187,7 @@ def main():
     'testing.bed.gz' using model files under the 'checkpoint_6/' folder 
     and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. For most
     models, as prediction tasks usually won't take long, it is recommended to 
-    set '--without_h5 --cpu_only' for using only CPUs and not generating HDF5 files.
+    set '--cpu_only' for using only CPUs and not generating HDF5 files.
     If the input BED file has many sites (e.g. many millions), it is recommended 
     to spilt it into smaller files (e.g. 1 million each) for parallel processing.
     
@@ -168,29 +196,23 @@ def main():
         --model_config_path checkpoint_6/model.config.pkl \\
         --calibrator_path checkpoint_6/model.fdiri_cal.pkl \\
         --pred_file testing.ckpt6.fdiri.tsv.gz \\
-        --without_h5 \\
         --cpu_only \\
         > test.out 2> test.err
     """) 
     
     args = parse_arguments(parser)
-    
-    # Print command line
-    print(' '.join(sys.argv))
-    for k,v in vars(args).items():
-        print("{0}: {1}".format(k,v))
 
     # Set input file
     test_file = args.test_data   
     ref_genome= args.ref_genome
 
     pred_batch_size = args.pred_batch_size
-    
+    sampled_segments = args.sampled_segments
     # Output file path
     pred_file = args.pred_file
     
     # Whether to generate H5 file for distal data
-    without_h5 = args.without_h5
+    with_h5 = args.with_h5
     n_h5_files = args.n_h5_files
     cpu_only = args.cpu_only
 
@@ -230,7 +252,19 @@ def main():
         without_bw_distal = config['without_bw_distal']
     else:
         without_bw_distal = False
+    
+    # set segment_center   
+    if not args.segment_center:
+        args.segment_center = segment_center = config['segment_center']
+    else:
+        segment_center = args.segment_center
+
     seq_only = config['seq_only']
+    # custom_dataloader = args.custom_dataloader
+    # Print command line
+    print(' '.join(sys.argv))
+    for k,v in vars(args).items():
+        print("{0}: {1}".format(k,v))
    
     
     start_time = time.time()
@@ -260,24 +294,24 @@ def main():
     else:
         print('NOTE: no bigWig files provided.')
 
-    # Get the H5 file path for testing data
-    test_h5f_path = get_h5f_path(test_file, bw_names, distal_radius, distal_order, without_bw_distal)
-
-    # Prepare testing data 
-    if without_h5:
-
-        dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, bw_radii, local_radius, local_order, distal_radius, distal_order, seq_only, without_bw_distal)
-        print('using prepare_dataset_np ...')
+    if with_h5:
+        print("Warming: recommend don`t used --with_h5", file=sys.stderr)
+        dataset = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
+                                    segment_center, local_radius, local_order, distal_radius, distal_order, \
+                                    h5f_path=h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files, \
+                                    without_bw_distal=without_bw_distal)
     else:
+        print('using numpy/pandas for distal_seq ...')
+        dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, bw_radii, \
+                                     segment_center, local_radius, local_order, distal_radius, distal_order, seq_only=seq_only)
+        if not dataset_test.distal_info:
+            dataset_test.get_distal_encoding_infomation()
+    print("test set preprocess time:", (time.time() - start_time))
+    data_local_test = dataset_test.data_local.reset_index(drop=True)
 
-        dataset_test = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, local_radius, local_order, distal_radius, distal_order, test_h5f_path, 5000, seq_only, n_h5_files, without_bw_distal)
-        
-        #prepare_dataset_h5(bed_regions, ref_genome, bw_files, bw_names, local_radius=5, local_order=1, distal_radius=50, distal_order=1, h5f_path='distal_data.h5', h5_chunk_size=1, seq_only=False, n_h5_files=1)
-            
-    data_local_test = dataset_test.data_local
     n_cont = len(dataset_test.cont_cols)
     
-    test_size = len(dataset_test)
+    test_size = len(data_local_test)
 
     sys.stdout.flush()
     
@@ -337,14 +371,18 @@ def main():
     prob_names = ['prob'+str(i) for i in range(n_class)]
 
     # Dataloader for testing data    
-    if cpu_only:
-        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=0)
-    else:
-        dataloader = DataLoader(dataset_test, batch_size=pred_batch_size, shuffle=False, num_workers=0)   
+    # if custom_dataloader:
+        # dataloader = MyDataLoader(dataset_test, sampled_segments, batch_size2=pred_batch_size, shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)   
+    
+    segmentLoader_test = DataLoader(dataset_test, 1, shuffle=False, pin_memory=False)
+    dataloader= generate_data_batches(segmentLoader_test, sampled_segments, pred_batch_size, shuffle=False)
+        
 
     # Do the prediction
-    pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
-    
+    if not args.pred_time_view:
+        pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
+    else:
+        pred_y, test_total_loss = run_time_view_model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
     # Print some data for debugging
     print('pred_y:', F.softmax(pred_y[1:10], dim=1))
     for i in range(1, n_class):
@@ -368,8 +406,11 @@ def main():
 
     # Write the prediction
     test_pred_df = data_and_prob[['mut_type'] + prob_names]
-    pred_df = pd.concat((test_bed.to_dataframe()[['chrom', 'start', 'end', 'strand']], test_pred_df), axis=1)
+    chr_pos = get_position_info(test_bed, segment_center)
+    pred_df = pd.concat((chr_pos, test_pred_df), axis=1)
     pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] +  prob_names
+    pred_df.sort_values(['chrom', 'start'], inplace=True)
+    pred_df.reset_index(drop=True, inplace=True)
     pred_df.to_csv(pred_file, sep='\t', float_format='%.4g', index=False)
     
     #do k-mer evaluation
@@ -395,9 +436,6 @@ def main():
                 print('regional corr:', str(win_size)+'bp', corr)
 
     print('Total time used: %s seconds' % (time.time() - start_time))
-   
     
 if __name__ == "__main__":
     main()
-
-

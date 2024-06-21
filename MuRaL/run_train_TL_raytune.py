@@ -19,9 +19,11 @@ import os
 import time
 import datetime
 
+from MuRaL.printer_utils import get_printer
 from MuRaL.nn_models import *
 from MuRaL.nn_utils import *
 from MuRaL.preprocessing import *
+from MuRaL.train_utils import run_train
 from MuRaL.evaluation import *
 from MuRaL.training import *
 from MuRaL._version import __version__
@@ -84,7 +86,7 @@ def parse_arguments(parser):
                           Use the weights of the pre-trained model to initialize the last 
                           FC layers. If False, parameters of last FC layers are randomly 
                           initialized. Default: False.""").strip())  
-    
+   
     data_args.add_argument('--validation_data', type=str, metavar='FILE', default=None,
                           help=textwrap.dedent("""
                           File path for validation data. If this option is set,
@@ -121,24 +123,46 @@ def parse_arguments(parser):
                           used some bigWig tracks, tracks with same names are needed 
                           to be provided with this option. Default: None.""").strip())
     
-    data_args.add_argument('--without_h5', default=False, action='store_true', 
+    data_args.add_argument('--with_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Do not generate HDF5 files for input BED files. Default: False.""").strip())
-
+                          Generate HDF5 files for input BED files. Default: False.""").strip())
+    
+    data_args.add_argument('--h5f_path', type=str, default=None,
+                    help=textwrap.dedent("""
+                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+    
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
                           Number of HDF5 files for each BED file. When the BED file has many
                           positions and the distal radius is large, increasing the value for 
                           --n_h5_files files can reduce the time for generating HDF5 files.
                           Default: 1.
-                          """ ).strip())
+                          """ ).strip())            
 
+    data_args.add_argument('--use_ray', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Use ray for parameter search.  Default: False.
+                          """ ).strip())                        
+    
+    learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+                          help=textwrap.dedent("""
+                          Length of the segment to be considered in the model.  Default: 300000""" ).strip())                         
+    
+    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=10,  
+                          help=textwrap.dedent("""
+                          Size of segments for shuffle in DataLoaer. Default: 1.
+                          """ ).strip())
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
                           help=textwrap.dedent("""
                           Size of mini batches for model training. Default: 128.
                           """ ).strip())    
                           
+    learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
+                          help=textwrap.dedent("""
+                          Specify the way to load data. Default: False.
+                          """ ).strip())
+
     learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
                           help=textwrap.dedent("""
                           Optimization method for parameter learning: 'Adam' or 'AdamW'.
@@ -195,7 +219,7 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
-    
+
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""
                           Ray-Tune experiment name.  Default: 'my_experiment'.
@@ -264,6 +288,15 @@ def parse_arguments(parser):
         args = parser.parse_args()
 
     return args
+
+def para_read_from_config(para, config):
+    try:
+        value = config[para]
+    except:
+        print(f"Error: {para} not in spcify model, please set non-zero value for this para")
+        sys.exit()
+    return value
+
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description="""
@@ -295,11 +328,29 @@ def main():
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
     """)
     args = parse_arguments(parser)
-
+    
+    start_time = time.time()
+    current_time = datetime.datetime.now()
+    # Creat tmp log file
+    timestamp = current_time.strftime("%Y%m%d_%H%M%S")
+    if not args.use_ray:
+        experiment_dir = f'results/{args.experiment_name}'
+        os.makedirs(experiment_dir, exist_ok=True)
+        tmp_log_file = f"{experiment_dir}/{args.experiment_name}_{timestamp}.log"
+        args.tmp_log_file = tmp_log_file
+    else:
+        tmp_log_file = args.tmp_log_file = None
+    
+    # Ensure output can be viewed in real-time in a distributed environment
+    print = get_printer(args.use_ray, tmp_log_file)
+    
+    print('Start time:', current_time)
     print(' '.join(sys.argv))
+    
     for k,v in vars(args).items():
         print("{0}: {1}".format(k,v))
-    
+    sys.stdout.flush()
+
     train_file  = args.train_data = os.path.abspath(args.train_data) 
     valid_file = args.validation_data
     if valid_file: 
@@ -311,8 +362,10 @@ def main():
     if sample_weights:
         args.sample_weights = os.path.abspath(args.sample_weights)
     #ImbSampler = args.ImbSampler
-    
+    segment_center = args.segment_center
+    sampled_segments = args.sampled_segments
     batch_size = args.batch_size
+    custom_dataloader = args.custom_dataloader
     #n_class = args.n_class
     #model_no = args.model_no
     #seq_only = args.seq_only
@@ -379,7 +432,13 @@ def main():
             args.without_bw_distal = without_bw_distal = config['without_bw_distal']
         else:
             args.without_bw_distal = without_bw_distal = False
-            
+        
+        if not segment_center:
+            segment_center = args.segment_center = para_read_from_config('segment_center',config)
+
+        if not sampled_segments:
+            sampled_segments = args.sampled_segments = para_read_from_config('sampled_segments', config)
+        
         args.seq_only = config['seq_only']
     
     
@@ -411,32 +470,54 @@ def main():
             print('Warnings: no bigWig files provided in', bw_paths)
     else:
         print('NOTE: no bigWig files provided.')
-    # Read the train datapoints
-    train_bed = BedTool(train_file)
-    
-    # Generate H5 files for storing distal regions before training, one file for each possible distal radius
-    if not args.without_h5:
-        h5f_path = get_h5f_path(train_file, bw_names, distal_radius, distal_order, without_bw_distal)
-        generate_h5fv2(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
-        #generate_h5f(train_bed, h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
-    
-    if valid_file:
-        valid_bed = BedTool(valid_file)
-        valid_h5f_path = get_h5f_path(valid_file, bw_names, distal_radius, distal_order, without_bw_distal)
-        generate_h5fv2(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_paths, bw_files, chunk_size=10000, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
-        #generate_h5f(valid_bed, valid_h5f_path, ref_genome, distal_radius, distal_order, bw_files, 1)
-    
+
     if ray_ngpus > 0 or gpu_per_trial > 0:
         if not torch.cuda.is_available():
             print('Error: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)
             sys.exit()
-        # Set visible GPU(s)
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = cuda_id
-        print('Ray is using GPU device', 'cuda:'+cuda_id)
+        print('Train is using GPU device', 'cuda:'+cuda_id)
     else:
-        print('Ray is using only CPUs ...')
+        print('Train is using only CPUs ...')
     
+    if not args.use_ray:
+        print("Ray not used in model training !")
+        config = {
+        'local_radius': local_radius,
+        'segment_center': segment_center,
+        'local_order': local_order,
+        'local_hidden1_size': local_hidden1_size,
+        #'local_hidden2_size': tune.choice(local_hidden2_size),
+        'local_hidden2_size': local_hidden2_size,  
+        'distal_radius': distal_radius,
+        'emb_dropout': emb_dropout,
+        'local_dropout': local_dropout,
+        'CNN_kernel_size': CNN_kernel_size,
+        'CNN_out_channels': CNN_out_channels,
+        'distal_fc_dropout': distal_fc_dropout,
+        'batch_size': batch_size[0],
+        'sampled_segments': sampled_segments,
+        'learning_rate': learning_rate[0],
+        #'learning_rate': tune.choice(learning_rate),
+        'optim': optim[0],
+        'lr_scheduler':lr_scheduler[0],
+        'LR_gamma': LR_gamma[0],
+        'weight_decay': weight_decay[0],
+        #'weight_decay': tune.choice(weight_decay),
+        'transfer_learning': False,
+        'use_ray' : True,
+        'custom_dataloader' : custom_dataloader
+        }
+
+        para = False
+        run_train(train, n_trials, config, args, para)
+        #train(config, args)
+
+        return 0
+
+    # Set visible GPU(s)
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = cuda_id
+    print('Ray is using GPU device', 'cuda:'+cuda_id)
     if rerun_failed:
         resume_flag = 'ERRORED_ONLY'
     else:
@@ -451,6 +532,7 @@ def main():
     config_ray = {
         'local_radius': local_radius,
         'local_order': local_order,
+        'segment_center': segment_center,
         'local_hidden1_size': local_hidden1_size,
         'local_hidden2_size': local_hidden2_size,
         'distal_radius': distal_radius,
@@ -460,6 +542,7 @@ def main():
         'CNN_out_channels': CNN_out_channels,
         'distal_fc_dropout': distal_fc_dropout,
         'batch_size': tune.choice(batch_size),
+        'sampled_segments': sampled_segments,
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
         'lr_scheduler':tune.choice(lr_scheduler),
         #'learning_rate': tune.choice(learning_rate),
@@ -470,6 +553,8 @@ def main():
         'train_all': train_all,
         'init_fc_with_pretrained': init_fc_with_pretrained,
         'emb_dims':emb_dims,
+        'use_ray' : False,
+        'custom_dataloader' : custom_dataloader
     }
     
     # Set the scheduler for parallel training 
@@ -512,5 +597,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
-
