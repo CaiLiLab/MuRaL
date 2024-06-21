@@ -16,7 +16,7 @@ author = 'Cai Li, Yiyuan Fang, Shuyi Deng'
 def get_version():
     import re
     try:
-        f = open("../MuRaL/_version.py")
+        f = open(f"../MuRaL/_version.py")
     except EnvironmentError:
         return None
     for line in f.readlines():
@@ -26,11 +26,8 @@ def get_version():
             return 'v' + ver
     return None
 
-
 version = get_version()
 # The full version, including alpha/beta/rc tags.
-#release = 'v1.0.0'
-release = version
 
 # -- General configuration
 

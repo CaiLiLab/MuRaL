@@ -72,6 +72,7 @@ speed):
     # in environment.yml are updated, try the following:
     conda env update -n mural -f environment.yml --prune
 
+
     # if your machine has only CPUs
     conda env create -n mural -f environment_cpu.yml 
 
@@ -87,6 +88,9 @@ And then install MuRaL by typing:
 
 ::
 
+    # install dirichlet package
+    bash dirichlet_install.sh
+    # install MuRaL
     pip install .
 
 If the installation is complete, you can type ``mural_train -v`` to get
@@ -155,8 +159,10 @@ Model training
 ~~~~~~~~~~~~~~
 
 ``mural_train`` trains MuRaL models with training and validation
-mutation data, and exports training results under the './ray\_results/'
-folder. 
+mutation data. It exports training results to different folders 
+based on whether Ray is used for hyperparameter search. If Ray is used, 
+the results are saved under the './ray_results/' folder. 
+Otherwise, they are saved under the './results/' folder.
 
 * Input data
    
@@ -191,16 +197,22 @@ BE SORTED by chromosome coordinates. You can sort BED files by
 * Output data
 
 ``mural_train`` saves the model information at each checkpoint,
-normally at the end of each training epoch of a trial. The
-checkpointed model files during training are saved under folders
-named like:
+normally at the end of each training epoch of a trial. The checkpointed 
+model files during training are saved under folders named like:
+  
+  ::
+    
+    # serially running two trials (default)
+    ./results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+              - model
+              - model.config.pkl
+              - model.fdiri_cal.pkl
 
-::
-
+    # parallel running two trials use ray 
     ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
-               - model
-               - model.config.pkl
-               - model.fdiri_cal.pkl
+              - model
+              - model.config.pkl
+              - model.fdiri_cal.pkl
 
 In the above folder, the 'model' file contains the learned model
 parameters. The 'model.config.pkl' file contains configured
@@ -214,13 +226,17 @@ contain important information for each training epoch of trials
 ``get_best_mural_models`` to find the best model per trial after
 training.
 
-::
+  ::
 
-   get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
+    # serially running two trials (default)
+    get_best_mural_models ./results/your_experiment_name/Train_*/progress.csv
+
+    # parallel running two trials use ray 
+    get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 * Example 1
 
-The following command will train a model by running two trials,
+The following command will train a model by running two trials (default:``--cpu_per_trial=2``),
 using data in 'data/training.sorted.bed' for training. The training
 results will be saved under the folder './ray\_results/example1/'.
 Default values will be used for other unspecified arguments. Note
@@ -229,9 +245,22 @@ is used as validation data (i.e. ``--valid_ratio 0.1``). You can run
 this example under the 'examples/' folder in the package.
 
 ::
-
+  
+   # serially running two trials (default)
    mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
                --experiment_name example1 > test1.out 2> test1.err
+
+   # parallel running two trials use ray 
+   mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+               --use_ray --experiment_name example1 > test1.out 2> test1.err
+   
+.. note::
+
+  If the device has sufficient resources to execute multiple trials in parallel, 
+  it is recommended to add the ``--use_ray`` parameter. Using Ray allows for better resource 
+  scheduling. If executing multiple trials serially or running only a single trial (set ``--cpu_per_trial=1``), 
+  it is recommended not to use ``--use_ray``, which can improve the runtime speed by approximately 
+  2-3 times for each trial.
 
 * Example 2
 
@@ -251,6 +280,67 @@ under the 'examples/' folder in the package.
               --n_trials 2 --local_radius 7 \
               --distal_radius 200 --experiment_name example2 \
               > test2.out 2> test2.err
+
+* Example 3
+
+If the length of the expanded sequence used for training is large (``distal_radius`` 
+larger than 1000), data loading becomes a bottleneck in the training process. You can 
+set the option ``--cpu_per_trial`` to specify how many CPUs each trial. The following 
+command use 3 extral cpu to accelerate data loading. You can run this example 
+under the 'examples/' folder in the package.
+
+::
+  
+   mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+               --cpu_per_trial 4 --experiment_name example3 > test3.out 2> test3.err
+
+* Example 4
+
+If RAM memory or GPU memory limits the usage of ``mural_train`` (which may happen with large 
+expanded sequences used for training), the following suggestions may be helpful.
+
+For RAM memory, consider reducing the parameters ``--segment_center`` and ``--sampled_segments``. 
+First, adjust ``--segment_center`` (default is 300,000 bp, means maximum encoding unit of the 
+sequence is 300000+2*distal_radius bp), which is the key parameter 
+for trade-off between RAM memory usage and data preprocessing speed. You can reduce this 
+to 50,000 bp at the cost of an acceptable loss in data preprocessing speed. 
+The second consider is reduce ``--sampled_segments`` to 4. If do this, you should carefully 
+check the performance of trained model, because this parallel may influnce model performance 
+sometimes. The influnce of the two parameters see the figure:
+
+.. image:: images/preprocessAndRAM_memory_usage.svg 
+   :width: 830px
+
+For GPU memory, it is recommended to reduce ``--batch_size`` (default 128) to reduce GPU memory usage. 
+You can set the value to 64, 32, 16, 8 and so on. The commands are as following,  You can run this 
+example under the 'examples/' folder in the package.
+
+::
+  
+   # For RAM memory limit
+   mural_train --ref_genome data/seq.fa \
+              --train_data data/training.sorted.bed \
+              --validation_data data/validation.sorted.bed \
+              --n_trials 2 --local_radius 7 \
+              --distal_radius 64000 --segment_center 100000 \
+              --sampled_segments 4 --experiment_name example4 \
+              > test4.out 2> test4.err
+
+   # For GPU memory limit
+   mural_train --ref_genome data/seq.fa \
+              --train_data data/training.sorted.bed \
+              --validation_data data/validation.sorted.bed \
+              --n_trials 2 --local_radius 7 \
+              --batch_size 64
+              --distal_radius 64000 --experiment_name example4 \
+              > test4.out 2> test4.err
+
+.. note::
+
+  The RAM memory usage is approximately proportional to 
+  ``sampled_segments * segment_center * 4 * (2 * distal_radius + 1) * 4 / 2^30`` + a (GB), 
+  where a is a constant term ranging between 5 and 12 GB. Due to insufficient RAM memory, 
+  using this formula to estimate RAM usage might help in finding suitable parameters.
 
 Model prediction
 ~~~~~~~~~~~~~~~~
@@ -286,7 +376,7 @@ shown below.
     chr1    10008   10009   +       0       0.9817  0.004801 0.01006 0.003399
     chr1    10012   10013   -       0       0.9711  0.004898 0.02029 0.003746
 
-* Example 3
+* Example 5
 
 The following command will predict mutation rates for all sites in
 'data/testing.bed.gz' using model files under the
@@ -301,7 +391,7 @@ The following command will predict mutation rates for all sites in
                  --model_config_path models/checkpoint_6/model.config.pkl \
                  --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl \
                  --pred_file testing.ckpt6.fdiri.tsv.gz \
-                 --without_h5 --cpu_only > test3.out 2> test3.err
+                 --cpu_only > test5.out 2> test5.err
 
 Transfer learning
 ~~~~~~~~~~~~~~~~~
@@ -324,7 +414,7 @@ specific checkpoint folder, normally generated by ``mural_train`` or
 
 Output data has the same structure as that of ``mural_train``.
 
-* Example 4
+* Example 6
 
 The following command will train a transfer learning model using
 training data in 'data/training\_TL.sorted.bed', the validation data
@@ -340,7 +430,7 @@ in 'data/validation.sorted.bed', and the model files under
                 --model_path models/checkpoint_6/model \
                 --model_config_path models/checkpoint_6/model.config.pkl \
                 --train_all --init_fc_with_pretrained \
-                --experiment_name example4 > test4.out 2> test4.err
+                --experiment_name example6 > test6.out 2> test6.err
 
 
 Calculating k-mer and regional correlations for evaluation
@@ -391,7 +481,7 @@ for A>C, A>G and A>T, respectively).
  3-mer	prob3	0.947146892265788	2.6848989196451608e-08 # r and p for prob3
 
 
-* Example 5 
+* Example 7 
 
 The following commands use the prediction file 'testing.ckpt4.fdiri.tsv.gz' 
 to calculate 3-mer, 5-mer and 7-mer correlations:
@@ -439,7 +529,7 @@ of the considered mutation type is given in the '\*.corr.txt'.
  100Kb	prob3	0.4999	6.040983e-16 
 
 
-* Example 6
+* Example 8
 
 The following command will calculate the regional correlation for 100Kb windows and 
 'prob2' mutation type. 
@@ -553,7 +643,8 @@ per generation does not affect within-genome comparison but can affect
 between-species comparison. Whether to do or not do scaling does not affect
 the calculation of k-mer and regional mutation rate correlations.
 
-* Example 7
+* Example 9
+
 Here is an example for scaling mutation rates for A/T sites. Suppose that we 
 have the following proportions of different mutation types and proportions
 of different site groups in a genome. In addition, suppose we already know from 
