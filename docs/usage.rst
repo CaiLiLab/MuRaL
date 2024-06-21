@@ -308,7 +308,7 @@ The second consider is reduce ``--sampled_segments`` to 4. If do this, you shoul
 check the performance of trained model, because this parallel may influnce model performance 
 sometimes. The influnce of the two parameters see the figure:
 
-.. image:: images/preprocessAndRAM_memory_usage.svg 
+.. image:: images/preprocessAndRAM_memory_usage.jpg 
    :width: 830px
 
 For GPU memory, it is recommended to reduce ``--batch_size`` (default 128) to reduce GPU memory usage. 
