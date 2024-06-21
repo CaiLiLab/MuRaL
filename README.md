@@ -21,8 +21,8 @@ Below is an example showing that MuRaL-predicted rates (colored lines) are highl
 
 <img src="./docs/images/regional_correlation_example.jpg" alt="model schematic" width="500"/>
 
-### 2. Installation and usage <a name="Usage"></a>
-For detailed information about installation and usage, please go to [MuRaL documentation site](https://mural.readthedocs.io).
+### 2. Installation and usage <a name="Usage"></a> 
+For detailed information about installation and usage, please go to [MuRaL documentation site](https://mural-doc.readthedocs.io).
 
 ### 3. Trained models and predicted mutation rate maps of multiple species <a name="Trained_models"></a>
 Trained models for four species - ***Homo sapiens***, ***Macaca mulatta***, ***Arabidopsis thaliana*** and ***Drosophila melanogaster*** are provided in the 'models/' folder of the package. One can use these model files for prediction or transfer learning.
