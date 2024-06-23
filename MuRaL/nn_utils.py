@@ -155,7 +155,7 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
                 print(f"Batch Number: {batch_count}; Mean Time of 500 batch: {(time.time()-step_time)}")
                 step_time = time.time()
  
-            get_batch_train_recode = time.time() - batch_train_time
+            get_batch_train_recode += time.time() - batch_train_time
             if batch_count % 500 == 0:
                 print("training 500 batch used time:", get_batch_train_recode)
                 get_batch_train_recode = 0
