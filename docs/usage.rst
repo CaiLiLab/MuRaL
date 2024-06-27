@@ -199,13 +199,13 @@ model files during training are saved under folders named like:
   
   ::
     
-    # serially running two trials (default)
+    # running trials without Ray (default)
     ./results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
               - model
               - model.config.pkl
               - model.fdiri_cal.pkl
 
-    # parallelly running two trials using Ray 
+    # running trials using Ray 
     ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
               - model
               - model.config.pkl
@@ -225,10 +225,10 @@ training.
 
   ::
 
-    # serially running two trials (default)
+    # running trials without Ray (default)
     get_best_mural_models ./results/your_experiment_name/Train_*/progress.csv
 
-    # parallelly running two trials using Ray 
+    # running trials using Ray 
     get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 * Example 1
