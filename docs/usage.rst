@@ -247,15 +247,16 @@ this example under the 'examples/' folder in the package.
    mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
                --experiment_name example1 > test1.out 2> test1.err
 
-   # parallel running two trials using Ray 
+   # parallelly running two trials using Ray, with 3 CPUs each trial (6 requested CPUs in total)
    mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
-               --use_ray --experiment_name example1 > test1.out 2> test1.err
+               --use_ray --ray_ncpus 6 --cpu_per_trial 3 --experiment_name example1 \
+               > test1.out 2> test1.err
    
 .. note::
 
   If your machine has sufficient resources to execute multiple trials in parallel, 
   it is recommended to add the ``--use_ray`` option. Using Ray allows for better resource 
-  scheduling. If executing multiple trials serially or running only a single trial (set ``--n_trials 1``), 
+  scheduling. If running multiple trials serially or running only a single trial (set ``--n_trials 1``), 
   it is recommended not to use ``--use_ray``, which can improve the runtime speed by approximately 
   2-3 times for each trial.
 
