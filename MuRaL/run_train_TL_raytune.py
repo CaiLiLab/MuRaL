@@ -128,8 +128,8 @@ def parse_arguments(parser):
                           Generate HDF5 files for input BED files. Default: False.""").strip())
     
     data_args.add_argument('--h5f_path', type=str, default=None,
-                    help=textwrap.dedent("""
-                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+                         help=textwrap.dedent("""
+                         Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
@@ -139,18 +139,16 @@ def parse_arguments(parser):
                           Default: 1.
                           """ ).strip())            
 
-    data_args.add_argument('--use_ray', default=False, action='store_true',
-                          help=textwrap.dedent("""
-                          Use ray for parameter search.  Default: False.
-                          """ ).strip())                        
-    
     learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
-                          Length of the segment to be considered in the model.  Default: 300000""" ).strip())                         
-    
-    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=10,  
+                          The maximum encoding unit of the sequence. It affects trade-off 
+                          between RAM memory and preprocessing speed. It is recommended to use 300k.
+                          Default: 300000.""" ).strip())
+
+    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',
                           help=textwrap.dedent("""
-                          Size of segments for shuffle in DataLoaer. Default: 1.
+                          Number of segments chosen for generating samples for batches in DataLoader.
+                          Default: 10.
                           """ ).strip())
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -219,6 +217,11 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           If set, use only genomic sequences for the model and ignore
                           bigWig tracks. Default: False.""").strip())
+
+    raytune_args.add_argument('--use_ray', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Use ray to run multiple trials in parallel.  Default: False.
+                          """ ).strip())
 
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
                           help=textwrap.dedent("""

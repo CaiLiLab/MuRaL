@@ -1,8 +1,8 @@
 1.1.2
 -----
-- improve preprocessing code(reduced redundant coding and I/O operations)
+- use a new preprocessing strategy (segmenting the genome and more effective I/O operations)
 - modify data loading process
-- add support for large sequence lengths used in training(up to 64,000 bp)
+- add support for large input sequence lengths (up to 64,000 bp)
 - add a new training control way (without Ray; see train_utils.py, printer_utils.py) 
 - update documentation
 

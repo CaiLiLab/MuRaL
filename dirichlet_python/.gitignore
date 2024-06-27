@@ -1,0 +1,11 @@
+*.pyc
+*.sw*
+.vscode
+# Build folders
+venv/
+build/
+dirichletcal.egg-info/
+dist/
+venvtest/
+.coverage
+coverage.xml

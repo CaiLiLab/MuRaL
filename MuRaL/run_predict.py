@@ -107,15 +107,16 @@ def parse_arguments(parser):
     #                       Specify the way to construct DataLoaer, while allocw mutlti cpu for one trial, add this paramater. Default: False.
     #                       """ ).strip())
     
-    optional.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+    optional.add_argument('--segment_center', type=int, metavar='INT', default=300000,
                           help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence, it involves a trade-off 
-                          between RAM and execution speed. It is recommended to use 300k.
-                          Default: 300000.""").strip())
+                          The maximum encoding unit of the sequence. It affects trade-off 
+                          between RAM memory and preprocessing speed. It is recommended to use 300k.
+                          Default: 300000.""" ).strip())
 
-    optional.add_argument('--sampled_segments', metavar='INT', default=1, 
+    optional.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',
                           help=textwrap.dedent("""
-                          Size of segments for shuffle in DataLoaer. Default: 1.
+                          Number of segments chosen for generating samples for batches in DataLoader.
+                          Default: 10.
                           """ ).strip())
         
     optional.add_argument('--pred_batch_size', metavar='INT', default=16, 

@@ -113,18 +113,15 @@ def parse_arguments(parser):
     
     data_args.add_argument('--with_h5', default=False, action='store_true', 
                           help=textwrap.dedent("""
-                          Output distal encoding in HD5 File. This parameter can help improve the 
-                          speed of data loading in specific situations. Before use this parameter, 
-                          please first consider use the --cpu_per_trial, this is a more effect way 
-                          to accelerate training process by accelerating data loading. 
-                          
-                          If cpu_per_trial can only be set to 1, check your --distal_radius, if the value 
-                          less than 4k(this threshold may be lower for species with smaller genomes than
-                          human), it is recommended to use this parameter. Default: False.""").strip())
+                          Output distal encoding in HDF5 File. This parameter can help improve the 
+                          speed of data loading in specific situations. Before using this parameter, 
+                          please first consider increasing --cpu_per_trial, this is a more effect way 
+                          to accelerate training process by speeding up data loading. 
+                           Default: False.""").strip())
     
-    parser.add_argument('--h5f_path', type=str, default=None,
-                    help=textwrap.dedent("""
-                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+    data_args.add_argument('--h5f_path', type=str, default=None,
+                          help=textwrap.dedent("""
+                          Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
                           help=textwrap.dedent("""
@@ -153,13 +150,7 @@ def parse_arguments(parser):
                           help=textwrap.dedent("""
                           Number of mutation classes (or types), including the 
                           non-mutated class. Default: 4.""").strip())
-    
-    model_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
-                          help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence, it involves a trade-off 
-                          between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: 300000.""" ).strip())
-    
+       
     model_args.add_argument('--local_radius', type=int, metavar='INT', default=[5], nargs='+',
                           help=textwrap.dedent("""
                           Radius of the local sequence to be considered in the 
@@ -217,11 +208,17 @@ def parse_arguments(parser):
                           Dropout rate for the FC layer of the expanded module.
                           Default: 0.25.
                            """ ).strip())
+
+	learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+                          help=textwrap.dedent("""
+                          The maximum encoding unit of the sequence. It affects trade-off 
+                          between RAM memory and preprocessing speed. It is recommended to use 300k.
+                          Default: 300000.""" ).strip())
     
     learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',  
                           help=textwrap.dedent("""
-                          Number of segments for shuffle in DataLoaer. Sequence is encoding by
-                          segment, then drop batch from this segmenta. Default: 10.
+                          Number of segments chosen for generating samples for batches in DataLoader.
+						  Default: 10.
                           """ ).strip())
     
     learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -232,7 +229,7 @@ def parse_arguments(parser):
     learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
                           help=textwrap.dedent("""
                           Use a custom data loader. This data loader is not supported parallelizing
-                          data loading. But in --cpu-per-trials=1, without HD5, the speed of loading
+                          data loading. For '--cpu-per-trial 1' and without HD5, the speed of loading
                           data is faster than default dataloader. Default: False.
                           """ ).strip())
 #    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
@@ -300,7 +297,7 @@ def parse_arguments(parser):
     
     raytune_args.add_argument('--use_ray', default=False, action='store_true',
                           help=textwrap.dedent("""
-                          Use ray to executing multiple trials in parallel.  Default: False.
+                          Use ray to run multiple trials in parallel.  Default: False.
                           """ ).strip()) 
     
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
@@ -411,8 +408,19 @@ def main():
     
     * Output data
     This tool saves the model information at each checkpoint, normally at the 
-    end of each training epoch of each trial(default is 2). 
+    end of each training epoch of each trial. 
         
+		* If executing multiple trials serially (default) or 
+          running only a single trial(use '--n_trial 1'):
+        The checkpointed model files during training are saved under folders 
+        named like:
+
+        ./results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
+              - model
+              - model.config.pkl
+              - model.fdiri_cal.pkl
+
+       
         * If execute multiple trials in parallel(use '--use_ray'):
         The checkpointed model files during training are saved under folders 
         named like:
@@ -429,24 +437,11 @@ def main():
     mutation rates. These files can be used in downstream analyses such as
     model prediction and transfer learning.
          
-        * If executing multiple trials serially(default) or 
-          running only a single trial(use '--n_trial=1'):
-        The checkpointed model files during training are saved under folders 
-        named like:
-
-        ./results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
-              - model
-              - model.config.pkl
-              - model.fdiri_cal.pkl
-
-    The best model per trial after training can be find in './results/your_experiment_name/
-    your_experiment_name_xxx.log'. 
-    
-    Note: If the device has sufficient resources to execute multiple trials in parallel, 
-    it is recommended to add the --use_ray parameter. Using Ray allows for better resource 
-    scheduling. If executing multiple trials serially or running only a single trial, 
-    it is recommended not to use --use_ray, which can improve the runtime speed by approximately 
-    2-3 times for each trial.
+    Note: If your machine has sufficient resources to execute multiple trials in parallel, 
+	it is recommended to add the --use_ray option. Using Ray allows for better resource 
+	scheduling. If executing multiple trials serially or running only a single trial (--n_trials 1), 
+	it is recommended not to use --use_ray, which can improve the runtime speed by approximately 
+	2-3 times for each trial.
    
     Command line examples
     --------------------- 
@@ -456,14 +451,14 @@ def main():
     unspecified arguments. Note that, by default, 10% of the sites sampled from 
     'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
         
-        # parallel running two trials use ray 
+		# running two trials without Ray
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
+        
+        # running two trials using Ray 
         mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
         --n_trials 2 --use_ray --experiment_name example1 > test1.out 2> test1.err
 
-        # serially running two trials
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
-        --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
- 
     2. The following command will use data in 'train.sorted.bed' as training
     data and a separate 'validation.sorted.bed' as validation data. The option
     '--local_radius 10' means that length of the local sequence used for training
@@ -484,11 +479,11 @@ def main():
         > test3.out 2> test3.err
     
     4. If the length of the expanded sequence used for training is large (greater than 1000),
-      data loading becomes a bottleneck in the training process. You can set the option 
-      '--cpu_per_trial' to specify how many CPUs each trial should use to accelerate data loading.
+    data loading becomes a bottleneck in the training process. You can set the option 
+    '--cpu_per_trial' to specify how many CPUs each trial should be used to do data loading.
 
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
-        --n_trials 2 --cpu_per_trial 4 --experiment_name example1 > test1.out 2> test1.err
+        mural_train --ref_genome seq.fa --train_data train.sorted.bed --n_trials 2 \\
+		--cpu_per_trial 4 --experiment_name example4 > test4.out 2> test4.err
       
     Notes
     -----
@@ -496,7 +491,7 @@ def main():
     coordinates. You can sort BED files by running 'bedtools sort' or 
     'sort -k1,1 -k2,2n'.
     
-    2. By default, this tool generates an HDF5 file for each input BED
+    2. For '--with_h5', this tool generates an HDF5 file for each input BED
     file (training or validation file) based on the value of '--distal_radius' 
     and the tracks in '--bw_paths', if the corresponding HDF5 file doesn't 
     exist or is corrupted. Make sure that you have write permission for the folder
@@ -615,7 +610,7 @@ def main():
         weight_decay = weight_decay*2
     
     
-    #Use GPU
+    # Use GPU
     if gpu_per_trial > 0:
         if not torch.cuda.is_available():
             print('Error: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)

@@ -3,9 +3,9 @@
 import re
 
 from setuptools import setup, find_packages
-#from setuptools.command.sdist import sdist as _sdist
-#from setuptools.command.install import install as _install
 
+import os
+os.system('bash dirichlet_install.sh')
 
 def get_version():
     try:

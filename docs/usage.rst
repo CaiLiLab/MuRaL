@@ -88,9 +88,6 @@ And then install MuRaL by typing:
 
 ::
 
-    # install dirichlet package
-    bash dirichlet_install.sh
-    # install MuRaL
     pip install .
 
 If the installation is complete, you can type ``mural_train -v`` to get
@@ -208,7 +205,7 @@ model files during training are saved under folders named like:
               - model.config.pkl
               - model.fdiri_cal.pkl
 
-    # parallel running two trials use ray 
+    # parallelly running two trials using Ray 
     ./ray_results/your_experiment_name/Train_xxx...xxx/checkpoint_x/
               - model
               - model.config.pkl
@@ -222,7 +219,7 @@ which can be used for calibrating predicted mutation rates. These
 files can be used in downstream analyses such as model prediction and
 transfer learning. The 'progress.csv' files in 'Train\_xxx' folders
 contain important information for each training epoch of trials
-(e.g., validation loss, used time, etc.). One can use the command
+(e.g., validation loss, used time, etc.). You can use the command
 ``get_best_mural_models`` to find the best model per trial after
 training.
 
@@ -231,12 +228,12 @@ training.
     # serially running two trials (default)
     get_best_mural_models ./results/your_experiment_name/Train_*/progress.csv
 
-    # parallel running two trials use ray 
+    # parallelly running two trials using Ray 
     get_best_mural_models ./ray_results/your_experiment_name/Train_*/progress.csv
 
 * Example 1
 
-The following command will train a model by running two trials (default:``--cpu_per_trial=2``),
+The following command will train a model by running two trials (default:``--n_trials 2``),
 using data in 'data/training.sorted.bed' for training. The training
 results will be saved under the folder './ray\_results/example1/'.
 Default values will be used for other unspecified arguments. Note
@@ -250,15 +247,15 @@ this example under the 'examples/' folder in the package.
    mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
                --experiment_name example1 > test1.out 2> test1.err
 
-   # parallel running two trials use ray 
+   # parallel running two trials using Ray 
    mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
                --use_ray --experiment_name example1 > test1.out 2> test1.err
    
 .. note::
 
-  If the device has sufficient resources to execute multiple trials in parallel, 
-  it is recommended to add the ``--use_ray`` parameter. Using Ray allows for better resource 
-  scheduling. If executing multiple trials serially or running only a single trial (set ``--cpu_per_trial=1``), 
+  If your machine has sufficient resources to execute multiple trials in parallel, 
+  it is recommended to add the ``--use_ray`` option. Using Ray allows for better resource 
+  scheduling. If executing multiple trials serially or running only a single trial (set ``--n_trials 1``), 
   it is recommended not to use ``--use_ray``, which can improve the runtime speed by approximately 
   2-3 times for each trial.
 
@@ -286,38 +283,43 @@ under the 'examples/' folder in the package.
 If the length of the expanded sequence used for training is large (``distal_radius`` 
 larger than 1000), data loading becomes a bottleneck in the training process. You can 
 set the option ``--cpu_per_trial`` to specify how many CPUs each trial. The following 
-command use 3 extral cpu to accelerate data loading. You can run this example 
+command uses 3 extra CPUs to accelerate data loading. You can run this example 
 under the 'examples/' folder in the package.
 
 ::
   
-   mural_train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
-               --cpu_per_trial 4 --experiment_name example3 > test3.out 2> test3.err
+   mural_train --ref_genome data/seq.fa \
+               --train_data data/training.sorted.bed \
+               --cpu_per_trial 4 \
+               --experiment_name example3 > test3.out 2> test3.err
 
 * Example 4
 
 If RAM memory or GPU memory limits the usage of ``mural_train`` (which may happen with large 
-expanded sequences used for training), the following suggestions may be helpful.
+expanded sequences used for training), please refer to following suggestions.
 
-For RAM memory, consider reducing the parameters ``--segment_center`` and ``--sampled_segments``. 
-First, adjust ``--segment_center`` (default is 300,000 bp, means maximum encoding unit of the 
-sequence is 300000+2*distal_radius bp), which is the key parameter 
+Since v1.1.2, we split the genomes into segments of a spefic size to facilitate data preprocessing (see illustration in the panel A of the figure below). 
+
+To reduce RAM memory, you can set smaller values for ``--segment_center`` and ``--sampled_segments``. 
+The default value of ``--segment_center`` is 300,000 bp, meaning maximum encoding unit of the 
+sequence is 300000+2*distal_radius bp (see illustration in the panel A of the figure below). It is the key parameter 
 for trade-off between RAM memory usage and data preprocessing speed. You can reduce this 
-to 50,000 bp at the cost of an acceptable loss in data preprocessing speed. 
-The second consider is reduce ``--sampled_segments`` to 4. If do this, you should carefully 
-check the performance of trained model, because this parallel may influnce model performance 
-sometimes. The influnce of the two parameters see the figure:
+(e.g., 50,000 bp) at the cost of an acceptable loss in data preprocessing speed. 
+The second option is to set smaller value for ``--sampled_segments`` (default 10). If changing this, you should also 
+check the performance of trained model, because ``--sampled_segments`` may also influnce model performance 
+sometimes. The impact of the two parameters on RAM usage can be visualized in the following figure (panels B & C):
 
 .. image:: images/preprocessAndRAM_memory_usage.jpg 
    :width: 830px
 
-For GPU memory, it is recommended to reduce ``--batch_size`` (default 128) to reduce GPU memory usage. 
-You can set the value to 64, 32, 16, 8 and so on. The commands are as following,  You can run this 
-example under the 'examples/' folder in the package.
+To reduce GPU memory, it is recommended to reduce ``--batch_size`` (default 128). You can set smaller values (e.g., 64, 32, 16, etc.).
+In addition, you may also consider using smaller models (e.g., reducing ``--distal_radius``, ``--CNN_out_channels``, etc.), but that may affect model performance.
+
+You can run the following commands under the 'examples/' folder in the package.
 
 ::
   
-   # For RAM memory limit
+   # use less RAM memory
    mural_train --ref_genome data/seq.fa \
               --train_data data/training.sorted.bed \
               --validation_data data/validation.sorted.bed \
@@ -326,7 +328,7 @@ example under the 'examples/' folder in the package.
               --sampled_segments 4 --experiment_name example4 \
               > test4.out 2> test4.err
 
-   # For GPU memory limit
+   # use less GPU memory
    mural_train --ref_genome data/seq.fa \
               --train_data data/training.sorted.bed \
               --validation_data data/validation.sorted.bed \
@@ -338,9 +340,9 @@ example under the 'examples/' folder in the package.
 .. note::
 
   The RAM memory usage is approximately proportional to 
-  ``sampled_segments * segment_center * 4 * (2 * distal_radius + 1) * 4 / 2^30`` + a (GB), 
-  where a is a constant term ranging between 5 and 12 GB. Due to insufficient RAM memory, 
-  using this formula to estimate RAM usage might help in finding suitable parameters.
+  ``sampled_segments * segment_center * 4 * (2 * distal_radius + 1) * 4 / 2^30 + C`` (GB), 
+  where ``C`` is a constant term ranging between 5 and 12 GB. If insufficient RAM memory, 
+  using this formula to estimate RAM usage might help in finding proper parameters.
 
 Model prediction
 ~~~~~~~~~~~~~~~~
@@ -398,7 +400,7 @@ Transfer learning
 
 ``mural_train_TL`` trains MuRaL models like ``mural_train`` but
 initializes model parameters with learned weights from a pre-trained
-model. Its training results are also saved under the './ray\_results/'
+model. Its training results are also saved under the './results/' or './ray\_results/'
 folder. 
 
 * Input data
@@ -711,12 +713,12 @@ the above example. More details can be found in the MuRaL paper.
 Trained models and predicted mutation rate maps of multiple species
 -----------------------------------------------------------------------
 
-Trained models for four species - *Homo sapiens*, *Macaca mulatta*, 
+Trained models (by MuRaL v1.0.0) for four species - *Homo sapiens*, *Macaca mulatta*, 
 *Arabidopsis thaliana* and *Drosophila melanogaster* are provided in 
 the 'models/' folder of the package. One can use these model files 
 for prediction or transfer learning.
 
-Predicted single-nucleotide mutation rate maps for these genomes are
+Predicted single-nucleotide mutation rate maps (by MuRaL v1.0.0) for these genomes are
 available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 
 Citation
