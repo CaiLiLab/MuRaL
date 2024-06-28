@@ -113,12 +113,6 @@ def parse_arguments(parser):
                           between RAM memory and preprocessing speed. It is recommended to use 300k.
                           Default: 300000.""" ).strip())
 
-    optional.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',
-                          help=textwrap.dedent("""
-                          Number of segments chosen for generating samples for batches in DataLoader.
-                          Default: 10.
-                          """ ).strip())
-        
     optional.add_argument('--pred_batch_size', metavar='INT', default=16, 
                           help=textwrap.dedent("""
                           Size of mini batches for prediction. Default: 16.
@@ -208,7 +202,7 @@ def main():
     ref_genome= args.ref_genome
 
     pred_batch_size = args.pred_batch_size
-    sampled_segments = args.sampled_segments
+    sampled_segments = 1
     # Output file path
     pred_file = args.pred_file
     
