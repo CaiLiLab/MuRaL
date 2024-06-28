@@ -5,7 +5,7 @@ import re
 from setuptools import setup, find_packages
 
 import os
-os.system('bash dirichlet_install.sh')
+os.system('python dirichlet_python/setup.py')
 
 def get_version():
     try:
