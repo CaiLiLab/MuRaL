@@ -4,8 +4,12 @@ import re
 
 from setuptools import setup, find_packages
 
-import os
-os.system('python dirichlet_python/setup.py')
+import subprocess
+try:
+    subprocess.check_call(['pip', 'install', '.'], cwd='dirichlet_python')
+except subprocess.CalledProcessError as e:
+    print(f"Error installing dirichlet_python: {e}")
+    exit(1)
 
 def get_version():
     try:
