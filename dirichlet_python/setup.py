@@ -29,11 +29,11 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires = [
-        'numpy>=1.14.2'
-        'scipy>=1.0.0'
-        'scikit-learn>=0.19.1'
-        'jax'
-        'jaxlib'
+        'numpy>=1.14.2',
+        'scipy>=1.0.0',
+        'scikit-learn>=0.19.1',
+        'jax',
+        'jaxlib',
         'autograd'
     ]
 )

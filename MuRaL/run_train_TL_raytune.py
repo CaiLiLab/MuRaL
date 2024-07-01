@@ -441,7 +441,9 @@ def main():
 
         if not sampled_segments:
             sampled_segments = args.sampled_segments = para_read_from_config('sampled_segments', config)
-        
+        else:
+            sampled_segments = args.sampled_segments[0]
+
         args.seq_only = config['seq_only']
     
     

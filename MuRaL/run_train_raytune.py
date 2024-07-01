@@ -209,7 +209,7 @@ def parse_arguments(parser):
                           Default: 0.25.
                            """ ).strip())
 
-	learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+    learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
                           The maximum encoding unit of the sequence. It affects trade-off 
                           between RAM memory and preprocessing speed. It is recommended to use 300k.

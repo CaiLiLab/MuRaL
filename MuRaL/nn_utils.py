@@ -123,7 +123,7 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
     total_loss = 0
     batch_count = 0
     get_batch_time_recode = 0
-    get_batch_train_recode = 0
+    get_batch_predict_recode = 0
     step_time = time.time()
     get_batch_time = time.time()
 
@@ -136,7 +136,7 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
                 print("get 500 batch used time: ", get_batch_time_recode)
                 get_batch_time_recode = 0
             
-            batch_train_time = time.time()
+            batch_predict_time = time.time()
             cat_x = cat_x.to(device)
             cont_x = cont_x.to(device)
             distal_x = distal_x.to(device)
@@ -155,10 +155,10 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
                 print(f"Batch Number: {batch_count}; Mean Time of 500 batch: {(time.time()-step_time)}")
                 step_time = time.time()
  
-            get_batch_train_recode += time.time() - batch_train_time
+            get_batch_predict_recode += time.time() - batch_predict_time
             if batch_count % 500 == 0:
-                print("training 500 batch used time:", get_batch_train_recode)
-                get_batch_train_recode = 0
+                print("training 500 batch used time:", get_batch_predict_recode)
+                get_batch_predict_recode = 0
             get_batch_time = time.time()
 
             if device == torch.device('cpu'):
