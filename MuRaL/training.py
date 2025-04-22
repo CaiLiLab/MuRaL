@@ -467,6 +467,7 @@ def train(config, args, model_type, checkpoint_dir=None):
                 #print('F.softmax(model.models_w):', F.softmax(model.models_w, dim=0))
                 #print('model.conv1[0].weight.grad:', model.conv1[0].weight.grad)
             #print('model.conv1.0.weight.grad:', model.conv1.0.weight)
+            save_path = get_save_path(args.use_ray, args.trial_dir, epoch)
 
             valid_pred_y, valid_total_loss = model_predict_m(model, dataloader_valid, criterion, device, n_class, distal=True)
 
@@ -510,20 +511,10 @@ def train(config, args, model_type, checkpoint_dir=None):
 
             evaluator_before_calibra.evaluate_regional_corr(chr_pos, save_valid_preds=args.save_valid_preds, save_path=save_path)
             evaluator_after_calibra.evaluate_regional_corr(chr_pos)
-            
+
             # Save model data for each checkpoint
-            if not use_ray:
-                # Define a directory to save the files when not using Ray
-                #non_ray_checkpoint_dir = f'results/{args.experiment_name}/check_point{epoch}'
-                non_ray_checkpoint_dir = f'{trial_dir}/check_point{epoch}'
-                os.makedirs(non_ray_checkpoint_dir, exist_ok=True)
-                path = os.path.join(non_ray_checkpoint_dir, 'model')
-                save_model(model, fdiri_cal, config, path)
-            else:
-                with tune.checkpoint_dir(epoch) as checkpoint_dir:
-                    path = os.path.join(checkpoint_dir, 'model')
-                    save_model(model, fdiri_cal, config, path)
-            
+            save_model(model, fdiri_cal, config, save_path)
+
                     
             current_loss = valid_total_loss/valid_size
             if epoch == 0 or current_loss < min_loss:
@@ -541,9 +532,10 @@ def train(config, args, model_type, checkpoint_dir=None):
                     'loss': current_loss,
                     'fdiri_loss': fdiri_nll,
                     'after_min_loss': after_min_loss,
-                    'score': score,
+                    'score': evaluator_before_calibra.metrics['score'],
                     'total_params': total_params
                     }
+                non_ray_checkpoint_dir = f'{trial_dir}/checkpoint_{epoch}'
                 report_path = os.path.join(non_ray_checkpoint_dir, f'epoch_{epoch}_metrics.txt')
                 report_metrics(metrics, report_path)
                 if early_stopping.early_stop:
@@ -601,7 +593,7 @@ def model_choice(model_no, config, common_model_config, model_type):
                 'emb_padding_idx': 4**config['local_order'],
                 'out_channels': config['CNN_out_channels'],
                 'kernel_size': config['CNN_kernel_size'],
-                'downsize': config['down_list']
+                'no_of_cont': common_model_config['n_cont'],
             }
         else:
             mapping_rules = {
@@ -635,3 +627,14 @@ def model_choice(model_no, config, common_model_config, model_type):
     input_params = {para: adapt(para) for para in model_params if para != 'self'}
 
     return model(**input_params)
+
+def get_save_path(use_ray, trial_dir, epoch):
+    if use_ray:
+        with tune.checkpoint_dir(epoch) as checkpoint_dir:
+            path = os.path.join(checkpoint_dir, 'model')
+    else:
+        # Define a directory to save the files when not using Ray
+        non_ray_checkpoint_dir = f'{trial_dir}/checkpoint_{epoch}'
+        os.makedirs(non_ray_checkpoint_dir, exist_ok=True)
+        path = os.path.join(non_ray_checkpoint_dir, 'model')
+    return path

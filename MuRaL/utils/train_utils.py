@@ -106,7 +106,7 @@ def get_best_model_from_trial(trial_dir, minor='loss'):
     best_loss = float('inf')
     best_checkpoint  = None
     
-    checkpoint_prefix = 'check_point'
+    checkpoint_prefix = 'checkpoint_'
     checkpoint_num = max([extract_number_from_checkpoint(name) \
                           for name in os.listdir(trial_dir) if name.startswith(checkpoint_prefix)])
     progress_message = ''
