@@ -20,183 +20,21 @@ import os
 import time
 import datetime
 
-from MuRaL.nn_models import *
-from MuRaL.nn_utils import *
-from MuRaL.preprocessing import *
-from MuRaL.evaluation import *
-from MuRaL._version import __version__
-
-# from MuRaL.custom_dataloader import MyDataLoader
-from MuRaL.preprocessing import prepare_dataset_np, get_position_info, generate_data_batches
-
-from pynvml import *
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+from model.nn_models import *
+from model.nn_utils import *
+from data.preprocessing import *
+from evaluation.evaluation import *
+from ._version import __version__
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.allow_tf32 = True
 
-def parse_arguments(parser):
-    """
-    Parse parameters from the command line
-    """ 
-    optional = parser._action_groups.pop()
-    required = parser.add_argument_group('Required arguments')
-    optional.title = 'Other arguments' 
+def run_predict_pipline(args, model_type='snv'):
     
-    required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
-                          required=True, help=textwrap.dedent("""
-                          File path of the reference genome in FASTA format.""").strip())
-    
-    required.add_argument('--test_data', type=str, metavar='FILE', required=True,
-                          help= textwrap.dedent("""
-                          File path of the data to do prediction, in BED format.""").strip())
-    
-    required.add_argument('--model_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path of the trained model.
-                          """ ).strip())
-        
-    required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path for the configurations of the trained model.
-                          """ ).strip()) 
-
-    optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv.gz', help=textwrap.dedent("""
-                          Name of the output file for prediction results.
-                          Default: 'pred.tsv.gz'.
-                          """ ).strip())
-        
-    optional.add_argument('--calibrator_path', type=str, metavar='FILE', default='',help=textwrap.dedent("""
-                          File path for the paired calibrator of the trained model.
-                          """ ).strip())
-    
-    optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for a list of BigWig files for non-sequence 
-                          features such as the coverage track. Default: None.""").strip())
-    optional.add_argument('--n_h5_files', metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.
-                          """ ).strip())
-    
-    optional.add_argument('--pred_time_view', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Check pred time of each part. Default: False.
-                          """).strip())
-    
-    optional.add_argument('--with_h5', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Generate HDF5 file for the BED file. Default: False.
-                          """).strip())
-
-    optional.add_argument('--h5f_path', type=str, default=None,
-                    help=textwrap.dedent("""
-                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
-
-    optional.add_argument('--cpu_only', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Only use CPU computing. Default: False.
-                          """).strip())
-    
-    # optional.add_argument('--custom_dataloader', default=False, action='store_true',  
-    #                       help=textwrap.dedent("""
-    #                       Specify the way to construct DataLoaer, while allocw mutlti cpu for one trial, add this paramater. Default: False.
-    #                       """ ).strip())
-    
-    optional.add_argument('--segment_center', type=int, metavar='INT', default=300000,
-                          help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence. It affects trade-off 
-                          between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: 300000.""" ).strip())
-
-    optional.add_argument('--pred_batch_size', metavar='INT', default=16, 
-                          help=textwrap.dedent("""
-                          Size of mini batches for prediction. Default: 16.
-                          """ ).strip())
-    
-    optional.add_argument('--kmer_corr', type=int, metavar='INT', default=[], nargs='+',
-                          help=textwrap.dedent("""
-                          Calculate k-mer correlations with observed variants in 5th column.
-                          Accept one or more odd positive integers for k-mers, e.g., "3 5 7".
-                          Default: no value.
-                          """ ).strip())
-    
-    optional.add_argument('--region_corr', type=int, metavar='INT', default=[], nargs='+',
-                          help=textwrap.dedent("""
-                          Calculate region correlations with observed variants in 5th column.
-                          Accept one or more positive integers for window size (bp), 
-                          e.g., "10000 50000". Default: no value.
-                          """ ).strip())
-    
-    optional.add_argument('-v', '--version', action='version',
-                        version='%(prog)s {}'.format(__version__))
-    
-    parser._action_groups.append(optional)
-    
-    if len(sys.argv) == 1:
-        parser.parse_args(['--help'])
-    else:
-        args = parser.parse_args()
-
-    return args
-
-def main():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
-                                     description="""
-    Overview
-    -------- 
-    This tool uses a trained MuRaL model to do prediction for the sites in the 
-    input BED file.
-    
-    * Input data 
-    Required input files for prediction include the reference FASTA file, 
-    a BED-formatted data file and a trained model. The BED file is organized 
-    in the same way as that for training. The 5th column can be set to '0' 
-    if no observed mutations for the sites in the prediction BED. The 
-    model-related files for input are 'model' and 'model.config.pkl', which 
-    are generated at the training step. The file 'model.fdiri_cal.pkl', which 
-    is for calibrating predicted mutation rates, is optional. If the input BED
-    file has many sites (e.g. many millions), it is recommended to split it
-    into smaller files (e.g. 1 million each) for parallel processing.
-   
-    * Output data 
-    The output of `mural_predict` is a tab-separated file containing the 
-    sequence coordinates and the predicted probabilities for all possible 
-    mutation types. Usually, the 'prob0' column stores probabilities for the 
-    non-mutated class and other 'probX' columns for mutated classes. 
-   
-    Some example lines of a prediction output file are shown below:
-    chrom   start   end    strand mut_type  prob0   prob1   prob2   prob3
-    chr1    10006   10007   -       0       0.9797  0.003134 0.01444 0.002724
-    chr1    10007   10008   +       0       0.9849  0.005517 0.00707 0.002520
-    chr1    10008   10009   +       0       0.9817  0.004801 0.01006 0.003399
-    chr1    10012   10013   -       0       0.9711  0.004898 0.02029 0.003746
-
-    Command line examples
-    ---------------------
-    1. The following command will predict mutation rates for all sites in 
-    'testing.bed.gz' using model files under the 'checkpoint_6/' folder 
-    and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. For most
-    models, as prediction tasks usually won't take long, it is recommended to 
-    set '--cpu_only' for using only CPUs and not generating HDF5 files.
-    If the input BED file has many sites (e.g. many millions), it is recommended 
-    to spilt it into smaller files (e.g. 1 million each) for parallel processing.
-    
-        mural_predict --ref_genome seq.fa --test_data testing.bed.gz \\
-        --model_path checkpoint_6/model \\
-        --model_config_path checkpoint_6/model.config.pkl \\
-        --calibrator_path checkpoint_6/model.fdiri_cal.pkl \\
-        --pred_file testing.ckpt6.fdiri.tsv.gz \\
-        --cpu_only \\
-        > test.out 2> test.err
-    """) 
-    
-    args = parse_arguments(parser)
-
     # Set input file
     test_file = args.test_data   
     ref_genome= args.ref_genome
@@ -314,19 +152,15 @@ def main():
         device = torch.device('cpu')
     else:
         # Find a GPU with enough memory
-        nvmlInit()
-        cuda_id = '0'
-        for i in range(nvmlDeviceGetCount()):
-            h = nvmlDeviceGetHandleByIndex(i)
-            info = nvmlDeviceGetMemoryInfo(h)
-            if info.free > 2.0*(2**30): # Reserve 2GB GPU memory
-                cuda_id = str(i)
-                break
-
+        if cuda_id == None:
+            cuda_id = get_available_gpu(1)
+        else:
+            check_cuda_id(cuda_id)
         print('CUDA: ', torch.cuda.is_available())
         if torch.cuda.is_available():
             print('using'  , 'cuda:'+cuda_id)
         device = torch.device('cuda:'+cuda_id if torch.cuda.is_available() else 'cpu')
+        torch.cuda.set_device(f'cuda:{cuda_id}')
   
     #####
     if without_bw_distal:
@@ -336,18 +170,14 @@ def main():
     #####
 
     # Choose the network model
-    if model_no == 0:
-        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], n_class=n_class, emb_padding_idx=4**local_order).to(device)
-    elif model_no == 1:
-        model = Network1(in_channels=in_channels, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class).to(device)
-    elif model_no == 2:
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=in_channels, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
-    elif model_no == 3:
-        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[local_hidden1_size, local_hidden2_size], emb_dropout=emb_dropout, lin_layer_dropouts=[local_dropout, local_dropout], in_channels=in_channels, out_channels=CNN_out_channels, kernel_size=CNN_kernel_size, distal_radius=distal_radius, distal_order=distal_order, distal_fc_dropout=distal_fc_dropout, n_class=n_class, emb_padding_idx=4**local_order).to(device)
-
-    else:
-        print('Error: no model selected!')
-        sys.exit() 
+    common_model_config = {
+        'emb_dims': emb_dims,
+        'n_cont': n_cont,
+        'n_class': n_class,
+        'distal_order': distal_order,
+        'in_channels': in_channels,
+        }
+    model = model_choice(model_no, config, common_model_config, model_type)
 
     print('model:')
     print(model)
@@ -432,5 +262,3 @@ def main():
 
     print('Total time used: %s seconds' % (time.time() - start_time))
     
-if __name__ == "__main__":
-    main()

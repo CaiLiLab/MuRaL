@@ -38,17 +38,18 @@ import random
 
 from _version import __version__
 from scripts.run_train_raytune import run_train_pipline
+from scripts.run_predict import run_predict_pipline
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
 
 banner = """
-mural_indel is a powerful tool for MURAL-based indel analysis.
+mural_indel is a generalizable framework to estimate INDEL mutation rates based on deep learning.
 
 Version:   {}
 About:     Developed for genome editing research.
-Docs:      https://github.com/yourlab/mural_indel
-Mail:      yourlab@example.com
+Docs:      https://mural-doc.readthedocs.io/en/latest/
+Mail:      mural-project@outlook.com
 """.format(__version__)
 
 def run_train_raytune():
@@ -514,7 +515,7 @@ def main():
         run_train_pipline(args, model_type='indel')
 
     elif args.func == 'predict':
-        pass
+        run_predict_pipline(args, model_type='snv')
     
     elif args.func == 'evaluate':
         pass
