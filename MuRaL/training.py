@@ -31,18 +31,20 @@ import os
 import time
 import datetime
 import random
+import inspect
 
-from MuRaL.printer_utils import get_printer
-from MuRaL.nn_models import *
-from MuRaL.nn_utils import *
-from MuRaL.evaluation import *
-from MuRaL.custom_dataloader import MyDataLoader
-from MuRaL.preprocessing import *
+from utils.printer_utils import get_printer
+from model.nn_utils import *
+from evaluation.evaluation import *
+from data.custom_dataloader import MyDataLoader
+from data.preprocessing import *
+from model.UNet_models import UNet_Small
+from model.nn_models import *
 
 
 
 #from torchsampler import ImbalancedDatasetSampler
-def train(config, args, checkpoint_dir=None):
+def train(config, args, model_type, checkpoint_dir=None):
     """
     Training funtion.
     
@@ -59,11 +61,9 @@ def train(config, args, checkpoint_dir=None):
         print = get_printer(args.use_ray, args.trial_training_log)
         trial_dir = args.trial_dir
 
-    # print("torch.__version__: ", torch.__version__)
-    # print("torch.__path__: ", torch.__path__)
-    # print("torch.version.cuda():", torch.version.cuda)
-    print("torch._C._cuda_getDeviceCount():", torch._C._cuda_getDeviceCount(), file=sys.stderr)
-    print("torch.cuda.device_count(): ", torch.cuda.device_count(), file=sys.stderr)
+
+    print("torch._C._cuda_getDeviceCount():", torch._C._cuda_getDeviceCount())
+    print("torch.cuda.device_count(): ", torch.cuda.device_count())
 
     # Get parameters from the command line
     train_file = args.train_data # Ray requires absolute paths
@@ -104,6 +104,13 @@ def train(config, args, checkpoint_dir=None):
     cpu_per_trial = args.cpu_per_trial
     save_valid_preds = args.save_valid_preds
     grace_period = args.grace_period
+
+    # unet specify para
+    if model_type == 'indel':
+        if not hasattr(args, 'down_list'):
+            sys.exit('Error: The indel model requires the --down-list parameter. '
+                    'Please provide a down_list file path.')
+        config['down_list'] = down_list = args.down_list
 
     bw_paths = args.bw_paths
     without_bw_distal = args.without_bw_distal
@@ -147,7 +154,7 @@ def train(config, args, checkpoint_dir=None):
         step_stime = time.time()
         dataset = prepare_dataset_np(train_bed, ref_genome, bw_files, bw_names, bw_radii, \
                                      config['segment_center'], config['local_radius'], config['local_order'], \
-                                        config['distal_radius'], distal_order, seq_only=seq_only)
+                                        config['distal_radius'], distal_order, seq_only=seq_only, model_type=model_type)
         if not dataset.distal_info:
             dataset.get_distal_encoding_infomation()
         print("training set preprocess without H5 used time:", (time.time() - step_stime))
@@ -156,7 +163,7 @@ def train(config, args, checkpoint_dir=None):
         dataset = prepare_dataset_h5(train_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
                                      config['segment_center'], config['local_radius'], config['local_order'], \
                                         config['distal_radius'], distal_order, h5f_path=h5f_path, chunk_size=5000, \
-                                            seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
+                                            seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal, model_type=model_type)
         print("training set preprocess with H5 used time:", time.time() - step_stime)
 
     data_local = dataset.data_local
@@ -180,7 +187,7 @@ def train(config, args, checkpoint_dir=None):
         if not with_h5:
             step_time = time.time()
             dataset_valid = prepare_dataset_np(valid_bed, ref_genome, bw_files, bw_names, bw_radii, \
-                                               config['segment_center'], config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only)
+                                               config['segment_center'], config['local_radius'], config['local_order'], config['distal_radius'], distal_order, seq_only=seq_only, model_type=model_type)
             if not dataset_valid.distal_info:
                 dataset_valid.get_distal_encoding_infomation()
             print("validation set preprocess time without H5 used time:", (time.time() - step_time))
@@ -189,7 +196,7 @@ def train(config, args, checkpoint_dir=None):
             dataset_valid = prepare_dataset_h5(valid_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
                                          config['segment_center'], config['local_radius'], config['local_order'], \
                                             config['distal_radius'], distal_order, h5f_path=h5f_path, chunk_size=5000, \
-                                                seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal)
+                                                seq_only=seq_only, n_h5_files=n_h5_files, without_bw_distal=without_bw_distal, model_type=model_type)
             print("validation set preprocess with H5 used time:", time.time() - step_stime)
 
     
@@ -199,22 +206,20 @@ def train(config, args, checkpoint_dir=None):
     
     device = torch.device('cpu')
     if gpu_per_trial > 0:
-        # Set the device
+        # assert CUDA is available
         if not torch.cuda.is_available():
             print('Warning: You requested GPU computing, but CUDA is not available! If you want to run without GPU, please set "--ray_ngpus 0 --gpu_per_trial 0"', file=sys.stderr)
+        # set the device
         if not use_ray:
-            if torch.cuda.is_available():
-                device = torch.device(f'cuda:{cuda_id}' if torch.cuda.is_available() else 'cpu')
-                torch.cuda.set_device(f'cuda:{cuda_id}')
+            device = torch.device(f'cuda:{cuda_id}' if torch.cuda.is_available() else 'cpu')
+            torch.cuda.set_device(f'cuda:{cuda_id}')
         else:    
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     #valid_size = int(len(dataset)*valid_ratio)
     #train_size = len(dataset) - valid_size
     #print('train_size, valid_size:', train_size, valid_size)
-    ################################################
-    ### to-do: no valid_file unit test  ########
-    #################################################
+
     if not valid_file:
         # split by segment
         valid_segment_size = int(len(dataset)*valid_ratio)
@@ -264,26 +269,14 @@ def train(config, args, checkpoint_dir=None):
     #####
     
     # Choose the network model for training
-    if model_no == 0:
-        # Local-only model
-        model = Network0(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], n_class=n_class, emb_padding_idx=4**config['local_order'])
-
-    elif model_no == 1:
-        # ResNet model
-        model = Network1(in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'],  distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class)
-
-    elif model_no == 2:
-        # Combined model
-        model = Network2(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
-        
-    elif model_no == 3:
-        # Combined model
-        model = Network3(emb_dims, no_of_cont=n_cont, lin_layer_sizes=[config['local_hidden1_size'], config['local_hidden2_size']], emb_dropout=config['emb_dropout'], lin_layer_dropouts=[config['local_dropout'], config['local_dropout']], in_channels=in_channels, out_channels=config['CNN_out_channels'], kernel_size=config['CNN_kernel_size'], distal_radius=config['distal_radius'], distal_order=distal_order, distal_fc_dropout=config['distal_fc_dropout'], n_class=n_class, emb_padding_idx=4**config['local_order'])
-        
-
-    else:
-        print('Error: no model selected!')
-        sys.exit() 
+    common_model_config = {
+        'emb_dims': emb_dims,
+        'n_cont': n_cont,
+        'n_class': n_class,
+        'distal_order': distal_order,
+        'in_channels': in_channels,
+        }
+    model = model_choice(model_no, config, common_model_config, model_type)
     
     model.to(device)
     # Count the parameters in the model
@@ -485,89 +478,38 @@ def train(config, args, checkpoint_dir=None):
             
             # Train the calibrator using the validataion data
             #valid_y_prob = valid_y_prob.reset_index() #### for "ValueError: Input contains NaN"
-
             fdiri_cal, fdiri_nll = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiri')
             #fdirio_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='FullDiriODIR')
             #vec_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='VectS')
             #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
-            
-            print("valid_data_and_prob.iloc[0:10]", valid_data_and_prob.iloc[0:10])
-            
-            # Compare observed/predicted 3/5/7mer mutation frequencies
-            print('3mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 3, n_class))
-            print('5mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 5, n_class))
-            print('7mer correlation - all: ', freq_kmer_comp_multi(valid_data_and_prob, 7, n_class))
-            
+
+            prob_cal = fdiri_cal.predict_proba(valid_y_prob.to_numpy())  # calibrate
+            #Evaluation
+            evaluator_before_calibra = Evaluator(data_local_valid, valid_y_prob, n_class, printer=print)
+            evaluator_after_calibra = Evaluator(data_local_valid, prob_cal, n_class, calibra="FullDiri", printer=print)
+
+            kmer_list = [2, 4, 6] if model_type == 'indel' else [3, 5, 7]
+
+            evaluator_before_calibra.evaluate_kmer(kmer_list)
+            evaluator_after_calibra.evaluate_kmer(kmer_list)
+
             print ('Training Loss: ', total_loss/train_size)
-            
             print ('Validation Loss: ', valid_total_loss/valid_size)
             print ('Validation Loss (after fdiri_cal): ', fdiri_nll)
             
-            ###########
-            prob_cal = fdiri_cal.predict_proba(valid_y_prob.to_numpy())  
-            y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
-    
-            # Combine data and do k-mer evaluation
-            valid_cal_data_and_prob = pd.concat([data_local_valid, y_prob], axis=1)         
-            print('3mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 3, n_class))
-            print('5mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 5, n_class))
-            print('7mer correlation(after fdiri_cal): ', freq_kmer_comp_multi(valid_cal_data_and_prob, 7, n_class))
-            ############      
-            
             # Calculate a custom score by looking obs/pred 3/5-mer correlations in binned windows
-            if valid_size > 10000 *10:
-                region_size = 10000
-            else:
-                region_size = valid_size // 10
-            
-            n_regions = valid_size//region_size
-            print('n_regions:', n_regions)
-            
-            score = 0
-            corr_3mer = []
-            corr_5mer = []
-            
-            region_avg = []
-            for i in range(n_regions):
-                corr_3mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 3, n_class)    
-                corr_5mer = freq_kmer_comp_multi(valid_data_and_prob.iloc[region_size*i:region_size*(i+1), ], 5, n_class)
-                
-                score += np.sum([(1-corr)**2 for corr in corr_3mer]) + np.sum([(1-corr)**2 for corr in corr_5mer])
-                
-                avg_prob = calc_avg_prob(valid_data_and_prob.iloc[region_size*i:region_size*(i+1)], n_class)
-                region_avg.append(avg_prob)
-                #print("avg_prob:", avg_prob, i)
-            
-            region_avg = pd.DataFrame(region_avg)
-            #print('region_avg.head():', region_avg.head())
-            corr_list = []
-            for i in range(n_class):
-                corr_list.append(region_avg[i].corr(region_avg[i + n_class]))
-            
-            print('corr_list:', corr_list)
-            #print('corr_3mer:', corr_3mer)
-            #print('corr_5mer:', corr_5mer)
-            print('regional score:', score, n_regions)
-            
+            evaluator_before_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
+            evaluator_after_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
+
             # Output genomic positions and predicted probabilities
             if not valid_file:
                 chr_pos = get_position_info_by_trainset(train_bed, config['segment_center'])
                 chr_pos = chr_pos.loc[dataset_valid.indices].reset_index(drop=True)
             else:
                 chr_pos = get_position_info(valid_bed, config['segment_center'])
-                
-            valid_pred_df = pd.concat((chr_pos, valid_data_and_prob[['mut_type'] + prob_names]), axis=1)
-            valid_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
-            ####
-            valid_cal_pred_df = pd.concat((chr_pos, valid_cal_data_and_prob[['mut_type'] + prob_names]), axis=1)
-            valid_cal_pred_df.columns = ['chrom', 'start', 'end', 'strand', 'mut_type'] + prob_names
-            
-            ####
-            valid_pred_df.sort_values(['chrom', 'start'], inplace=True)
-            valid_pred_df.reset_index(drop=True, inplace=True)
-            valid_cal_pred_df.sort_values(['chrom', 'start'], inplace=True)
-            valid_cal_pred_df.reset_index(drop=True, inplace=True)
-            print('valid_pred_df: ', valid_pred_df.head())
+
+            evaluator_before_calibra.evaluate_regional_corr(chr_pos, save_valid_preds=args.save_valid_preds, save_path=save_path)
+            evaluator_after_calibra.evaluate_regional_corr(chr_pos)
             
             # Save model data for each checkpoint
             if not use_ray:
@@ -576,20 +518,12 @@ def train(config, args, checkpoint_dir=None):
                 non_ray_checkpoint_dir = f'{trial_dir}/check_point{epoch}'
                 os.makedirs(non_ray_checkpoint_dir, exist_ok=True)
                 path = os.path.join(non_ray_checkpoint_dir, 'model')
-                save_model_and_files(model, fdiri_cal, config, valid_pred_df, path, save_valid_preds)
+                save_model(model, fdiri_cal, config, path)
             else:
                 with tune.checkpoint_dir(epoch) as checkpoint_dir:
                     path = os.path.join(checkpoint_dir, 'model')
-                    save_model_and_files(model, fdiri_cal, config, valid_pred_df, path, save_valid_preds)
+                    save_model(model, fdiri_cal, config, path)
             
-            #for win_size in [20000, 100000, 500000]:
-            for win_size in [100000, 500000]:
-                
-                corr_win = corr_calc_sub(valid_pred_df, win_size, prob_names)
-                print('regional corr (validation):', str(win_size)+'bp', corr_win)
-                
-                corr_win_cal = corr_calc_sub(valid_cal_pred_df, win_size, prob_names)
-                print('regional corr (validation, after calibration):', str(win_size)+'bp', corr_win_cal)
                     
             current_loss = valid_total_loss/valid_size
             if epoch == 0 or current_loss < min_loss:
@@ -635,7 +569,7 @@ def train(config, args, checkpoint_dir=None):
     best_epoch = epoch - early_stopping.counter
     print(f"Best Epoch: {best_epoch}")
 
-def save_model_and_files(model, fdiri_cal, config, valid_pred_df, save_path, save_valid_preds):
+def save_model(model, fdiri_cal, config, save_path):
     """Save model state, fdiri_cal, config and validation predictions to the specified path."""
     torch.save(model.state_dict(), save_path)
 
@@ -645,8 +579,6 @@ def save_model_and_files(model, fdiri_cal, config, valid_pred_df, save_path, sav
     with open(save_path + '.config.pkl', 'wb') as fp:
         pickle.dump(config, fp)
 
-    if save_valid_preds:
-        valid_pred_df.to_csv(save_path + '.valid_preds.tsv.gz', sep='\t', float_format='%.4g', index=False)
 
 def report_metrics(metrics, report_path=None):
     """Report metrics by saving them to a file or printing them."""
@@ -657,3 +589,49 @@ def report_metrics(metrics, report_path=None):
     else:
         for key, value in metrics.items():
             print(f"{key}: {value}")
+
+def model_choice(model_no, config, common_model_config, model_type): 
+    model_config = {**config, **common_model_config}
+    
+    def adapt(para):
+        if model_type == 'snv':
+            mapping_rules = {
+                'lin_layer_sizes': [config['local_hidden1_size'], config['local_hidden2_size']],
+                'lin_layer_dropouts': [config['local_dropout'], config['local_dropout']],
+                'emb_padding_idx': 4**config['local_order'],
+                'out_channels': config['CNN_out_channels'],
+                'kernel_size': config['CNN_kernel_size'],
+                'downsize': config['down_list']
+            }
+        else:
+            mapping_rules = {
+                'out_channels': config['CNN_out_channels'],
+                'kernel_size': config['CNN_kernel_size'],
+                'downsize': config['down_list']
+            }
+        
+        if para in mapping_rules:
+            return mapping_rules[para]
+        else:
+            return model_config[para]
+
+    # model registry
+    MODEL_REGISTRY = {
+        'snv': {0: Network0, 1: Network1, 2: Network2},
+        'indel': {0: UNet_Small}
+    }
+
+    if model_type not in MODEL_REGISTRY:
+        raise ValueError(f"model_type must be one of {list(MODEL_REGISTRY.keys())}, got {model_type}")
+    
+    # map model according to model_no
+    model_map = MODEL_REGISTRY[model_type]
+    model = model_map.get(model_no)
+    if model is None:
+        raise ValueError(f"model_no for {model_type} must be one of {list(model_map.keys())}, got {model_no}")
+    
+    # distribution parameters for model
+    model_params = inspect.signature(model.__init__).parameters.keys()
+    input_params = {para: adapt(para) for para in model_params if para != 'self'}
+
+    return model(**input_params)
