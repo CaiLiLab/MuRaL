@@ -579,8 +579,7 @@ def get_seqs_to_digitalized(long_seq, regions, radius, seq_strand, model_type='s
         if not init:
             init = True
             chrom_init = chrom
-            start0 = int(start) - radius
-            stop0 = int(stop) + radius
+            start0, stop0 = get_expanded_region(start, stop, radius, model_type=model_type)
             leng_seq = len(long_seq)
             continue
         
