@@ -6,6 +6,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import sys
 
+from .UNet_models import UNet_Small
+from .nn_models import *
+
 
 def weights_init(m):
     """Initialize network layers"""
@@ -172,3 +175,48 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
 
     return pred_y, total_loss
 
+def model_choice(model_no, config, common_model_config, model_type): 
+    model_config = {**config, **common_model_config}
+    
+    def adapt(para):
+        if model_type == 'snv':
+            mapping_rules = {
+                'lin_layer_sizes': [config['local_hidden1_size'], config['local_hidden2_size']],
+                'lin_layer_dropouts': [config['local_dropout'], config['local_dropout']],
+                'emb_padding_idx': 4**config['local_order'],
+                'out_channels': config['CNN_out_channels'],
+                'kernel_size': config['CNN_kernel_size'],
+                'no_of_cont': common_model_config['n_cont'],
+            }
+        else:
+            mapping_rules = {
+                'out_channels': config['CNN_out_channels'],
+                'kernel_size': config['CNN_kernel_size'],
+                'downsize': config['down_list']
+            }
+        
+        if para in mapping_rules:
+            return mapping_rules[para]
+        else:
+            return model_config[para]
+
+    # model registry
+    MODEL_REGISTRY = {
+        'snv': {0: Network0, 1: Network1, 2: Network2},
+        'indel': {0: UNet_Small}
+    }
+
+    if model_type not in MODEL_REGISTRY:
+        raise ValueError(f"model_type must be one of {list(MODEL_REGISTRY.keys())}, got {model_type}")
+    
+    # map model according to model_no
+    model_map = MODEL_REGISTRY[model_type]
+    model = model_map.get(model_no)
+    if model is None:
+        raise ValueError(f"model_no for {model_type} must be one of {list(model_map.keys())}, got {model_no}")
+    
+    # distribution parameters for model
+    model_params = inspect.signature(model.__init__).parameters.keys()
+    input_params = {para: adapt(para) for para in model_params if para != 'self'}
+
+    return model(**input_params)
