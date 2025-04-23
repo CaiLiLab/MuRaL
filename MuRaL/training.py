@@ -311,6 +311,8 @@ def train(config, args, model_type, checkpoint_dir=None):
             for param in model.parameters():
                 param.requires_grad = True
         else:
+            if model_type == 'indel':
+                sys.exit('Error: --train_all need used in commend line for INDEL, transfer learning for INDEL model need fine tune all parameters !' )
             # Train only the final fc layers
             for param in model.parameters():
                 param.requires_grad = False
