@@ -206,7 +206,8 @@ def change_h5f_path(h5f_path, bed_file, bw_names, central_radius, distal_radius,
         print(f"Warming : input h5f_path not dir, h5f path generate to {h5f_path_new} !")
     return h5f_path_new
 
-def generate_h5f(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_files, h5_chunk_size=1, chunk_size=50000, without_bw_distal=True, model_type='snv'):
+#def generate_h5f(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_files, h5_chunk_size=1, chunk_size=50000, without_bw_distal=True, model_type='snv'):
+def generate_h5f(bed_regions, h5f_path, ref_genome, central_radius, distal_radius, distal_order, bw_files, model_type='snv'):
     """Generate the H5 file for storing distal data"""
 
     print('Generating HDF5 file:', h5f_path)
