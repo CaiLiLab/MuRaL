@@ -26,7 +26,8 @@ from model.nn_models import *
 from model.nn_utils import *
 from data.preprocessing import *
 from evaluation.evaluation import *
-from ._version import __version__
+from utils.gpu_utils import get_available_gpu, check_cuda_id 
+from _version import __version__
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
@@ -48,6 +49,7 @@ def run_predict_pipline(args, model_type='snv'):
     with_h5 = args.with_h5
     n_h5_files = args.n_h5_files
     cpu_only = args.cpu_only
+    cuda_id = args.cuda_id
 
     # Get saved model-related files
     model_path = args.model_path
@@ -132,11 +134,11 @@ def run_predict_pipline(args, model_type='snv'):
         dataset = prepare_dataset_h5(test_bed, ref_genome, bw_paths, bw_files, bw_names, bw_radii, \
                                     segment_center, local_radius, local_order, distal_radius, distal_order, \
                                     h5f_path=h5f_path, chunk_size=5000, seq_only=seq_only, n_h5_files=n_h5_files, \
-                                    without_bw_distal=without_bw_distal)
+                                    without_bw_distal=without_bw_distal, model_type=model_type)
     else:
         print('using numpy/pandas for distal_seq ...')
         dataset_test = prepare_dataset_np(test_bed, ref_genome, bw_files, bw_names, bw_radii, \
-                                     segment_center, local_radius, local_order, distal_radius, distal_order, seq_only=seq_only)
+                                     segment_center, local_radius, local_order, distal_radius, distal_order, seq_only=seq_only, model_type=model_type)
         if not dataset_test.distal_info:
             dataset_test.get_distal_encoding_infomation()
     print("test set preprocess time:", (time.time() - start_time))
@@ -149,6 +151,8 @@ def run_predict_pipline(args, model_type='snv'):
     sys.stdout.flush()
     
     if cpu_only:
+        if cuda_id != None:
+            print('Warning: --cpu_only is set, but cuda_id is provided. Ignoring cuda_id')
         device = torch.device('cpu')
     else:
         # Find a GPU with enough memory
@@ -261,4 +265,3 @@ def run_predict_pipline(args, model_type='snv'):
                 print('regional corr:', str(win_size)+'bp', corr)
 
     print('Total time used: %s seconds' % (time.time() - start_time))
-    

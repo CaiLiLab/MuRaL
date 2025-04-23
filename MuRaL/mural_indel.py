@@ -515,7 +515,7 @@ def main():
         run_train_pipline(args, model_type='indel')
 
     elif args.func == 'predict':
-        run_predict_pipline(args, model_type='snv')
+        run_predict_pipline(args, model_type='indel')
     
     elif args.func == 'evaluate':
         pass

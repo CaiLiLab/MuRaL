@@ -38,6 +38,7 @@ import random
 
 from _version import __version__
 from scripts.run_train_raytune import run_train_pipline
+from scripts.run_predict import run_predict_pipline
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
