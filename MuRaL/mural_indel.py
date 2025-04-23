@@ -40,6 +40,7 @@ from _version import __version__
 from scripts.run_train_raytune import run_train_pipline
 from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
+from scripts.calc_kmer_corr import run_kmer_corr_calc
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -584,16 +585,16 @@ def parse_arguments(parser):
                           Default: 1.
                           """ ).strip())            
 
-    transfer_learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
+    transfer_learn_args.add_argument('--segment_center', type=int, metavar='INT', default=None, 
                           help=textwrap.dedent("""
                           The maximum encoding unit of the sequence. It affects trade-off 
                           between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: 300000.""" ).strip())
+                          Default: None(read from config).""" ).strip())
 
-    transfer_learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',
+    transfer_learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=None,
                           help=textwrap.dedent("""
                           Number of segments chosen for generating samples for batches in DataLoader.
-                          Default: 10.
+                          Default: None(read from config).
                           """ ).strip())
     
     transfer_learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
@@ -725,11 +726,45 @@ def parse_arguments(parser):
                           Rerun errored or incomplete trials. Default: False.
                           """ ).strip())
     
-    parser._action_groups.append(optional)
+    transfer_parser._action_groups.append(transfer_optional)
     transfer_parser.set_defaults(func='transfer')   
 
     eval_parser = subparsers.add_parser('evaluate', help='Evaluate mural-indel model', description="....")
 
+    eval_optional = eval_parser._action_groups.pop()
+
+    eval_required = eval_parser.add_argument_group('Required arguments')
+    eval_kmer_parser = eval_parser.add_argument_group('kmer-related arguments')
+    eval_regional_parser = eval_parser.add_argument_group('regional-related arguments')
+
+    eval_required.add_argument('--pred_file', required=True, type=str,
+                       help='predicted file')
+
+    eval_required.add_argument('--ref_genome', required=True, type=str,
+                       help='Reference genome FASTA file')
+
+    eval_required.add_argument('--out_prefix', default='result', type=str,
+                       help='Output filename prefix')
+
+    eval_required.add_argument('--n_class', type=int, default=8,
+                       help='indel is 8.')
+
+    eval_required.add_argument('--kmer_only', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Only evaluation kmer correlation.  Default: False.
+                          """ ).strip())
+
+    eval_required.add_argument('--regional_only', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          only evaluation regional correlation.  default: false.
+                          """ ).strip())
+
+    eval_kmer_parser.add_argument('--kmer_length', type=int, default=3,
+                          help=textwrap.dedent("""
+                            Length of kmer. Default: 3.
+                          """ ).strip())
+
+    eval_parser._action_groups.append(eval_optional)
     eval_parser.set_defaults(func='evaluate')
 
     
@@ -767,7 +802,16 @@ def main():
         run_transfer_pipline(args, model_type='indel')
 
     elif args.func == 'evaluate':
-        pass
+        if args.kmer_only:
+            run_kmer_corr_calc(args, model_type='indel')
+            return
+        if args.regional_only:
+            run_regional_corr_calc(args, model_type='indel')
+            return
+
+        run_kmer_corr_calc(args, model_type='indel')
+        run_regional_corr_calc(args, model_type='indel')
+
     else:
         parser.print_help()
 
