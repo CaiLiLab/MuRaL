@@ -20,6 +20,7 @@ import numpy as np
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from data.preprocessing import get_expanded_region
+from typing import Dict, Any
 
 def parse_arguments():
     """Parse and validate command line parameters"""
@@ -122,20 +123,45 @@ def get_canonical_kmer(strand: str, sequence: str) -> str:
 # ----------------------
 # Data Analysis
 # ----------------------
-def calculate_mutation_rates(kmer_saver) -> pd.DataFrame:
-    """Calculate observed and predicted mutation rates"""
-    result = []
-    columns = [f'avg_obs_rate{i}' for i in range(1, kmer_saver.n_class)] + \
-        [f'avg_pred_rate{i}' for i in range(1, kmer_saver.n_class)] + \
-        [f'number_of_mut{i}' for i in range(1, kmer_saver.n_class)] +  ['number_of_all']
-
-    for kmer, kmer_counts_obs in kmer_saver.kmer_mut_obs.items():
-        kmer_count = kmer_counts_obs.sum()
-        avg_obs_rates = kmer_counts_obs[1:] / kmer_count
-        avg_pred_rates = kmer_saver.kmer_mut_pred[kmer][1:] / kmer_count
-        row_data =  np.concatenate([avg_obs_rates, avg_pred_rates, kmer_counts_obs[1:], [kmer_count]])
-        result.append(row_data)
-    results = pd.DataFrame(results, index=kmer_saver.kmer_mut_obs.keys(), columns=columns).reset_index().rename(columns={'index': 'type'})
+def calculate_mutation_rates(kmer_saver: Any) -> pd.DataFrame:
+    """Calculate observed and predicted mutation rates for each k-mer.
+    
+    Returns:
+        DataFrame with columns:
+        - type: k-mer sequence
+        - avg_obs_rate{1..n}: Average observed rates per class
+        - avg_pred_rate{1..n}: Average predicted rates per class
+        - number_of_mut{1..n}: Raw mutation counts per class (int)
+        - number_of_all: Total counts (int)
+    """
+    # Generate column names using list comprehension
+    mutation_classes = range(1, kmer_saver.n_class)
+    rate_cols = [f"avg_obs_rate{i}" for i in mutation_classes]
+    pred_cols = [f"avg_pred_rate{i}" for i in mutation_classes]
+    count_cols = [f"number_of_mut{i}" for i in mutation_classes]
+    
+    # Process data using dictionary comprehension
+    results = {
+        kmer: np.concatenate([
+            obs_counts[1:] / obs_counts.sum(),  # Normalized observed rates
+            kmer_saver.kmer_mut_pred[kmer][1:] / obs_counts.sum(),  # Normalized predicted rates
+            obs_counts[1:],  # Raw mutation counts
+            [obs_counts.sum()]  # Total counts
+        ])
+        for kmer, obs_counts in kmer_saver.kmer_mut_obs.items()
+    }
+    
+    # Create DataFrame with proper typing
+    results = (
+        pd.DataFrame.from_dict(results, orient='index', columns=rate_cols + pred_cols + count_cols + ['number_of_all'])
+        .rename_axis('type')
+        .reset_index()
+    )
+    
+    # Convert count columns to integers
+    results[count_cols] = results[count_cols].astype(int)
+    results['number_of_all'] = results['number_of_all'].astype(int)
+    
     return results
 
 def calculate_correlations(df: pd.DataFrame, n_class) -> Dict[int, Tuple[float, float]]:
@@ -143,7 +169,7 @@ def calculate_correlations(df: pd.DataFrame, n_class) -> Dict[int, Tuple[float, 
 
     return {
         subtype: pearsonr(df[f'avg_obs_rate{subtype}'], df[f'avg_pred_rate{subtype}'])
-        for subtype in [range(1, n_class)]
+        for subtype in range(1, n_class)
     }
 
 
