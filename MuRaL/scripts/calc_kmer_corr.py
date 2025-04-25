@@ -182,13 +182,12 @@ def write_output_files(args, df: pd.DataFrame,
     # Write mutation rates
     df.to_csv(
         f"{args.out_prefix}.{args.kmer_length}-mer.mut_rates.tsv",
-        sep='\t', index=False, float_format="%.5f"
-    )
+        sep='\t', index=False)
     
     # Write correlation results
     with open(f"{args.out_prefix}.{args.kmer_length}-mer.corr.txt", 'w') as f:
         for subtype, (corr, pval) in correlations.items():
-            f.write(f"{args.kmer_length}-mer\t{subtype}\t{corr:.5f}\t{pval:.5e}\n")
+            f.write(f"{args.kmer_length}-mer\t{subtype}\t{corr:.5f}\t{pval:.10e}\n")
 
 
 # ----------------------

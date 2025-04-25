@@ -40,6 +40,8 @@ from _version import __version__
 from scripts.run_train_raytune import run_train_pipline
 from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
+from scripts.calc_kmer_corr import run_kmer_corr_calc
+from scripts.calc_regional_corr import run_regional_corr_calc
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -723,7 +725,50 @@ def parse_arguments(parser):
     transfer_parser.set_defaults(func='transfer')   
 
     eval_parser = subparsers.add_parser('evaluate', help='Evaluate mural-indel model', description="....")
+    eval_optional = eval_parser._action_groups.pop()
 
+    eval_required = eval_parser.add_argument_group('Required arguments')
+    eval_kmer_parser = eval_parser.add_argument_group('kmer-related arguments')
+    eval_regional_parser = eval_parser.add_argument_group('regional-related arguments')
+
+    eval_required.add_argument('--pred_file', required=True, type=str,
+                       help='predicted file')
+
+    eval_required.add_argument('--ref_genome', required=True, type=str,
+                       help='Reference genome FASTA file')
+
+    eval_required.add_argument('--out_prefix', default='result', type=str,
+                       help='Output filename prefix')
+
+    eval_required.add_argument('--n_class', type=int, default=8,
+                       help='indel is 4.')
+
+    eval_required.add_argument('--kmer_only', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Only evaluation kmer correlation.  Default: False.
+                          """ ).strip())
+
+    eval_required.add_argument('--regional_only', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          only evaluation regional correlation.  default: false.
+                          """ ).strip())
+
+    eval_kmer_parser.add_argument('--kmer_length', type=int, default=3,
+                          help=textwrap.dedent("""
+                            Length of kmer. Default: 3.
+                          """ ).strip())
+
+    eval_regional_parser.add_argument('--window_size', type=int, default=100000, 
+                          help=textwrap.dedent("""window size (bp) for calculating regional rates. Default: 100000.
+                          """).strip())
+
+    eval_regional_parser.add_argument('--ratio_cutoff', type=float, default=0.2, 
+                          help=textwrap.dedent(""" 
+                          ratio cutoff for filtering windows with few valid sites. 
+                          Default: 0.2, meaning that windows with  fewer than 0.2*median(numbers of sites in surveyed windows) will be discarded.
+                          """).strip())
+
+    eval_parser._action_groups.append(eval_optional)
 
     eval_parser.set_defaults(func='evaluate')
 
@@ -759,7 +804,17 @@ def main():
         run_transfer_pipline(args, model_type='snv')
     
     elif args.func == 'evaluate':
-        pass
+        assert (args.kmer_only and args.regional_only) is False, "Please set one of --kmer_only or --regional_only to True."
+        if args.kmer_only:
+            run_kmer_corr_calc(args, model_type='indel')
+            return
+        elif args.regional_only:
+            run_regional_corr_calc(args)
+            return
+
+        run_kmer_corr_calc(args, model_type='indel')
+        run_regional_corr_calc(args)
+
     else:
         parser.print_help()
 

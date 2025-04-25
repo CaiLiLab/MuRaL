@@ -41,6 +41,7 @@ from scripts.run_train_raytune import run_train_pipline
 from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
 from scripts.calc_kmer_corr import run_kmer_corr_calc
+from scripts.calc_regional_corr import run_regional_corr_calc
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -764,6 +765,16 @@ def parse_arguments(parser):
                             Length of kmer. Default: 3.
                           """ ).strip())
 
+    eval_regional_parser.add_argument('--window_size', type=int, default=100000, 
+                          help=textwrap.dedent("""window size (bp) for calculating regional rates. Default: 100000.
+                          """).strip())
+
+    eval_regional_parser.add_argument('--ratio_cutoff', type=float, default=0.2, 
+                          help=textwrap.dedent(""" 
+                          ratio cutoff for filtering windows with few valid sites. 
+                          Default: 0.2, meaning that windows with  fewer than 0.2*median(numbers of sites in surveyed windows) will be discarded.
+                          """).strip())
+
     eval_parser._action_groups.append(eval_optional)
     eval_parser.set_defaults(func='evaluate')
 
@@ -802,15 +813,16 @@ def main():
         run_transfer_pipline(args, model_type='indel')
 
     elif args.func == 'evaluate':
+        assert (args.kmer_only and args.regional_only) is False, "Please set one of --kmer_only or --regional_only to True."
         if args.kmer_only:
             run_kmer_corr_calc(args, model_type='indel')
             return
-        if args.regional_only:
-            run_regional_corr_calc(args, model_type='indel')
+        elif args.regional_only:
+            run_regional_corr_calc(args)
             return
 
         run_kmer_corr_calc(args, model_type='indel')
-        run_regional_corr_calc(args, model_type='indel')
+        run_regional_corr_calc(args)
 
     else:
         parser.print_help()
