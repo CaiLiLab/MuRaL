@@ -507,12 +507,14 @@ class Evaluator:
 
         kmer_out_identify = {
             'no_calibra' : 'mer correlation - all: ',
-            'FullDiri' : 'mer correlation(after fdiri_cal)'
+            'FullDiri' : 'mer correlation(after fdiri_cal)',
+            'Poisson' : 'mer correlation(after Poisson_cal)',
         }
 
         regional_out_identify = {
             'no_calibra' : 'regional corr (validation):',
-            'FullDiri' : 'regional corr (validation, after calibration):'
+            'FullDiri' : 'regional corr (validation, after fdiri_cal):',
+            'Poisson' : 'regional corr (validation, after Poisson_cal):',
         }
 
         if self.calibra is None:

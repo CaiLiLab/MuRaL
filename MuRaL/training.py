@@ -40,6 +40,7 @@ from data.custom_dataloader import MyDataLoader
 from data.preprocessing import *
 from model.UNet_models import UNet_Small
 from model.nn_models import *
+from model.calibration import poisson_calibrate
 
 
 
@@ -487,14 +488,19 @@ def train(config, args, model_type, checkpoint_dir=None):
             #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
 
             prob_cal = fdiri_cal.predict_proba(valid_y_prob.to_numpy())  # calibrate
+            if args.poisson_calib:
+                prob_poisson_cal = poisson_calibrate(valid_y_prob)
+
             #Evaluation
             evaluator_before_calibra = Evaluator(data_local_valid, valid_y_prob, n_class, printer=print)
             evaluator_after_calibra = Evaluator(data_local_valid, prob_cal, n_class, calibra="FullDiri", printer=print)
+            evaluator_after_calibra_poisson = Evaluator(data_local_valid, prob_poisson_cal, n_class, calibra="Poisson", printer=print)
 
             kmer_list = [2, 4, 6] if model_type == 'indel' else [3, 5, 7]
 
             evaluator_before_calibra.evaluate_kmer(kmer_list)
             evaluator_after_calibra.evaluate_kmer(kmer_list)
+            evaluator_after_calibra_poisson.evaluate_kmer(kmer_list)
 
             print ('Training Loss: ', total_loss/train_size)
             print ('Validation Loss: ', valid_total_loss/valid_size)
@@ -503,6 +509,7 @@ def train(config, args, model_type, checkpoint_dir=None):
             # Calculate a custom score by looking obs/pred 3/5-mer correlations in binned windows
             evaluator_before_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
             evaluator_after_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
+            evaluator_after_calibra_poisson.evaluate_regional_score(valid_size, kmer_list[:2])
 
             # Output genomic positions and predicted probabilities
             if not valid_file:
@@ -511,8 +518,10 @@ def train(config, args, model_type, checkpoint_dir=None):
             else:
                 chr_pos = get_position_info(valid_bed, config['segment_center'])
 
+            # regional correlation
             evaluator_before_calibra.evaluate_regional_corr(chr_pos, save_valid_preds=args.save_valid_preds, save_path=save_path)
             evaluator_after_calibra.evaluate_regional_corr(chr_pos)
+            evaluator_after_calibra_poisson.evaluate_regional_corr(chr_pos)
 
             # Save model data for each checkpoint
             save_model(model, fdiri_cal, config, save_path)

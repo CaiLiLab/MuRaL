@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from model.nn_models import *
 from model.nn_utils import *
+from model.calibration import poisson_calibrate
 from data.preprocessing import *
 from evaluation.evaluation import *
 from utils.gpu_utils import get_available_gpu, check_cuda_id 
@@ -227,6 +228,9 @@ def run_predict_pipline(args, model_type='snv'):
             calibr = pickle.load(fcal)         
             prob_cal = calibr.predict_proba(y_prob.to_numpy())  
             y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
+    
+    if args.poisson_calibrate:
+        y_prob = poisson_calibrate(y_prob)
     
     print('Mean Loss, Total Loss, Test Size:', test_total_loss/test_size, test_total_loss, test_size)
     

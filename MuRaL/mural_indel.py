@@ -42,7 +42,7 @@ from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
 from scripts.calc_kmer_corr import run_kmer_corr_calc
 from scripts.calc_regional_corr import run_regional_corr_calc
-from scripts.scaling import apply_scaling
+from scripts.scaling import scaling_files, calc_mu_scaling_factor
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -82,6 +82,7 @@ def parse_arguments(parser):
     train_required = train_parser.add_argument_group('Required arguments')
     data_args = train_parser.add_argument_group('Data-related arguments')
     model_args = train_parser.add_argument_group('Model-related arguments')
+    calibra_args = train_parser.add_argument_group('Calibration-related arguments')
     learn_args = train_parser.add_argument_group('Learning-related arguments')
     raytune_args = train_parser.add_argument_group('RayTune-related arguments')
 
@@ -235,6 +236,11 @@ def parse_arguments(parser):
                           Dropout rate for the FC layer of the expanded module.
                           Default: 0.25.
                            """ ).strip())
+
+    calibra_args.add_argument('--poisson_calib', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                            Use Poisson calibration for the model. 
+                           Default: False.""").strip())
 
     learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
                           help=textwrap.dedent("""
@@ -416,6 +422,11 @@ def parse_arguments(parser):
     predict_optional.add_argument('--calibrator_path', type=str, metavar='FILE', default='',help=textwrap.dedent("""
                           File path for the paired calibrator of the trained model.
                           """ ).strip())
+
+    predict_optional.add_argument('--poisson_calib', default=False, action='store_true', 
+                          help=textwrap.dedent("""
+                            Use Poisson calibration for the model. 
+                           Default: False.""").strip())
     
     predict_optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
                           help=textwrap.dedent("""
