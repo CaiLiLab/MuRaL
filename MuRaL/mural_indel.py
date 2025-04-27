@@ -42,6 +42,7 @@ from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
 from scripts.calc_kmer_corr import run_kmer_corr_calc
 from scripts.calc_regional_corr import run_regional_corr_calc
+from scripts.scaling import apply_scaling
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -778,6 +779,33 @@ def parse_arguments(parser):
     eval_parser._action_groups.append(eval_optional)
     eval_parser.set_defaults(func='evaluate')
 
+    scale_parser = subparsers.add_parser('scale', help='Scaling indel mutation rate', description="....")
+
+    scale_optional = scale_parser._action_groups.pop()
+    scale_required = scale_parser.add_argument_group('Required arguments')
+
+    scale_required.add_argument('--pred_files', type=str, metavar='FILE', default=[], nargs='+', help='Prediction files (one or more) for calculating scaling factors.')
+
+    scale_required.add_argument('--n_class', type=int,  default=8, help='indel is 4')
+
+    scale_required.add_argument('--out_file', type=str, metavar='FILE', default=[], nargs='+', help='output file with scaled rates. Default: pred_file_name.scaled.tsv.gz')
+
+    scale_required.add_argument('--benchmark_regions', type=str, metavar='FILE', default='',
+                        help='High-confidence regions used for calculating the scaling factor')
+
+    scale_required.add_argument('--genomewide_mu', type=float, metavar='FLOAT', default=None, help='Mutation rate per base per generation.')
+        
+    scale_required.add_argument('--m_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific mutation types.')
+    
+    scale_required.add_argument('--g_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific sites in the genome.')
+    
+    scale_required.add_argument('--do_scaling', default=False, action='store_true', help='Save scaled mutation rates for input pred files. Default: False.')
+
+    scale_required.add_argument('--scale_factors', type=float, metavar='FLOAT', default=[], nargs='+', help='scaling factor for producing mutation rates per base per generation. ')
+    
+    scale_parser._action_groups.append(scale_optional)
+    scale_parser.set_defaults(func='scale')
+
     
     # set global parameter
     optional.title = '[General help]' 
@@ -789,16 +817,18 @@ def parse_arguments(parser):
     else:
         args = parser.parse_args()
 
-    return args, {'train': train_parser, 'predict': predict_parser, 'evaluate': eval_parser}
+    #return args, {'train': train_parser, 'predict': predict_parser, 'transfer': transfer_parser, 'evaluate': eval_parser, 'scale': scale_parser}
+    return args
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description=banner)
-    args, subparsers = parse_arguments(parser)
+    #args, subparsers = parse_arguments(parser)
+    args = parse_arguments(parser)
 
-    if len(sys.argv) == 2:
-        subparsers[args.command].print_help()
-        sys.exit(1)
+    # if len(sys.argv) == 2:
+    #     subparsers[args.command].print_help()
+    #     sys.exit(1)
 
     if args.func == 'train':
         run_train_pipline(args, model_type='indel')
@@ -823,6 +853,12 @@ def main():
 
         run_kmer_corr_calc(args, model_type='indel')
         run_regional_corr_calc(args)
+    
+    elif args.func == 'scale':
+        # 判断列表是否为空
+        if len(args.scale_factors) != 0:
+            scaling_factors(args.pred_files, args.scale_factors, args.n_class, args.out_files)
+        calc_mu_scaling_factor(args)
 
     else:
         parser.print_help()
