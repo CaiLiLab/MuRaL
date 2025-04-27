@@ -67,9 +67,10 @@ def calc_mu_scaling_factor(args):
 
         df_name = pd.DataFrame('.', index=range(df.shape[0]), columns=['name'])
 
-        prob_name = [f'prob{i}' for i in range(1, n_class)]
+        prob_cols = [f'prob{i}' for i in range(1, n_class)]
+        df_score = df[prob_cols].sum(axis=1).to_frame(name='score')
 
-        pred_df = pd.concat((df[['chrom', 'start', 'end']], df_name, df[prob_name], df['strand']), axis=1)
+        pred_df = pd.concat((df[['chrom', 'start', 'end']], df_name, df_score, df['strand']), axis=1)
 
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         
