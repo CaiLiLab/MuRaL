@@ -34,6 +34,8 @@ def to_np(tensor):
     else:
         return tensor.detach().numpy()
 
+
+
 def bed_reader(bed_regions, central_bp):
     """
     Read a given BED region file and generate a new list of regions,
@@ -76,24 +78,28 @@ def bed_reader(bed_regions, central_bp):
             start0 = 1
             end0 = 1 + central_bp 
             
+
+        # next segment            
+        if start > end0:
+            # yield the previous segment
+            if pos_strand_region:
+                yield pos_strand_region, '+'
+                pos_strand_region = []
+            if neg_strand_region:
+                yield neg_strand_region, '-'
+                neg_strand_region = []
+            # update new segment bounds
+            while start > end0:
+                start0 = end0
+                end0 += central_bp
+
+        # record site in new segment
         if strand == '+':
             pos_strand_region.append(region)
 
         else:
-            neg_strand_region.append(region)
-            
-        if start > end0:
-            if pos_strand_region:
-                yield pos_strand_region, '+'
-                pos_strand_region = []
+            neg_strand_region.append(region)          
 
-            if neg_strand_region:
-                yield neg_strand_region, '-'
-                neg_strand_region = []
-
-            start0 = end0
-            end0 += central_bp
-            
     if pos_strand_region:
         yield pos_strand_region, '+'
     if neg_strand_region:
