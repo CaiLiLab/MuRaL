@@ -494,13 +494,14 @@ def train(config, args, model_type, checkpoint_dir=None):
             #Evaluation
             evaluator_before_calibra = Evaluator(data_local_valid, valid_y_prob, n_class, printer=print)
             evaluator_after_calibra = Evaluator(data_local_valid, prob_cal, n_class, calibra="FullDiri", printer=print)
-            evaluator_after_calibra_poisson = Evaluator(data_local_valid, prob_poisson_cal, n_class, calibra="Poisson", printer=print)
 
             kmer_list = [2, 4, 6] if model_type == 'indel' else [3, 5, 7]
 
             evaluator_before_calibra.evaluate_kmer(kmer_list)
             evaluator_after_calibra.evaluate_kmer(kmer_list)
-            evaluator_after_calibra_poisson.evaluate_kmer(kmer_list)
+            if args.poisson_calib:
+                evaluator_after_calibra_poisson = Evaluator(data_local_valid, prob_poisson_cal, n_class, calibra="Poisson", printer=print)
+                evaluator_after_calibra_poisson.evaluate_kmer(kmer_list)
 
             print ('Training Loss: ', total_loss/train_size)
             print ('Validation Loss: ', valid_total_loss/valid_size)
@@ -509,7 +510,8 @@ def train(config, args, model_type, checkpoint_dir=None):
             # Calculate a custom score by looking obs/pred 3/5-mer correlations in binned windows
             evaluator_before_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
             evaluator_after_calibra.evaluate_regional_score(valid_size, kmer_list[:2])
-            evaluator_after_calibra_poisson.evaluate_regional_score(valid_size, kmer_list[:2])
+            if args.poisson_calib:
+                evaluator_after_calibra_poisson.evaluate_regional_score(valid_size, kmer_list[:2])
 
             # Output genomic positions and predicted probabilities
             if not valid_file:
@@ -521,7 +523,8 @@ def train(config, args, model_type, checkpoint_dir=None):
             # regional correlation
             evaluator_before_calibra.evaluate_regional_corr(chr_pos, save_valid_preds=args.save_valid_preds, save_path=save_path)
             evaluator_after_calibra.evaluate_regional_corr(chr_pos)
-            evaluator_after_calibra_poisson.evaluate_regional_corr(chr_pos)
+            if args.poisson_calib:
+                evaluator_after_calibra_poisson.evaluate_regional_corr(chr_pos)
 
             # Save model data for each checkpoint
             save_model(model, fdiri_cal, config, save_path)

@@ -487,7 +487,7 @@ def CB_loss(labels, logits, samples_per_cls, no_of_classes, loss_type, beta, gam
     return cb_loss
 
 class Evaluator:
-    def __init__(self, data_local, y_prob, n_class, calibra=None, printer=print):
+    def __init__(self, data_local, y_prob, n_class, calibra='no_calibra', printer=print):
         self.n_class = n_class
         self.prob_names = ['prob'+str(i) for i in range(n_class)]
         self.data_local = data_local
@@ -517,12 +517,10 @@ class Evaluator:
             'Poisson' : 'regional corr (validation, after Poisson_cal):',
         }
 
-        if self.calibra is None:
-            return kmer_out_identify['no_calibra'], regional_out_identify['no_calibra']
-        return kmer_out_identify['FullDiri'], regional_out_identify['FullDiri']
+        return kmer_out_identify[self.calibra], regional_out_identify[self.calibra]
 
     def evaluate_kmer(self, kmer_list=[3,5,7]):
-        if self.calibra is None:
+        if self.calibra == 'no_calibra':
             self.printer("valid_data_and_prob.iloc[0:10]", self.data_and_prob.iloc[0:10])
         for k in kmer_list:
             kmer_corr = freq_kmer_comp_multi(self.data_and_prob, k, self.n_class)
@@ -534,7 +532,7 @@ class Evaluator:
         valid_pred_df.sort_values(['chrom', 'start'], inplace=True)
         valid_pred_df.reset_index(drop=True, inplace=True)
 
-        if self.calibra is None:
+        if self.calibra == 'no_calibra':
             self.printer('valid_pred_df: ', valid_pred_df.head())
 
         for win_size in win_size_list:
@@ -571,14 +569,20 @@ class Evaluator:
         corr_list = []
         for i in range(self.n_class):
             corr_list.append(region_avg[i].corr(region_avg[i + self.n_class]))
-
-        if self.calibra is None:    
-            self.printer('corr_list:', corr_list)
-            #print(f'corr_{kmer_list[0]}mer:', corr_first_kmer)
-            #print(f'corr_{kmer_list[1]}mer:', corr_second_kmer)
-            self.printer('regional score:', score, n_regions)
-        else:
-            self.printer('corr_list(after fdiri_cal)', corr_list)
-            self.printer('regional score(after fdiri_cal)', score, n_regions)
         
+        corr_list_perfix = {
+            'no_calibra' : 'corr_list: ',
+            'FullDiri' : 'corr_list(after fdiri_cal)',
+            'Poisson' : 'corr_list(after Poisson_cal)',
+        }
+
+        regional_score_perfix = {
+            'no_calibra' : 'regional score: ',
+            'FullDiri' : 'regional score(after fdiri_cal)',
+            'Poisson' : 'regional score(after Poisson_cal)',
+        }
+
+        self.printer(corr_list_perfix[self.calibra], corr_list)
+        self.printer(regional_score_perfix[self.calibra], score, n_regions)
+
         self.metrics['score'] = score
