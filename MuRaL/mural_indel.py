@@ -1,42 +1,18 @@
-"""
-Code for training models with RayTune
-"""
-
-import warnings
-warnings.filterwarnings('ignore',category=FutureWarning)
-
-
-from pybedtools import BedTool
-
+# cli.py
 import sys
 import argparse
-import pandas as pd
-import numpy as np
-import pickle
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-from torch.utils.data import random_split
-
-#torch.backends.cuda.matmul.allow_tf32 = True
-#torch.backends.cudnn.benchmark = True
-#torch.backends.cudnn.deterministic = True
-#torch.backends.cudnn.allow_tf32 = True
-
-from functools import partial
-import ray
-from ray import tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
-
-import os
-import time
-import datetime
-import random
+import textwrap
 
 from _version import __version__
+
+# import commands
+from commands.train import add_indel_train_parser
+from commands.predict import add_indel_predict_parser
+from commands.transfer import add_indel_transfer_parser
+from commands.evaluate import add_indel_eval_parser
+from commands.scale import add_indel_scale_parser
+
+# import scripts
 from scripts.run_train_raytune import run_train_pipline
 from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
@@ -44,8 +20,12 @@ from scripts.calc_kmer_corr import run_kmer_corr_calc
 from scripts.calc_regional_corr import run_regional_corr_calc
 from scripts.scaling import scaling_files, calc_mu_scaling_factor
 
-import textwrap
-#from torch.utils.tensorboard import SummaryWriter
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        """Override the default error handling method"""
+        sys.stderr.write('\nError: %s\n\n' % message)
+        self.print_help(sys.stderr)
+        sys.exit(1)
 
 banner = """
 mural_indel is a generalizable framework to estimate INDEL mutation rates based on deep learning.
@@ -56,14 +36,12 @@ Docs:      https://mural-doc.readthedocs.io/en/latest/
 Mail:      mural-project@outlook.com
 """.format(__version__)
 
-def run_train_raytune():
-    print("indel model is training!")
+def create_parser():
+#    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+#                                     description=banner)
 
-def parse_arguments(parser):
-    """
-    Parse parameters from the command line
-    """   
-
+    parser = ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     description=banner)
 
     optional = parser._action_groups.pop()
     subparsers = parser.add_subparsers(
@@ -74,772 +52,40 @@ def parse_arguments(parser):
         required=True
     )
 
-    train_parser = subparsers.add_parser('train', help='Train mural-indel model', description="....")
-    train_parser.set_defaults(func='train')
+    # register subparsers for each command
+    train_parser = add_indel_train_parser(subparsers)
+    predict_parsert = add_indel_predict_parser(subparsers)
+    transfer_parser = add_indel_transfer_parser(subparsers)
+    eval_parser = add_indel_eval_parser(subparsers)
+    scale_parser = add_indel_scale_parser(subparsers)
 
-    
-    #required = parser.add_argument_group('Required arguments')
-    train_required = train_parser.add_argument_group('Required arguments')
-    data_args = train_parser.add_argument_group('Data-related arguments')
-    model_args = train_parser.add_argument_group('Model-related arguments')
-    calibra_args = train_parser.add_argument_group('Calibration-related arguments')
-    learn_args = train_parser.add_argument_group('Learning-related arguments')
-    raytune_args = train_parser.add_argument_group('RayTune-related arguments')
-
-    train_required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
-                          required=True, help=textwrap.dedent("""
-                          File path of the reference genome in FASTA format.""").strip())
-    
-    train_required.add_argument('--train_data', type=str, metavar='FILE', default='',  
-                          required=True, help= textwrap.dedent("""
-                          File path of training data in a sorted BED format. If the options
-                          --validation_data and --valid_ratio not specified, 10%% of the
-                          sites sampled from the training BED will be used as the
-                          validation data.""").strip())
-    
-    data_args.add_argument('--validation_data', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for validation data. If this option is set,
-                          the value of --valid_ratio will be ignored. Default: None.
-                          """).strip()) 
-    
-    data_args.add_argument('--sample_weights', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for sample weights. Default: None.
-                          """).strip())
-    
-    data_args.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
-                          help=textwrap.dedent("""
-                          Ratio of validation data relative to the whole training data.
-                          Default: 0.1. 
-                          """ ).strip())
-    
-    data_args.add_argument('--split_seed', type=int, metavar='INT', default=-1, 
-                          help=textwrap.dedent("""
-                          Seed for randomly splitting data into training and validation
-                          sets. Default: a random number generated by the job.
-                          """ ).strip())
-    
-    data_args.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for a list of BigWig files for non-sequence 
-                          features such as the coverage track. Default: None.""").strip())
-
-    data_args.add_argument('--without_bw_distal', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Do not use BigWig tracks for distal-related layers. Default: False.""").strip())
-    
-    data_args.add_argument('--seq_only', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          If set, use only genomic sequences for the model and ignore
-                          bigWig tracks. Default: False.""").strip())
-    
-    data_args.add_argument('--with_h5', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Output distal encoding in HDF5 File. This parameter can help improve the 
-                          speed of data loading in specific situations. Before using this parameter, 
-                          please first consider increasing --cpu_per_trial, this is a more effect way 
-                          to accelerate training process by speeding up data loading. 
-                           Default: False.""").strip())
-    
-    data_args.add_argument('--h5f_path', type=str, default=None,
-                          help=textwrap.dedent("""
-                          Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
-    
-    data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.                          """ ).strip())
-    
-    data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Save prediction results for validation data in the checkpoint
-                          folders. Default: False.
-                          """ ).strip())
-
-    model_args.add_argument('--model_no', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Which network architecture to be used: 
-                          0 - 'local-only' model;
-                          1 - 'expanded-only' model;
-                          2 - 'local + expanded' model.
-                          3 - 'local + expanded' model, with separate local FC layers for
-                              features in BigWig tracks.
-                          Default: 2.
-                          """ ).strip())
-    model_args.add_argument('--n_class', type=int, metavar='INT', default='4',  
-                          help=textwrap.dedent("""
-                          Number of mutation classes (or types), including the 
-                          non-mutated class. Default: 4.""").strip())
-       
-    model_args.add_argument('--local_radius', type=int, metavar='INT', default=[5], nargs='+',
-                          help=textwrap.dedent("""
-                          Radius of the local sequence to be considered in the 
-                          model. Length of the local sequence = local_radius*2+1 bp.
-                          Default: 5.""" ).strip())
-    
-    model_args.add_argument('--local_order', type=int, metavar='INT', default=[3], nargs='+', 
-                          help=textwrap.dedent("""
-                          Length of k-mer in the embedding layer. Default: 3.""").strip())
-    
-    model_args.add_argument('--local_hidden1_size', type=int, metavar='INT', default=[150], nargs='+', 
-                          help=textwrap.dedent("""
-                          Size of 1st hidden layer for local module. Default: 150.
-                          """).strip())
-    
-    model_args.add_argument('--local_hidden2_size', type=int, metavar='INT', default=[0], nargs='+',
-                          help=textwrap.dedent("""
-                          Size of 2nd hidden layer for local module. 
-                          Default: local_hidden1_size//2 .
-                          """ ).strip())
-    
-    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[200], nargs='+', 
-                          help=textwrap.dedent("""
-                          Radius of the expanded sequence to be considered. 
-                          Length of the expanded sequence = distal_radius*2+1 bp.
-                          Values should be >=100. Default: 200. 
-                          """ ).strip())
-    
-    model_args.add_argument('--distal_order', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Order of distal sequences to be considered. Kept for 
-                          future development. Default: 1. """ ).strip())   
-
-    model_args.add_argument('--emb_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
-                          help=textwrap.dedent("""
-                          Dropout rate for inputs of the k-mer embedding layer.
-                          Default: 0.1.""" ).strip())
-    
-    model_args.add_argument('--local_dropout', type=float, metavar='FLOAT', default=[0.1], nargs='+', 
-                          help=textwrap.dedent("""
-                          Dropout rate for inputs of local hidden layers.  Default: 0.1.""" ).strip())
-    
-    model_args.add_argument('--CNN_kernel_size', type=int, metavar='INT', default=[3], nargs='+', 
-                          help=textwrap.dedent("""
-                          Kernel size for CNN layers in the expanded module. Default: 3.
-                          """ ).strip())
-    
-    model_args.add_argument('--CNN_out_channels', type=int, metavar='INT', default=[32], nargs='+', 
-                          help=textwrap.dedent("""
-                          Number of output channels for CNN layers. Default: 32.
-                          """ ).strip())
-
-    model_args.add_argument('--down_list', type=int, metavar='INT', default=1, nargs='+', required=False,
-                          help=textwrap.dedent("""
-                          dowsample list for UNet_pro. Default: 1.
-                          """ ).strip())
-    
-    model_args.add_argument('--distal_fc_dropout', type=float, metavar='FLOAT', default=[0.25], nargs='+', 
-                          help=textwrap.dedent("""
-                          Dropout rate for the FC layer of the expanded module.
-                          Default: 0.25.
-                           """ ).strip())
-
-    calibra_args.add_argument('--poisson_calib', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                            Use Poisson calibration for the model. 
-                           Default: False.""").strip())
-
-    learn_args.add_argument('--segment_center', type=int, metavar='INT', default=300000, 
-                          help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence. It affects trade-off 
-                          between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: 300000.""" ).strip())
-    
-    learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=[10], nargs='+',  
-                          help=textwrap.dedent("""
-                          Number of segments chosen for generating samples for batches in DataLoader.
-						  Default: 10.
-                          """ ).strip())
-    
-    learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
-                          help=textwrap.dedent("""
-                          Size of mini batches for model training. Default: 128.
-                          """ ).strip())
-    
-    learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Use a custom data loader. This data loader is not supported parallelizing
-                          data loading. For '--cpu-per-trial 1' and without HD5, the speed of loading
-                          data is faster than default dataloader. Default: False.
-                          """ ).strip())
-#    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
-#                          help=textwrap.dedent("""
-#                          Use ImbalancedDatasetSampler for dataloader.
-#                          """ ).strip())
-                          
-    learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
-                          help=textwrap.dedent("""
-                          Optimization method for parameter learning: 'Adam' or 'AdamW'.
-                          Default: 'Adam'.
-                          """ ).strip())
- 
-    learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.001], nargs='+', 
-                          help=textwrap.dedent("""
-                          Learning rate for parameter learning, an argument for the 
-                          optimization method.  Default: 0.001.
-                          """ ).strip())
-    
-    learn_args.add_argument('--lr_scheduler', type=str, metavar='STR', default=['StepLR'], nargs='+', 
-                          help=textwrap.dedent("""
-                          Learning rate scheduler.
-                          Default: 'StepLR'.
-                          """ ).strip())
-    
-    learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
-                          help=textwrap.dedent("""
-                          Calcaute 'weight_decay' (regularization parameter) based on total 
-                          training steps. It automatically adjusts 'weight_decay' for different 
-                          batch sizes, training sizes and epochs. Its value MUST be smaller than 1.
-                          For values in the range 0~1, smaller values mean stronger regularization.
-                          Set a value of <=0 to turn this off.
-                          Default: 0.1.
-                          """ ).strip())
-    
-    learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
-                          help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization method. 
-                          If you want to use this option, please also set '--weight_decay_auto' to 0.
-                          Default: 1e-5. 
-                          """ ).strip())
-    
-    learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
-                          help=textwrap.dedent("""
-                          When the learning rate reaches the mininum rate, reset it to 
-                          a larger one. Default: 1e-4.
-                          """ ).strip())
-    
-    learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
-                          help=textwrap.dedent("""
-                          The minimum learning rate. Default: 1e-6.
-                          """ ).strip())
-    
-    learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.9], nargs='+', 
-                          help=textwrap.dedent("""
-                          'gamma' argument for the learning rate scheduler.
-                           Default: 0.9.
-                           """ ).strip())
-
-    learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          If set, torch.backends.cudnn.benchmark will be False. 
-                          Default: not set.
-                          """).strip())
-    
-    raytune_args.add_argument('--use_ray', default=False, action='store_true',
-                          help=textwrap.dedent("""
-                          Use ray to run multiple trials in parallel.  Default: False.
-                          """ ).strip()) 
-    
-    raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
-                          help=textwrap.dedent("""
-                          Ray-Tune experiment name.  Default: 'my_experiment'.
-                          """ ).strip()) 
-    
-    raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of trials for this training job.  Default: 2.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--epochs', type=int, metavar='INT', default=10, 
-                          help=textwrap.dedent("""
-                          Maximum number of epochs for each trial.  Default: 10.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--grace_period', type=int, metavar='INT', default=5, 
-                          help=textwrap.dedent("""
-                          'grace_period' parameter for early stopping. 
-                           Default: 5.
-                           """ ).strip())
-    
-    raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
-                          help=textwrap.dedent("""
-                          Metric for ASHA schedualing: 'loss', 'fdiri_loss'.
-                          Default: 'loss'.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. Default: 2.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of GPUs requested by Ray-Tune. Default: 1.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--cpu_per_trial', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of CPUs used per trial. Default: 2.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.15, 
-                          help=textwrap.dedent("""
-                          Number of GPUs used per trial. Default: 0.15.
-                          """ ).strip())
-    
-    raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default=None, 
-                          help=textwrap.dedent("""
-                          Which GPU device to be used. Default: '0'. 
-                          """ ).strip())
-    
-    raytune_args.add_argument('--rerun_failed', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Rerun errored or incomplete trials. Default: False.
-                          """ ).strip())
-    
-    predict_parser = subparsers.add_parser('predict', help='Predict mural-indel model', description="....")
-
-    predict_optional = predict_parser._action_groups.pop()  
-    predict_required = predict_parser.add_argument_group('Predict Required arguments')
-    predict_optional.title = 'Other arguments'
-
-    predict_required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
-                          required=True, help=textwrap.dedent("""
-                          File path of the reference genome in FASTA format.""").strip())
-    
-    predict_required.add_argument('--test_data', type=str, metavar='FILE', required=True,
-                          help= textwrap.dedent("""
-                          File path of the data to do prediction, in BED format.""").strip())
-    
-    predict_required.add_argument('--model_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path of the trained model.
-                          """ ).strip())
-        
-    predict_required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path for the configurations of the trained model.
-                          """ ).strip()) 
-
-    predict_optional.add_argument('--pred_file', type=str, metavar='FILE', default='pred.tsv.gz', help=textwrap.dedent("""
-                          Name of the output file for prediction results.
-                          Default: 'pred.tsv.gz'.
-                          """ ).strip())
-        
-    predict_optional.add_argument('--calibrator_path', type=str, metavar='FILE', default='',help=textwrap.dedent("""
-                          File path for the paired calibrator of the trained model.
-                          """ ).strip())
-
-    predict_optional.add_argument('--poisson_calib', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                            Use Poisson calibration for the model. 
-                           Default: False.""").strip())
-    
-    predict_optional.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for a list of BigWig files for non-sequence 
-                          features such as the coverage track. Default: None.""").strip())
-
-    predict_optional.add_argument('--n_h5_files', metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.
-                          """ ).strip())
-    
-    predict_optional.add_argument('--pred_time_view', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Check pred time of each part. Default: False.
-                          """).strip())
-    
-    predict_optional.add_argument('--with_h5', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Generate HDF5 file for the BED file. Default: False.
-                          """).strip())
-
-    predict_optional.add_argument('--h5f_path', type=str, default=None,
-                    help=textwrap.dedent("""
-                    Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
-
-    predict_optional.add_argument('--cpu_only', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Only use CPU computing. Default: False.
-                          """).strip())
-
-    predict_optional.add_argument('--cuda_id', type=str, metavar='STR', default=None, 
-                          help=textwrap.dedent("""
-                          Which GPU device to be used. Default: '0'. 
-                          """ ).strip())
-    
-    # optional.add_argument('--custom_dataloader', default=False, action='store_true',  
-    #                       help=textwrap.dedent("""
-    #                       Specify the way to construct DataLoaer, while allocw mutlti cpu for one trial, add this paramater. Default: False.
-    #                       """ ).strip())
-    
-    predict_optional.add_argument('--segment_center', type=int, metavar='INT', default=300000,
-                          help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence. It affects trade-off 
-                          between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: 300000.""" ).strip())
-
-    predict_optional.add_argument('--pred_batch_size', type=int, metavar='INT', default=16, 
-                          help=textwrap.dedent("""
-                          Size of mini batches for prediction. Default: 16.
-                          """ ).strip())
-    
-    predict_optional.add_argument('--kmer_corr', type=int, metavar='INT', default=[], nargs='+',
-                          help=textwrap.dedent("""
-                          Calculate k-mer correlations with observed variants in 5th column.
-                          Accept one or more odd positive integers for k-mers, e.g., "3 5 7".
-                          Default: no value.
-                          """ ).strip())
-    
-    predict_optional.add_argument('--region_corr', type=int, metavar='INT', default=[], nargs='+',
-                          help=textwrap.dedent("""
-                          Calculate region correlations with observed variants in 5th column.
-                          Accept one or more positive integers for window size (bp), 
-                          e.g., "10000 50000". Default: no value.
-                          """ ).strip())
-    
-    
-    predict_parser._action_groups.append(predict_optional)
-
-    predict_parser.set_defaults(func='predict')
-
-    transfer_parser = subparsers.add_parser('transfer', help='Transfer Learning for mural-indel model', description="....")
-    transfer_optional = transfer_parser._action_groups.pop()
-    transfer_required = transfer_parser.add_argument_group('Required arguments')
-    transfer_data_args = transfer_parser.add_argument_group('Data-related arguments')
-    transfer_model_args = transfer_parser.add_argument_group('Transfer learning arguments')
-    transfer_learn_args = transfer_parser.add_argument_group('Learning-related arguments')
-    transfer_raytune_args = transfer_parser.add_argument_group('RayTune-related arguments')
-    
-    transfer_required.add_argument('--ref_genome', type=str, metavar='FILE', default='',  
-                          required=True, help=textwrap.dedent("""
-                          File path of the reference genome in FASTA format.""").strip())
-    
-    transfer_required.add_argument('--train_data', type=str, metavar='FILE', default='',  
-                          required=True, help= textwrap.dedent("""
-                          File path of training data in a sorted BED format. If the options
-                          --validation_data and --valid_ratio not specified, 10%% of the
-                          sites sampled from the training BED will be used as the
-                          validation data.""").strip())
-    
-    transfer_required.add_argument('--model_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path of the trained model.
-                          """ ).strip())  
-    
-    transfer_required.add_argument('--model_config_path', type=str, metavar='FILE', required=True,
-                          help=textwrap.dedent("""
-                          File path for the configurations of the trained model.
-                          """ ).strip())    
-    
-    transfer_model_args.add_argument('--train_all', default=False, action='store_true', 
-                          help= textwrap.dedent("""
-                          Train all parameters of the model. If False, only the parameters
-                          in the last FC layers will be trained. Default: False.""").strip())
-    
-    
-    transfer_model_args.add_argument('--init_fc_with_pretrained', default=False, action='store_true', 
-                          help= textwrap.dedent("""
-                          Use the weights of the pre-trained model to initialize the last 
-                          FC layers. If False, parameters of last FC layers are randomly 
-                          initialized. Default: False.""").strip())  
-
-    transfer_model_args.add_argument('--n_class', type=int, metavar='INT', default='8',  
-                          help=textwrap.dedent("""
-                          Number of mutation classes (or types), including the 
-                          non-mutated class. Default: 8.""").strip())
-   
-    transfer_data_args.add_argument('--validation_data', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for validation data. If this option is set,
-                          the value of --valid_ratio will be ignored. Default: None.
-                          """).strip()) 
-    
-    transfer_data_args.add_argument('--sample_weights', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for sample weights. Default: None.
-                          """).strip())
-    
-    transfer_data_args.add_argument('--valid_ratio', type=float, metavar='FLOAT', default=0.1, 
-                          help=textwrap.dedent("""
-                          Ratio of validation data relative to the whole training data.
-                          Default: 0.1. 
-                          """ ).strip())
-    
-    transfer_data_args.add_argument('--split_seed', type=int, metavar='INT', default=-1, 
-                          help=textwrap.dedent("""
-                          Seed for randomly splitting data into training and validation
-                          sets. Default: a random number generated by the job.
-                          """ ).strip())
-    
-    transfer_data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Save prediction results for validation data in the checkpoint
-                          folders. Default: False.
-                          """ ).strip())
-    
-    transfer_data_args.add_argument('--bw_paths', type=str, metavar='FILE', default=None,
-                          help=textwrap.dedent("""
-                          File path for a list of BigWig files for non-sequence 
-                          features such as the coverage track. If the pre-trained model
-                          used some bigWig tracks, tracks with same names are needed 
-                          to be provided with this option. Default: None.""").strip())
-    
-    transfer_data_args.add_argument('--with_h5', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Generate HDF5 files for input BED files. Default: False.""").strip())
-    
-    transfer_data_args.add_argument('--h5f_path', type=str, default=None,
-                         help=textwrap.dedent("""
-                         Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
-    
-    transfer_data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.
-                          """ ).strip())            
-
-    transfer_learn_args.add_argument('--segment_center', type=int, metavar='INT', default=None, 
-                          help=textwrap.dedent("""
-                          The maximum encoding unit of the sequence. It affects trade-off 
-                          between RAM memory and preprocessing speed. It is recommended to use 300k.
-                          Default: None(read from config).""" ).strip())
-
-    transfer_learn_args.add_argument('--sampled_segments', type=int, metavar='INT', default=None,
-                          help=textwrap.dedent("""
-                          Number of segments chosen for generating samples for batches in DataLoader.
-                          Default: None(read from config).
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--batch_size', type=int, metavar='INT', default=[128], nargs='+', 
-                          help=textwrap.dedent("""
-                          Size of mini batches for model training. Default: 128.
-                          """ ).strip())    
-                          
-    transfer_learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Specify the way to load data. Default: False.
-                          """ ).strip())
-
-    transfer_learn_args.add_argument('--optim', type=str, metavar='STR', default=['Adam'], nargs='+', 
-                          help=textwrap.dedent("""
-                          Optimization method for parameter learning: 'Adam' or 'AdamW'.
-                          Default: 'Adam'.
-                          """ ).strip())
- 
-    transfer_learn_args.add_argument('--learning_rate', type=float, metavar='FLOAT', default=[0.0001], nargs='+', 
-                          help=textwrap.dedent("""
-                          Learning rate for parameter learning, an argument for the 
-                          optimization method.  Default: 0.0001.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--lr_scheduler', type=str, metavar='STR', default=['StepLR'], nargs='+', 
-                          help=textwrap.dedent("""
-                          Learning rate scheduler.
-                          Default: 'StepLR'.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--weight_decay_auto', type=float, metavar='FLOAT', default=0.1, 
-                          help=textwrap.dedent("""
-                          Calcaute 'weight_decay' (regularization parameter) based on total 
-                          training steps. It automatically adjusts 'weight_decay' for different 
-                          batch sizes, training sizes and epochs. Its value MUST be smaller than 1.
-                          For values in the range 0~1, smaller values mean stronger regularization.
-                          Set a value of <=0 to turn this off.
-                          Default: 0.1.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--weight_decay', type=float, metavar='FLOAT', default=[1e-5], nargs='+', 
-                          help=textwrap.dedent("""
-                          'weight_decay' argument (regularization) for the optimization method. 
-                          If you want to use this option, please also set '--weight_decay_auto' to 0.
-                          Default: 1e-5.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--restart_lr', type=float, metavar='FLOAT', default=1e-4, 
-                          help=textwrap.dedent("""
-                          When the learning rate reaches the mininum rate, reset it to 
-                          a larger one. Default: 1e-4.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--min_lr', type=float, metavar='FLOAT', default=1e-6, 
-                          help=textwrap.dedent("""
-                          The minimum learning rate. Default: 1e-6.
-                          """ ).strip())
-    
-    transfer_learn_args.add_argument('--LR_gamma', type=float, metavar='FLOAT', default=[0.9], nargs='+', 
-                          help=textwrap.dedent("""
-                          'gamma' argument for the learning rate scheduler.
-                           Default: 0.9.
-                           """ ).strip())
-    
-    transfer_learn_args.add_argument('--cudnn_benchmark_false', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          If set, use only genomic sequences for the model and ignore
-                          bigWig tracks. Default: False.""").strip())
-
-    transfer_raytune_args.add_argument('--use_ray', default=False, action='store_true',
-                          help=textwrap.dedent("""
-                          Use ray to run multiple trials in parallel.  Default: False.
-                          """ ).strip())
-
-    transfer_raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='my_experiment',
-                          help=textwrap.dedent("""
-                          Ray-Tune experiment name.  Default: 'my_experiment'.
-                          """ ).strip()) 
-    
-    transfer_raytune_args.add_argument('--n_trials', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of trials for this training job.  Default: 2.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--epochs', type=int, metavar='INT', default=10, 
-                          help=textwrap.dedent("""
-                          Maximum number of epochs for each trial.  Default: 10.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--grace_period', type=int, metavar='INT', default=5, 
-                          help=textwrap.dedent("""
-                          'grace_period' parameter for early stopping. 
-                           Default: 5.
-                           """ ).strip())
-    
-    transfer_raytune_args.add_argument('--ASHA_metric', type=str, metavar='STR', default='loss', 
-                          help=textwrap.dedent("""
-                          Metric for ASHA schedualing; the value can be 'loss' or 'fdiri_loss'.
-                          Default: 'loss'.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--ray_ncpus', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of CPUs requested by Ray-Tune. Default: 2.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--ray_ngpus', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of GPUs requested by Ray-Tune. Default: 1.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--cpu_per_trial', type=int, metavar='INT', default=2, 
-                          help=textwrap.dedent("""
-                          Number of CPUs used per trial. Default: 2.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--gpu_per_trial', type=float, metavar='FLOAT', default=0.15, 
-                          help=textwrap.dedent("""
-                          Number of GPUs used per trial. Default: 0.15.
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--cuda_id', type=str, metavar='STR', default='0', 
-                          help=textwrap.dedent("""
-                          Which GPU device to be used. Default: '0'. 
-                          """ ).strip())
-    
-    transfer_raytune_args.add_argument('--rerun_failed', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Rerun errored or incomplete trials. Default: False.
-                          """ ).strip())
-    
-    transfer_parser._action_groups.append(transfer_optional)
-    transfer_parser.set_defaults(func='transfer')   
-
-    eval_parser = subparsers.add_parser('evaluate', help='Evaluate mural-indel model', description="....")
-
-    eval_optional = eval_parser._action_groups.pop()
-
-    eval_required = eval_parser.add_argument_group('Required arguments')
-    eval_kmer_parser = eval_parser.add_argument_group('kmer-related arguments')
-    eval_regional_parser = eval_parser.add_argument_group('regional-related arguments')
-
-    eval_required.add_argument('--pred_file', required=True, type=str,
-                       help='predicted file')
-
-    eval_required.add_argument('--ref_genome', required=True, type=str,
-                       help='Reference genome FASTA file')
-
-    eval_required.add_argument('--out_prefix', default='result', type=str,
-                       help='Output filename prefix')
-
-    eval_required.add_argument('--n_class', type=int, default=8,
-                       help='indel is 8.')
-
-    eval_required.add_argument('--kmer_only', default=False, action='store_true',
-                          help=textwrap.dedent("""
-                          Only evaluation kmer correlation.  Default: False.
-                          """ ).strip())
-
-    eval_required.add_argument('--regional_only', default=False, action='store_true',
-                          help=textwrap.dedent("""
-                          only evaluation regional correlation.  default: false.
-                          """ ).strip())
-
-    eval_kmer_parser.add_argument('--kmer_length', type=int, default=3,
-                          help=textwrap.dedent("""
-                            Length of kmer. Default: 3.
-                          """ ).strip())
-
-    eval_regional_parser.add_argument('--window_size', type=int, default=100000, 
-                          help=textwrap.dedent("""window size (bp) for calculating regional rates. Default: 100000.
-                          """).strip())
-
-    eval_regional_parser.add_argument('--ratio_cutoff', type=float, default=0.2, 
-                          help=textwrap.dedent(""" 
-                          ratio cutoff for filtering windows with few valid sites. 
-                          Default: 0.2, meaning that windows with  fewer than 0.2*median(numbers of sites in surveyed windows) will be discarded.
-                          """).strip())
-
-    eval_parser._action_groups.append(eval_optional)
-    eval_parser.set_defaults(func='evaluate')
-
-    scale_parser = subparsers.add_parser('scale', help='Scaling indel mutation rate', description="....")
-
-    scale_optional = scale_parser._action_groups.pop()
-    scale_required = scale_parser.add_argument_group('Required arguments')
-
-    scale_required.add_argument('--pred_files', type=str, metavar='FILE', default=[], nargs='+', help='Prediction files (one or more) for calculating scaling factors.')
-
-    scale_required.add_argument('--n_class', type=int,  default=8, help='indel is 4')
-
-    scale_required.add_argument('--out_file', type=str, metavar='FILE', default=[], nargs='+', help='output file with scaled rates. Default: pred_file_name.scaled.tsv.gz')
-
-    scale_required.add_argument('--benchmark_regions', type=str, metavar='FILE', default='',
-                        help='High-confidence regions used for calculating the scaling factor')
-
-    scale_required.add_argument('--genomewide_mu', type=float, metavar='FLOAT', default=None, help='Mutation rate per base per generation.')
-        
-    scale_required.add_argument('--m_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific mutation types.')
-    
-    scale_required.add_argument('--g_proportions', type=float, metavar='FLOAT', default=[], nargs='+', help='Proportions of specific sites in the genome.')
-    
-    scale_required.add_argument('--do_scaling', default=False, action='store_true', help='Save scaled mutation rates for input pred files. Default: False.')
-
-    scale_required.add_argument('--scale_factors', type=float, metavar='FLOAT', default=[], nargs='+', help='scaling factor for producing mutation rates per base per generation. ')
-    
-    scale_parser._action_groups.append(scale_optional)
-    scale_parser.set_defaults(func='scale')
-
-    
-    # set global parameter
+    # global options
     optional.title = '[General help]' 
     parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__))
     parser._action_groups.append(optional)
 
     if len(sys.argv) == 1:
         parser.parse_args(['--help'])
-    else:
-        args = parser.parse_args()
-
-    #return args, {'train': train_parser, 'predict': predict_parser, 'transfer': transfer_parser, 'evaluate': eval_parser, 'scale': scale_parser}
-    return args
+    
+    subparsers = {
+        'train': train_parser,
+        'predict': predict_parsert,
+        'transfer': transfer_parser,
+        'evaluate': eval_parser,
+        'scale': scale_parser
+    }
+    
+    return parser, subparsers
 
 def main():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
-                                     description=banner)
-    #args, subparsers = parse_arguments(parser)
-    args = parse_arguments(parser)
+    parser, subparsers = create_parser()
 
-    # if len(sys.argv) == 2:
-    #     subparsers[args.command].print_help()
-    #     sys.exit(1)
+    try:
+        args = parser.parse_args()
+    except Exception as e:
+        print(f"Error: {e}")
+        subparsers[args.func].print_help()
+        sys.exit(1)
 
     if args.func == 'train':
         run_train_pipline(args, model_type='indel')
@@ -866,7 +112,6 @@ def main():
         run_regional_corr_calc(args)
     
     elif args.func == 'scale':
-        # 判断列表是否为空
         if len(args.scale_factors) != 0:
             scaling_factors(args.pred_files, args.scale_factors, args.n_class, args.out_files)
         calc_mu_scaling_factor(args)
