@@ -28,21 +28,27 @@ def apply_scaling(pred_file, scale_factor, n_class, out_file):
     df['prob0'] = 1 - df[column_names].sum(axis=1)
     df.to_csv(out_file, sep="\t", index=False, float_format='%.4g')
 
-def scaling_files(pred_files, scale_factors, n_class, out_file):
-    for idx, pred_file in enumerate(pred_files):
-        scale_factor = scale_factors[idx]
-        out_file = out_files[idx]
-        apply_scaling(pred_file, scale_factor, n_class, out_file[idx])
+def scaling_files(pred_files, scale_factors, n_class, out_files):
+    # check input is list
+    if (
+        not isinstance(pred_files, list) or 
+        not isinstance(scale_factors, list) or 
+        not isinstance(out_files, list)
+        ):
+        print('ERROR: pred_files, scale_factors, and out_files must be lists!', file=sys.stderr)
+        sys.exit()
+    for pred_file, scale_factor, out_file in zip(pred_files, scale_factors, out_files):
+        apply_scaling(pred_file, scale_factor, n_class, out_file)
 
 
-def calc_mu_scaling_factor(args):
+def calc_mu_scaling_factor(args, model_type):
 
    # Read the prediction file
     benchmark_regions = args.benchmark_regions
     
     genomewide_mu = args.genomewide_mu
     
-    g_proportions = args.g_proportions
+    g_proportions = args.g_proportions if model_type == 'snv' else [1] * len(args.pred_files)
     
     m_proportions = args.m_proportions
     
@@ -94,7 +100,7 @@ def calc_mu_scaling_factor(args):
         print('prob_sum: %.3e' % prob_sum)
         print('scaling factor: %.3e' % scale_factor)
         
-        if do_scaling:
+        if args.do_scaling:
             pred_file = pred_files[i]
             out_file = pred_file +'.scaled.tsv.gz'
             apply_scaling(pred_file, scale_factor, n_class, out_file)

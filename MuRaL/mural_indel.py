@@ -10,7 +10,8 @@ from commands.train import add_indel_train_parser
 from commands.predict import add_indel_predict_parser
 from commands.transfer import add_indel_transfer_parser
 from commands.evaluate import add_indel_eval_parser
-from commands.scale import add_indel_scale_parser
+from commands.scale import add_indel_scale_parser, add_indel_calc_scaling_factor_parser
+from commands.get_best_model import add_indel_get_best_model_parser
 
 # import scripts
 from scripts.run_train_raytune import run_train_pipline
@@ -18,7 +19,9 @@ from scripts.run_predict import run_predict_pipline
 from scripts.run_train_TL_raytune import run_transfer_pipline
 from scripts.calc_kmer_corr import run_kmer_corr_calc
 from scripts.calc_regional_corr import run_regional_corr_calc
+from scripts.calc_motif_corr import run_motif_corr_calc
 from scripts.scaling import scaling_files, calc_mu_scaling_factor
+from scripts.get_best_model import get_best_model
 
 class ArgumentParser(argparse.ArgumentParser):
     def error(self, message):
@@ -57,7 +60,9 @@ def create_parser():
     predict_parsert = add_indel_predict_parser(subparsers)
     transfer_parser = add_indel_transfer_parser(subparsers)
     eval_parser = add_indel_eval_parser(subparsers)
+    calc_scaling_factor_parser = add_indel_calc_scaling_factor_parser(subparsers)
     scale_parser = add_indel_scale_parser(subparsers)
+    get_best_model_parser = add_indel_get_best_model_parser(subparsers)
 
     # global options
     optional.title = '[General help]' 
@@ -72,7 +77,9 @@ def create_parser():
         'predict': predict_parsert,
         'transfer': transfer_parser,
         'evaluate': eval_parser,
-        'scale': scale_parser
+        'calc_scaling_factor': calc_scaling_factor_parser,
+        'scale': scale_parser,
+        'get_best_model': get_best_model_parser
     }
     
     return parser, subparsers
@@ -100,21 +107,34 @@ def main():
         run_transfer_pipline(args, model_type='indel')
 
     elif args.func == 'evaluate':
+        strand_adpat = {'pos': '+',
+         'neg': '-',
+         'both': 'both'
+        }
         assert (args.kmer_only and args.regional_only) is False, "Please set one of --kmer_only or --regional_only to True."
+        args.strand = strand_adpat[args.strand]
         if args.kmer_only:
             run_kmer_corr_calc(args, model_type='indel')
             return
         elif args.regional_only:
             run_regional_corr_calc(args)
             return
+        elif args.motif_only:
+            run_motif_corr_calc(args, model_type='indel')
 
-        run_kmer_corr_calc(args, model_type='indel')
-        run_regional_corr_calc(args)
+        else:
+            run_kmer_corr_calc(args, model_type='indel')
+            run_regional_corr_calc(args)
+
+    elif args.func == 'calc_scaling_factor':
+        calc_mu_scaling_factor(args, model_type='indel')
     
     elif args.func == 'scale':
-        if len(args.scale_factors) != 0:
-            scaling_factors(args.pred_files, args.scale_factors, args.n_class, args.out_files)
-        calc_mu_scaling_factor(args)
+        print(args.pred_file, args.scale_factor, args.n_class, args.out_file)
+        scaling_files(args.pred_file, args.scale_factor, args.n_class, args.out_file)
+
+    elif args.func == 'get_best_model':
+        get_best_model(args.trial_path)
 
     else:
         parser.print_help()

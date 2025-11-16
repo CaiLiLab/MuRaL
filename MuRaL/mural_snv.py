@@ -10,7 +10,8 @@ from commands.train import add_snv_train_parser
 from commands.predict import add_snv_predict_parser
 from commands.transfer import add_snv_transfer_parser
 from commands.evaluate import add_snv_eval_parser
-from commands.scale import add_snv_scale_parser
+from commands.scale import add_snv_scale_parser, add_snv_calc_scaling_factor_parser
+from commands.get_best_model import add_snv_get_best_model_parser
 
 # import scripts
 from scripts.run_train_raytune import run_train_pipline
@@ -19,6 +20,7 @@ from scripts.run_train_TL_raytune import run_transfer_pipline
 from scripts.calc_kmer_corr import run_kmer_corr_calc
 from scripts.calc_regional_corr import run_regional_corr_calc
 from scripts.scaling import scaling_files, calc_mu_scaling_factor
+from scripts.get_best_model import get_best_model
 
 class ArgumentParser(argparse.ArgumentParser):
     def error(self, message):
@@ -57,7 +59,9 @@ def create_parser():
     predict_parsert = add_snv_predict_parser(subparsers)
     transfer_parser = add_snv_transfer_parser(subparsers)
     eval_parser = add_snv_eval_parser(subparsers)
+    calc_scaling_factor_parser = add_snv_calc_scaling_factor_parser(subparsers)
     scale_parser = add_snv_scale_parser(subparsers)
+    get_best_model_parser = add_snv_get_best_model_parser(subparsers)
 
     # global options
     optional.title = '[General help]' 
@@ -72,7 +76,9 @@ def create_parser():
         'predict': predict_parsert,
         'transfer': transfer_parser,
         'evaluate': eval_parser,
-        'scale': scale_parser
+        'calc_scaling_factor': calc_scaling_factor_parser,
+        'scale': scale_parser,
+        'get_best_model': get_best_model_parser
     }
     
     return parser, subparsers
@@ -111,10 +117,14 @@ def main():
         run_kmer_corr_calc(args, model_type='snv')
         run_regional_corr_calc(args)
     
+    elif args.func == 'calc_scaling_factor':
+        calc_mu_scaling_factor(args, model_type='snv')
+
     elif args.func == 'scale':
-        if len(args.scale_factors) != 0:
-            scaling_factors(args.pred_files, args.scale_factors, args.n_class, args.out_files)
-        calc_mu_scaling_factor(args)
+        scaling_files(args.pred_file, args.scale_factor, args.n_class, args.out_file)
+    
+    elif args.func == 'get_best_model':
+        get_best_model(args.trial_path)
 
     else:
         parser.print_help()
