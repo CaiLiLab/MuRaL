@@ -8,6 +8,7 @@ def add_common_transfer_parser(
     """
     Add common arguments for all transfer learning parsers.
     """
+    transfer_parser.set_defaults(func='transfer')
     transfer_optional = transfer_parser._action_groups.pop()
     transfer_optional.title = "Other arguments"
     transfer_required = transfer_parser.add_argument_group('Required arguments')
@@ -86,20 +87,13 @@ def add_common_transfer_parser(
                           to be provided with this option. Default: None.""").strip())
     
     transfer_data_args.add_argument('--with_h5', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Generate HDF5 files for input BED files. Default: False.""").strip())
+                          help=argparse.SUPPRESS)
     
     transfer_data_args.add_argument('--h5f_path', type=str, default=None,
-                         help=textwrap.dedent("""
-                         Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+                         help=argparse.SUPPRESS)
     
     transfer_data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.
-                          """ ).strip())            
+                          help=argparse.SUPPRESS)
 
     transfer_learn_args.add_argument('--segment_center', type=int, metavar='INT', default=None, 
                           help=textwrap.dedent("""
@@ -241,7 +235,12 @@ def add_common_transfer_parser(
                           help=textwrap.dedent("""
                           Rerun errored or incomplete trials. Default: False.
                           """ ).strip())
-    
+
+    transfer_optional.add_argument('--poisson_calib', default=False, action='store_true', 
+                                  help=textwrap.dedent("""
+                                  Use Poisson calibration for the model. 
+                                  Default: False.""").strip())
+ 
     transfer_parser._action_groups.append(transfer_optional)
     
     return transfer_required, transfer_data_args, transfer_model_args, transfer_learn_args, transfer_raytune_args
@@ -277,11 +276,11 @@ def add_indel_transfer_parser(subparsers: argparse._SubParsersAction) -> argpars
     ---------------------
     1. The following command will train a transfer learning model using training data 
     in 'training.sorted.bed', the validation data in 'validation.sorted.bed', and the model
-    files under 'checkpoint_6/'.
+    files under 'checkpoint_9/'. All files are located in: example/indel
    
-        mural_indel transfer --ref_genome seq.fa --train_data training.sorted.bed \\
-        --validation_data validation.sorted.bed --model_path checkpoint_6/model \\
-        --model_config_path checkpoint_6/model.config.pkl --train_all \\
+        mural_indel transfer --ref_genome data/seq.fa --train_data data/training.sorted.bed \\
+        --validation_data data/validation.sorted.bed --model_path models/checkpoint_9/model \\
+        --model_config_path models/checkpoint_9/model.config.pkl --train_all \\
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
         """)
     )
@@ -327,11 +326,11 @@ def add_snv_transfer_parser(subparsers: argparse._SubParsersAction) -> argparse.
     ---------------------
     1. The following command will train a transfer learning model using training data 
     in 'training.sorted.bed', the validation data in 'validation.sorted.bed', and the model
-    files under 'checkpoint_6/'.
+    files under 'checkpoint_6/'. All files are located in: example/snv
    
-        mural_snv transfer --ref_genome seq.fa --train_data training.sorted.bed \\
-        --validation_data validation.sorted.bed --model_path checkpoint_6/model \\
-        --model_config_path checkpoint_6/model.config.pkl --train_all \\
+        mural_snv transfer --ref_genome data/seq.fa --train_data data/training.sorted.bed \\
+        --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model \\
+        --model_config_path models/checkpoint_6/model.config.pkl --train_all \\
         --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
         """)
     )

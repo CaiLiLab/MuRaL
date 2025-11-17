@@ -8,6 +8,7 @@ def add_common_train_parser(
     """
     Add common arguments for all training parsers.
     """
+    train_parser.set_defaults(func='train')
 
     train_optional = train_parser._action_groups.pop()
     train_optional.title = 'Other arguments'
@@ -67,45 +68,18 @@ def add_common_train_parser(
                           bigWig tracks. Default: False.""").strip())
     
     data_args.add_argument('--with_h5', default=False, action='store_true', 
-                          help=textwrap.dedent("""
-                          Output distal encoding in HDF5 File. This parameter can help improve the 
-                          speed of data loading in specific situations. Before using this parameter, 
-                          please first consider increasing --cpu_per_trial, this is a more effect way 
-                          to accelerate training process by speeding up data loading. 
-                           Default: False.""").strip())
+                          help=argparse.SUPPRESS)
     
     data_args.add_argument('--h5f_path', type=str, default=None,
-                          help=textwrap.dedent("""
-                          Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+                          help=argparse.SUPPRESS)
     
     data_args.add_argument('--n_h5_files', type=int, metavar='INT', default=1, 
-                          help=textwrap.dedent("""
-                          Number of HDF5 files for each BED file. When the BED file has many
-                          positions and the distal radius is large, increasing the value for 
-                          --n_h5_files files can reduce the time for generating HDF5 files.
-                          Default: 1.                          """ ).strip())
+                          help=argparse.SUPPRESS)
     
     data_args.add_argument('--save_valid_preds', default=False, action='store_true', 
                           help=textwrap.dedent("""
                           Save prediction results for validation data in the checkpoint
                           folders. Default: False.
-                          """ ).strip())
-
-    model_args.add_argument('--local_radius', type=int, metavar='INT', default=[5], nargs='+',
-                          help=textwrap.dedent("""
-                          Radius of the local sequence to be considered in the 
-                          model. Length of the local sequence = local_radius*2+1 bp.
-                          Default: 5.""" ).strip())
-    
-    model_args.add_argument('--local_order', type=int, metavar='INT', default=[3], nargs='+', 
-                          help=textwrap.dedent("""
-                          Length of k-mer in the embedding layer. Default: 3.""").strip())
-    
-    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[200], nargs='+', 
-                          help=textwrap.dedent("""
-                          Radius of the expanded sequence to be considered. 
-                          Length of the expanded sequence = distal_radius*2+1 bp.
-                          Values should be >=100. Default: 200. 
                           """ ).strip())
     
     model_args.add_argument('--distal_order', type=int, metavar='INT', default=1, 
@@ -122,8 +96,6 @@ def add_common_train_parser(
                           help=textwrap.dedent("""
                           Number of output channels for CNN layers. Default: 32.
                           """ ).strip())
-
-
 
     calibra_args.add_argument('--poisson_calib', default=False, action='store_true', 
                           help=textwrap.dedent("""
@@ -148,11 +120,7 @@ def add_common_train_parser(
                           """ ).strip())
     
     learn_args.add_argument('--custom_dataloader', default=False, action='store_true',  
-                          help=textwrap.dedent("""
-                          Use a custom data loader. This data loader is not supported parallelizing
-                          data loading. For '--cpu-per-trial 1' and without HD5, the speed of loading
-                          data is faster than default dataloader. Default: False.
-                          """ ).strip())
+                          help=argparse.SUPPRESS)
 
 #    learn_args.add_argument('--ImbSampler', default=False, action='store_true', 
 #                          help=textwrap.dedent("""
@@ -289,7 +257,7 @@ def add_indel_train_parser(subparsers: argparse._SubParsersAction) -> argparse._
         description="""
     Overview
     --------    
-    This tool trains MuRaL models with training and validation mutation data
+    This tool trains MuRaL-INDEL models with training and validation mutation data
     and exports training results under the "./ray_results/" folder.
     
     * Input data
@@ -358,36 +326,38 @@ def add_indel_train_parser(subparsers: argparse._SubParsersAction) -> argparse._
    
     Command line examples
     --------------------- 
+    All example files are located in: example/indel
+    Note: --use_reverse should be used, if insertion model is trained. 
+
     1. The following command will train a model by running two trials, using data in
     'train.sorted.bed' for training. The training results will be saved under the
     folder './ray_results/example1/'. Default values will be used for other
     unspecified arguments. Note that, by default, 10% of the sites sampled from 
     'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
         
-		# running two trials without Ray
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+		# running two trials without Ray(default)
+        mural_indel train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
         
         # running two trials using Ray 
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        mural_indel train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --use_ray --experiment_name example1 > test1.out 2> test1.err
 
     2. The following command will use data in 'train.sorted.bed' as training
-    data and a separate 'validation.sorted.bed' as validation data. The option
-    '--local_radius 10' means that length of the local sequence used for training
-    is 10*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded 
-    sequence used for training is 100*2+1 = 201 bp. 
+    data and a separate 'validation.sorted.bed' as validation data. 
+    '--distal_radius 4000' means that length of the expanded sequence used for 
+    training is 4000*2 = 8000 bp. 
     
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
-        --validation_data validation.sorted.bed --n_trials 2 --local_radius 10 \\ 
-        --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
+        mural_indel train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
+        --validation_data data/validation.sorted.bed --n_trials 2  \\ 
+        --distal_radius 4000 --experiment_name example2 > test2.out 2> test2.err
     
     3. If you don't have (or don't want to use) GPU resources, you can set options
     '--ray_ngpus 0 --gpu_per_trial 0' as below. Be aware that if training dataset 
     is large or the model is parameter-rich, CPU-only computing could take a very 
     long time!
     
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        mural_indel train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --ray_ngpus 0 --gpu_per_trial 0 --experiment_name example3 \\ 
         > test3.out 2> test3.err
     
@@ -395,7 +365,7 @@ def add_indel_train_parser(subparsers: argparse._SubParsersAction) -> argparse._
     data loading becomes a bottleneck in the training process. You can set the option 
     '--cpu_per_trial' to specify how many CPUs each trial should be used to do data loading.
 
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed --n_trials 2 \\
+        mural_indel train --ref_genome data/seq.fa --train_data data/train.sorted.bed --n_trials 2 \\
 		--cpu_per_trial 4 --experiment_name example4 > test4.out 2> test4.err
       
     Notes
@@ -404,15 +374,7 @@ def add_indel_train_parser(subparsers: argparse._SubParsersAction) -> argparse._
     coordinates. You can sort BED files by running 'bedtools sort' or 
     'sort -k1,1 -k2,2n'.
     
-    2. For '--with_h5', this tool generates an HDF5 file for each input BED
-    file (training or validation file) based on the value of '--distal_radius' 
-    and the tracks in '--bw_paths', if the corresponding HDF5 file doesn't 
-    exist or is corrupted. Make sure that you have write permission for the folder
-    containing the BED file(s). Only one job is allowed to write to an HDF5 file,
-    so don't run multiple jobs involving a same BED file when its HDF5 file 
-    isn't generated yet. Otherwise, it may cause file permission errors.
-    
-    3. If it takes long to finish a job, you can check the information exported 
+    2. If it takes long to finish a job, you can check the information exported 
     to stdout (or redirected file) for the progress during running. 
     """)
     # Register common arguments
@@ -420,22 +382,35 @@ def add_indel_train_parser(subparsers: argparse._SubParsersAction) -> argparse._
 
 
     # Add indel-specific arguments
-    model_args.add_argument('--model_no', type=int, metavar='INT', default=2, 
+    model_args.add_argument('--model_no', type=int, metavar='INT', default=0, 
                             help=textwrap.dedent("""
                             Which network architecture to be used: 
                             0 - 'Unet-Small' model;
                             Default: 0.
                             """ ).strip())
-    
+
+    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[4000], nargs='+', 
+                          help=textwrap.dedent("""
+                          Radius of the expanded sequence to be considered. 
+                          Length of the expanded sequence = distal_radius*2 bp.
+                          Values should be >=1000. Default: 4000. 
+                          """ ).strip())
+
     model_args.add_argument('--n_class', type=int, metavar='INT', default=8,  
                             help=textwrap.dedent("""
                             Number of mutation classes (or types), including the 
                             non-mutated class. Default: 8.""").strip())
 
-    model_args.add_argument('--down_list', type=int, metavar='INT', default=1, nargs='+', required=False,
+    model_args.add_argument('--down_list', type=int, metavar='INT', default=[1, 4, 5, 5, 5,2], nargs='+', required=False,
                           help=textwrap.dedent("""
                           dowsample list for UNet_pro. Default: 1.
                           """ ).strip())
+
+    model_args.add_argument('--use_reverse', default=False, action='store_true',
+                          help=textwrap.dedent("""
+                          Use this parameter for insertion model. Two strand sequences will be used training.
+                          Default: False.
+                          """ ).strip()) 
 
     raytune_args.add_argument('--experiment_name', type=str, metavar='STR', default='indel_experiment',
                               help=textwrap.dedent("""
@@ -523,18 +498,20 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
    
     Command line examples
     --------------------- 
+    All example files are located in: example/snv
+
     1. The following command will train a model by running two trials, using data in
     'train.sorted.bed' for training. The training results will be saved under the
     folder './ray_results/example1/'. Default values will be used for other
     unspecified arguments. Note that, by default, 10% of the sites sampled from 
     'train.sorted.bed' is used as validation data (i.e., '--valid_ratio 0.1').
         
-		# running two trials without Ray
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+		# running two trials without Ray(default)
+        mural_snv train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --experiment_name example1 > test1.out 2> test1.err
         
         # running two trials using Ray 
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        mural_snv train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --use_ray --experiment_name example1 > test1.out 2> test1.err
 
     2. The following command will use data in 'train.sorted.bed' as training
@@ -543,8 +520,8 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
     is 10*2+1 = 21 bp. '--distal_radius 100' means that length of the expanded 
     sequence used for training is 100*2+1 = 201 bp. 
     
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
-        --validation_data validation.sorted.bed --n_trials 2 --local_radius 10 \\ 
+        mural_snv train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
+        --validation_data data/validation.sorted.bed --n_trials 2 --local_radius 10 \\ 
         --distal_radius 100 --experiment_name example2 > test2.out 2> test2.err
     
     3. If you don't have (or don't want to use) GPU resources, you can set options
@@ -552,7 +529,7 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
     is large or the model is parameter-rich, CPU-only computing could take a very 
     long time!
     
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed \\
+        mural_snv train --ref_genome data/seq.fa --train_data data/train.sorted.bed \\
         --n_trials 2 --ray_ngpus 0 --gpu_per_trial 0 --experiment_name example3 \\ 
         > test3.out 2> test3.err
     
@@ -560,7 +537,7 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
     data loading becomes a bottleneck in the training process. You can set the option 
     '--cpu_per_trial' to specify how many CPUs each trial should be used to do data loading.
 
-        mural_train --ref_genome seq.fa --train_data train.sorted.bed --n_trials 2 \\
+        mural_snv train --ref_genome data/seq.fa --train_data data/train.sorted.bed --n_trials 2 \\
 		--cpu_per_trial 4 --experiment_name example4 > test4.out 2> test4.err
       
     Notes
@@ -569,17 +546,10 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
     coordinates. You can sort BED files by running 'bedtools sort' or 
     'sort -k1,1 -k2,2n'.
     
-    2. For '--with_h5', this tool generates an HDF5 file for each input BED
-    file (training or validation file) based on the value of '--distal_radius' 
-    and the tracks in '--bw_paths', if the corresponding HDF5 file doesn't 
-    exist or is corrupted. Make sure that you have write permission for the folder
-    containing the BED file(s). Only one job is allowed to write to an HDF5 file,
-    so don't run multiple jobs involving a same BED file when its HDF5 file 
-    isn't generated yet. Otherwise, it may cause file permission errors.
-    
-    3. If it takes long to finish a job, you can check the information exported 
+    2. If it takes long to finish a job, you can check the information exported 
     to stdout (or redirected file) for the progress during running. 
     """)
+    train_parser.set_defaults(func='train')
 
     # Register common arguments
     train_required, model_args, calibra_args, raytune_args = add_common_train_parser(train_parser)
@@ -600,6 +570,23 @@ def add_snv_train_parser(subparsers: argparse._SubParsersAction) -> argparse._Su
                             help=textwrap.dedent("""
                             Number of mutation classes (or types), including the 
                             non-mutated class. Default: 4.""").strip())
+
+    model_args.add_argument('--distal_radius', type=int, metavar='INT', default=[200], nargs='+', 
+                          help=textwrap.dedent("""
+                          Radius of the expanded sequence to be considered. 
+                          Length of the expanded sequence = distal_radius*2+1 bp.
+                          Values should be >=100. Default: 200. 
+                          """ ).strip())
+
+    model_args.add_argument('--local_radius', type=int, metavar='INT', default=[7], nargs='+',
+                          help=textwrap.dedent("""
+                          Radius of the local sequence to be considered in the 
+                          model. Length of the local sequence = local_radius*2+1 bp.
+                          Default: 7.""" ).strip())
+    
+    model_args.add_argument('--local_order', type=int, metavar='INT', default=[3], nargs='+', 
+                          help=textwrap.dedent("""
+                          Length of k-mer in the embedding layer. Default: 3.""").strip())
 
     model_args.add_argument('--local_hidden1_size', type=int, metavar='INT', default=[150], nargs='+', 
                           help=textwrap.dedent("""

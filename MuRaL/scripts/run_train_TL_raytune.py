@@ -19,17 +19,13 @@ import os
 import time
 import datetime
 
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
-from utils.printer_utils import get_printer
-from model.nn_models import *
-from model.nn_utils import *
-from data.preprocessing import *
-from utils.train_utils import run_standalong_training
-from utils.gpu_utils import get_available_gpu, check_cuda_id 
-from evaluation import *
-from training import *
-from _version import __version__
+from MuRaL.utils.printer_utils import get_printer
+from MuRaL.model.nn_utils import *
+from MuRaL.data.preprocessing import *
+from MuRaL.utils.train_utils import run_standalong_training
+from MuRaL.utils.gpu_utils import get_available_gpu, check_cuda_id 
+from MuRaL.evaluation import *
+from MuRaL.training import *
 
 
 from pynvml import *
@@ -55,7 +51,7 @@ def para_read_from_config(para, config):
 
 def run_transfer_pipline(args, model_type):
 
-    from training import train
+    from MuRaL.training import train
 
     start_time = time.time()
     current_time = datetime.datetime.now()
@@ -144,15 +140,15 @@ def run_transfer_pipline(args, model_type):
 
         local_radius = args.local_radius = config['local_radius']
         local_order = args.local_order = config['local_order']
-        local_hidden1_size = args.local_hidden1_size = config['local_hidden1_size']
-        local_hidden2_size = args.local_hidden2_size = config['local_hidden2_size']
+        local_hidden1_size = args.local_hidden1_size = config.get('local_hidden1_size', None) # not used in INDEL
+        local_hidden2_size = args.local_hidden2_size = config.get('local_hidden2_size', None) # not used in INDEL
         distal_radius = args.distal_radius = config['distal_radius']
         distal_order = args.distal_order = 1 # reserved for future improvement
         CNN_kernel_size = args.CNN_kernel_size = config['CNN_kernel_size']  
         CNN_out_channels = args.CNN_out_channels = config['CNN_out_channels']
-        emb_dropout = args.emb_dropout = config['emb_dropout']
+        emb_dropout = args.emb_dropout = config.get('emb_dropout', None) # not used in INDEL
         local_dropout = args.local_dropout = config['local_dropout']
-        distal_fc_dropout = args.distal_fc_dropout = config['distal_fc_dropout']
+        distal_fc_dropout = args.distal_fc_dropout = config.get('distal_fc_dropout', None) # not used in INDEL
         emb_dims = config['emb_dims']
 
         args.n_class = config['n_class']
@@ -169,8 +165,7 @@ def run_transfer_pipline(args, model_type):
 
         if not sampled_segments:
             sampled_segments = args.sampled_segments = para_read_from_config('sampled_segments', config)
-        else:
-            sampled_segments = args.sampled_segments[0]
+        use_reverse = config.get('use_reverse', False)
 
         args.seq_only = config['seq_only']
     
@@ -249,9 +244,13 @@ def run_transfer_pipline(args, model_type):
         'LR_gamma': LR_gamma[0],
         'weight_decay': weight_decay[0],
         #'weight_decay': tune.choice(weight_decay),
-        'transfer_learning': False,
+        'transfer_learning': True,
+        'emb_dims':emb_dims,
+        'train_all': train_all,
+        'init_fc_with_pretrained': init_fc_with_pretrained,
         'use_ray' : False,
-        'custom_dataloader' : custom_dataloader
+        'custom_dataloader' : custom_dataloader,
+        'use_reverse': use_reverse
         }
 
         para = False
@@ -300,7 +299,8 @@ def run_transfer_pipline(args, model_type):
         'init_fc_with_pretrained': init_fc_with_pretrained,
         'emb_dims':emb_dims,
         'use_ray' : True,
-        'custom_dataloader' : custom_dataloader
+        'custom_dataloader' : custom_dataloader,
+        'use_reverse': use_reverse
     }
     
     # Set the scheduler for parallel training 

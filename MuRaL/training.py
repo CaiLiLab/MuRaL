@@ -33,14 +33,11 @@ import datetime
 import random
 import inspect
 
-from utils.printer_utils import get_printer
-from model.nn_utils import *
-from evaluation.evaluation import *
-from data.custom_dataloader import MyDataLoader
-from data.preprocessing import *
-from model.UNet_models import UNet_Small
-from model.nn_models import *
-from model.calibration import poisson_calibrate
+from MuRaL.utils.printer_utils import get_printer
+from MuRaL.model.nn_utils import *
+from MuRaL.evaluation.evaluation import *
+from MuRaL.data.preprocessing import *
+from MuRaL.model.calibration import poisson_calibrate
 
 
 
@@ -72,18 +69,18 @@ def train(config, args, model_type, checkpoint_dir=None):
     ref_genome= args.ref_genome
     n_h5_files = args.n_h5_files
 
-    local_radius = args.local_radius
-    local_order = args.local_order
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     batch_size = args.batch_size
     ####
     sample_weights = args.sample_weights
     #ImbSampler = args.ImbSampler
-    local_dropout = args.local_dropout
+    local_radius = config['local_radius']
+    local_order = config['local_order']
+    local_dropout = config['local_dropout']
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
-    distal_fc_dropout = args.distal_fc_dropout
+    distal_fc_dropout = config['distal_fc_dropout']
     model_no = args.model_no   
     #pred_file = args.pred_file   
     optim = args.optim
@@ -120,7 +117,6 @@ def train(config, args, model_type, checkpoint_dir=None):
     bw_radii = []
     h5f_path=args.h5f_path
     use_ray = args.use_ray
-    custom_dataloader = args.custom_dataloader
     segment_workers = cpu_per_trial - 1
     print("Extral cpu used dataloadr: ", segment_workers)
 
@@ -241,16 +237,11 @@ def train(config, args, model_type, checkpoint_dir=None):
     #if not ImbSampler: 
     if sample_weights:
         print("Warning: sample_weights be dropped, the program will run with sample_weights=None!")
-    if custom_dataloader:
-        # Dataloader for train and validation
-        dataloader_train = MyDataLoader(dataset_train, config['sampled_segments'], config['batch_size'], shuffle=True, shuffle2=True, num_workers=0, pin_memory=False)
-        dataloader_valid = MyDataLoader(dataset_valid, config['sampled_segments'], config['batch_size'], shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)
-    else:
-        segmentLoader_train = DataLoader(dataset_train, 1, shuffle=True, num_workers=segment_workers, pin_memory=False)
-        dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
+    segmentLoader_train = DataLoader(dataset_train, 1, shuffle=True, num_workers=segment_workers, pin_memory=False)
+    dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
         
-        segmentLoader_valid = DataLoader(dataset_valid, 1, shuffle=False, num_workers=segment_workers, pin_memory=False)
-        dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
+    segmentLoader_valid = DataLoader(dataset_valid, 1, shuffle=False, num_workers=segment_workers, pin_memory=False)
+    dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
 
     if config['transfer_learning']:
         emb_dims = config['emb_dims']
@@ -323,6 +314,8 @@ def train(config, args, model_type, checkpoint_dir=None):
             model.distal_fc[-1].bias.requires_grad = True
 
         if not config['init_fc_with_pretrained']:
+            if model_type == 'indel':
+                sys.exit('Error: --init_fc_with_pretrained need used in commend line for INDEL, transfer learning for INDEL model need fine tune all parameters !' )
             # Re-initialize fc layers
             model.local_fc[-1].apply(weights_init)
             model.distal_fc[-1].apply(weights_init)    
@@ -428,7 +421,7 @@ def train(config, args, model_type, checkpoint_dir=None):
             y  = y.to(device)
 
             # Forward Pass
-            preds = model.forward((cont_x, cat_x), distal_x)
+            preds = model.forward((cont_x, cat_x), distal_x) if model_type == 'snv' else model.forward(distal_x)
             loss = criterion(preds, y.long().squeeze())
             optimizer.zero_grad()
             loss.backward()
@@ -472,7 +465,7 @@ def train(config, args, model_type, checkpoint_dir=None):
             #print('model.conv1.0.weight.grad:', model.conv1.0.weight)
             save_path = get_save_path(args.use_ray, args.trial_dir, epoch)
 
-            valid_pred_y, valid_total_loss = model_predict_m(model, dataloader_valid, criterion, device, n_class, distal=True)
+            valid_pred_y, valid_total_loss = model_predict_m(model, dataloader_valid, criterion, device, n_class, distal=True, model_type=model_type)
 
             valid_y_prob = pd.DataFrame(data=to_np(F.softmax(valid_pred_y, dim=1)), columns=prob_names)
             
@@ -566,12 +559,11 @@ def train(config, args, model_type, checkpoint_dir=None):
         sys.stdout.flush()
 
         
-        if not custom_dataloader:
-            dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
-            dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
+        dataloader_train = generate_data_batches(segmentLoader_train, config['sampled_segments'], config['batch_size'], shuffle=True)
+        dataloader_valid = generate_data_batches(segmentLoader_valid, config['sampled_segments'], config['batch_size'], shuffle=False)
 
 
-    print(f"dital_radius: {distal_radius} training finish, {epoch} epochs total time:{time.time()-start_time} min!")
+    print(f"dital_radius: {distal_radius} training finish, {epoch} epochs total time:{time.time()-start_time} seconds!")
     best_epoch = epoch - early_stopping.counter
     print(f"Best Epoch: {best_epoch}")
 

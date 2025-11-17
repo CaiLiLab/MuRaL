@@ -42,7 +42,7 @@ class CombinedDatasetBatch(Dataset):
         return self.y[index], self.cont_X, self.cat_X[index], self.batch_distal[index]
     
 
-class MyDataLoader(DataLoader):
+class SnvDataLoader(DataLoader):
     def __init__(self, dataset, 
                  batch_size, batch_size2,
                  shuffle = None,shuffle2=None,

@@ -7,8 +7,8 @@ import torch.nn.functional as F
 import sys
 
 import inspect
-from .UNet_models import UNet_Small
-from .nn_models import *
+from MuRaL.model.model_indel import UNet_Small
+from MuRaL.model.model_snv import *
 
 
 def weights_init(m):
@@ -34,7 +34,7 @@ def weights_init(m):
                 if 'weight' in p:
                     torch.nn.init.xavier_uniform_(m.__getattr__(p))
 
-def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
+def model_predict_m(model, dataloader, criterion, device, n_class, distal=True, model_type='snv'):
     """Do model prediction using dataloader"""
     import time
     model.to(device)
@@ -51,11 +51,14 @@ def model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
             cont_x = cont_x.to(device)
             distal_x = distal_x.to(device)
             y  = y.to(device)
-        
-            if distal:
-                preds = model.forward((cont_x, cat_x), distal_x)
+
+            if model_type == 'snv':
+                if distal:
+                    preds = model.forward((cont_x, cat_x), distal_x)
+                else:
+                    preds = model.forward(cont_x, cat_x)
             else:
-                preds = model.forward(cont_x, cat_x)
+                preds = model.forward(distal_x)
             pred_y = torch.cat((pred_y, preds), dim=0)
                 
             loss = criterion(preds, y.long().squeeze(1))
@@ -117,7 +120,7 @@ class EarlyStopping:
 
 
 
-def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class, distal=True):
+def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class, distal=True, model_type='snv'):
     """Do model prediction using dataloader"""
     import time
     model.to(device)
@@ -145,11 +148,15 @@ def run_time_view_model_predict_m(model, dataloader, criterion, device, n_class,
             cont_x = cont_x.to(device)
             distal_x = distal_x.to(device)
             y  = y.to(device)
-        
-            if distal:
-                preds = model.forward((cont_x, cat_x), distal_x)
+
+            if model_type == 'snv':
+                if distal:
+                    preds = model.forward((cont_x, cat_x), distal_x)
+                else:
+                    preds = model.forward(cont_x, cat_x)
             else:
-                preds = model.forward(cont_x, cat_x)
+                preds = model.forward(distal_x)
+
             pred_y = torch.cat((pred_y, preds), dim=0)
                 
             loss = criterion(preds, y.long().squeeze(1))
@@ -193,7 +200,8 @@ def model_choice(model_no, config, common_model_config, model_type):
             mapping_rules = {
                 'out_channels': config['CNN_out_channels'],
                 'kernel_size': config['CNN_kernel_size'],
-                'downsize': config['down_list']
+                'downsize': config['down_list'],
+                'use_reverse' : config.get('use_reverse', False) # default False to maintain backward compatibility for deletion models for deletion models.
             }
         
         if para in mapping_rules:

@@ -8,6 +8,9 @@ def add_common_predict_parser(
     """
     Add common arguments for all prediction parsers.
     """
+
+    predict_parser.set_defaults(func='predict')
+
     # Define argument groups
     predict_optional = predict_parser._action_groups.pop()
     predict_required = predict_parser.add_argument_group("Predict Required arguments")
@@ -55,12 +58,7 @@ def add_common_predict_parser(
                                   features such as the coverage track. Default: None.""").strip())
 
     predict_optional.add_argument('--n_h5_files', metavar='INT', default=1, 
-                                  help=textwrap.dedent("""
-                                  Number of HDF5 files for each BED file. When the BED file has many
-                                  positions and the distal radius is large, increasing the value for 
-                                  --n_h5_files files can reduce the time for generating HDF5 files.
-                                  Default: 1.
-                                  """ ).strip())
+                                  help=argparse.SUPPRESS)
     
     predict_optional.add_argument('--pred_time_view', default=False, action='store_true',  
                                   help=textwrap.dedent("""
@@ -68,13 +66,10 @@ def add_common_predict_parser(
                                   """).strip())
     
     predict_optional.add_argument('--with_h5', default=False, action='store_true',  
-                                  help=textwrap.dedent("""
-                                  Generate HDF5 file for the BED file. Default: False.
-                                  """).strip())
+                                  help=argparse.SUPPRESS)
 
     predict_optional.add_argument('--h5f_path', type=str, default=None,
-                                  help=textwrap.dedent("""
-                                  Specify the folder to generate HDF5. Default: Folder containing the BED file.""").strip())
+                                  help=argparse.SUPPRESS)
 
     predict_optional.add_argument('--cpu_only', default=False, action='store_true',  
                                   help=textwrap.dedent("""
@@ -156,6 +151,8 @@ def add_indel_predict_parser(subparsers: argparse._SubParsersAction) -> None:
 
     Command line examples
     ---------------------
+    All files are located in: example/indel
+
     1. The following command will predict INDEL rates for all sites in 
     'testing.bed.gz' using model files under the 'checkpoint_6/' folder 
     and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. For most
@@ -164,11 +161,11 @@ def add_indel_predict_parser(subparsers: argparse._SubParsersAction) -> None:
     If the input BED file has many sites (e.g. many millions), it is recommended 
     to spilt it into smaller files (e.g. 1 million each) for parallel processing.
     
-        mural_predict --ref_genome seq.fa --test_data testing.bed.gz \\
-        --model_path checkpoint_6/model \\
-        --model_config_path checkpoint_6/model.config.pkl \\
-        --calibrator_path checkpoint_6/model.fdiri_cal.pkl \\
-        --pred_file testing.ckpt6.fdiri.tsv.gz \\
+        mural_indel predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \\
+        --model_path models/checkpoint_9/model \\
+        --model_config_path models/checkpoint_9/model.config.pkl \\
+        --calibrator_path models/checkpoint_9/model.fdiri_cal.pkl \\
+        --pred_file testing.ckpt9.fdiri.tsv.gz \\
         --cpu_only \\
         > test.out 2> test.err
     """)
@@ -217,6 +214,8 @@ def add_snv_predict_parser(subparsers: argparse._SubParsersAction) -> None:
 
     Command line examples
     ---------------------
+    All files are located in: example/snv
+
     1. The following command will predict mutation rates for all sites in 
     'testing.bed.gz' using model files under the 'checkpoint_6/' folder 
     and save prediction results into 'testing.ckpt6.fdiri.tsv.gz'. For most
@@ -225,11 +224,11 @@ def add_snv_predict_parser(subparsers: argparse._SubParsersAction) -> None:
     If the input BED file has many sites (e.g. many millions), it is recommended 
     to spilt it into smaller files (e.g. 1 million each) for parallel processing.
     
-        mural_predict --ref_genome seq.fa --test_data testing.bed.gz \\
-        --model_path checkpoint_6/model \\
-        --model_config_path checkpoint_6/model.config.pkl \\
-        --calibrator_path checkpoint_6/model.fdiri_cal.pkl \\
-        --pred_file testing.ckpt6.fdiri.tsv.gz \\
+        mural_snv predict --ref_genome data/seq.fa --test_data data/testing.bed.gz \\
+        --model_path models/checkpoint_6/model \\
+        --model_config_path models/checkpoint_6/model.config.pkl \\
+        --calibrator_path models/checkpoint_6/model.fdiri_cal.pkl \\
+        --pred_file models/testing.ckpt6.fdiri.tsv.gz \\
         --cpu_only \\
         > test.out 2> test.err
     """)

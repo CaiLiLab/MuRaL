@@ -1,3 +1,11 @@
+1.2.0
+-----
+- add new module `mural_indel` for predicting INDEL mutation rate
+- implemented separate entry points for SNV and INDEL tools:
+  * `mural_snv` for SNV predictions
+  * `mural_indel` for INDEL predictions
+- updated documentation to reflect new usage patterns
+
 1.1.2
 -----
 - use a new preprocessing strategy (segmenting the genome and more effective I/O operations)

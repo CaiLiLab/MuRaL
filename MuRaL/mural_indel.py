@@ -3,25 +3,25 @@ import sys
 import argparse
 import textwrap
 
-from _version import __version__
+from ._version import __version__
 
 # import commands
-from commands.train import add_indel_train_parser
-from commands.predict import add_indel_predict_parser
-from commands.transfer import add_indel_transfer_parser
-from commands.evaluate import add_indel_eval_parser
-from commands.scale import add_indel_scale_parser, add_indel_calc_scaling_factor_parser
-from commands.get_best_model import add_indel_get_best_model_parser
+from .commands.train import add_indel_train_parser
+from .commands.predict import add_indel_predict_parser
+from .commands.transfer import add_indel_transfer_parser
+from .commands.evaluate import add_indel_eval_parser
+from .commands.scale import add_indel_scale_parser, add_indel_calc_scaling_factor_parser
+from .commands.get_best_model import add_indel_get_best_model_parser
 
 # import scripts
-from scripts.run_train_raytune import run_train_pipline
-from scripts.run_predict import run_predict_pipline
-from scripts.run_train_TL_raytune import run_transfer_pipline
-from scripts.calc_kmer_corr import run_kmer_corr_calc
-from scripts.calc_regional_corr import run_regional_corr_calc
-from scripts.calc_motif_corr import run_motif_corr_calc
-from scripts.scaling import scaling_files, calc_mu_scaling_factor
-from scripts.get_best_model import get_best_model
+from .scripts.run_train_raytune import run_train_pipline
+from .scripts.run_predict import run_predict_pipline
+from .scripts.run_train_TL_raytune import run_transfer_pipline
+from .scripts.calc_kmer_corr import run_kmer_corr_calc
+from .scripts.calc_regional_corr import run_regional_corr_calc
+from .scripts.calc_motif_corr import run_motif_corr_calc
+from .scripts.scaling import scaling_files, calc_mu_scaling_factor
+from .scripts.get_best_model import get_best_model
 
 class ArgumentParser(argparse.ArgumentParser):
     def error(self, message):

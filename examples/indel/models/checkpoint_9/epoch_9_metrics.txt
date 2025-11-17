@@ -1,0 +1,5 @@
+loss: 0.38471463974157694
+fdiri_loss: 0.38165712926950945
+after_min_loss: 0
+score: 104.31676371935251
+total_params: 2237384

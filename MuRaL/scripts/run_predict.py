@@ -20,15 +20,11 @@ import os
 import time
 import datetime
 
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
-from model.nn_models import *
-from model.nn_utils import *
-from model.calibration import poisson_calibrate
-from data.preprocessing import *
-from evaluation.evaluation import *
-from utils.gpu_utils import get_available_gpu, check_cuda_id 
-from _version import __version__
+from MuRaL.model.nn_utils import *
+from MuRaL.model.calibration import poisson_calibrate
+from MuRaL.data.preprocessing import *
+from MuRaL.evaluation.evaluation import *
+from MuRaL.utils.gpu_utils import get_available_gpu, check_cuda_id 
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
@@ -200,19 +196,15 @@ def run_predict_pipline(args, model_type='snv'):
     # Set prob names for mutation types
     prob_names = ['prob'+str(i) for i in range(n_class)]
 
-    # Dataloader for testing data    
-    # if custom_dataloader:
-        # dataloader = MyDataLoader(dataset_test, sampled_segments, batch_size2=pred_batch_size, shuffle=False, shuffle2=False, num_workers=0, pin_memory=False)   
-    
     segmentLoader_test = DataLoader(dataset_test, 1, shuffle=False, pin_memory=False)
     dataloader= generate_data_batches(segmentLoader_test, sampled_segments, pred_batch_size, shuffle=False)
         
 
     # Do the prediction
     if not args.pred_time_view:
-        pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
+        pred_y, test_total_loss = model_predict_m(model, dataloader, criterion, device, n_class, distal=True, model_type=model_type)
     else:
-        pred_y, test_total_loss = run_time_view_model_predict_m(model, dataloader, criterion, device, n_class, distal=True)
+        pred_y, test_total_loss = run_time_view_model_predict_m(model, dataloader, criterion, device, n_class, distal=True, model_type=model_type)
     # Print some data for debugging
     print('pred_y:', F.softmax(pred_y[1:10], dim=1))
     for i in range(1, n_class):

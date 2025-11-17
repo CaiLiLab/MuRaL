@@ -17,9 +17,7 @@ from Bio.Seq import reverse_complement
 from scipy.stats import pearsonr
 import numpy as np
 
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
-from data.preprocessing import get_expanded_region
+from MuRaL.data.preprocessing import get_expanded_region
 from typing import Dict, Any
 
 def parse_arguments():

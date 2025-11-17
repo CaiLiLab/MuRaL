@@ -36,16 +36,12 @@ import time
 import datetime
 import random
 
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
-from utils.printer_utils import get_printer
-from model.nn_models import *
-from model.nn_utils import *
-from data.preprocessing import *
-from evaluation.evaluation import *
-from utils.train_utils import run_standalong_training
-from utils.gpu_utils import get_available_gpu, check_cuda_id 
-from _version import __version__
+from MuRaL.utils.printer_utils import get_printer
+from MuRaL.model.nn_utils import *
+from MuRaL.data.preprocessing import *
+from MuRaL.evaluation.evaluation import *
+from MuRaL.utils.train_utils import run_standalong_training
+from MuRaL.utils.gpu_utils import get_available_gpu, check_cuda_id 
 
 import textwrap
 #from torch.utils.tensorboard import SummaryWriter
@@ -56,7 +52,7 @@ def run_train_pipline(args, model_type):
     according args.modle = SNV or Indel choice train func
     """
 
-    from training import train
+    from MuRaL.training import train
     
     #args = parse_arguments(parser)
     train = partial(train, model_type=model_type)
@@ -94,18 +90,14 @@ def run_train_pipline(args, model_type):
     
     sampled_segments = args.sampled_segments
     segment_center = args.segment_center
-    local_radius = args.local_radius
-    local_order = args.local_order
-    local_hidden1_size = args.local_hidden1_size
-    local_hidden2_size = args.local_hidden2_size
+
+    snv_specify_para = ['local_hidden1_size', 'local_hidden2_size', 'emb_dropout', 'distal_fc_dropout', 'local_dropout']
+
     distal_radius = args.distal_radius  
     distal_order = args.distal_order
     batch_size = args.batch_size 
-    emb_dropout = args.emb_dropout
-    local_dropout = args.local_dropout
     CNN_kernel_size = args.CNN_kernel_size   
     CNN_out_channels = args.CNN_out_channels
-    distal_fc_dropout = args.distal_fc_dropout
     model_no = args.model_no   
     #pred_file = args.pred_file 
     sample_weights = args.sample_weights
@@ -192,18 +184,10 @@ def run_train_pipline(args, model_type):
     if not use_ray:
         print("Ray not used in model training !")
         config = {
-        'local_radius': local_radius[0],
         'segment_center': segment_center,
-        'local_order': local_order[0],
-        'local_hidden1_size': local_hidden1_size[0],
-        #'local_hidden2_size': tune.choice(local_hidden2_size),
-        'local_hidden2_size': local_hidden2_size[0] if local_hidden2_size[0]>0 else local_hidden1_size[0]//2, # default local_hidden2_size = local_hidden1_size//2
         'distal_radius': distal_radius[0],
-        'emb_dropout': emb_dropout[0],
-        'local_dropout': local_dropout[0],
         'CNN_kernel_size': CNN_kernel_size[0],
         'CNN_out_channels': CNN_out_channels[0],
-        'distal_fc_dropout': distal_fc_dropout[0],
         'batch_size': batch_size[0],
         'sampled_segments': sampled_segments[0],
         'learning_rate': learning_rate[0],
@@ -217,6 +201,25 @@ def run_train_pipline(args, model_type):
         'use_ray' : False,
         'custom_dataloader' : args.custom_dataloader 
     }
+
+        if model_type == 'snv':
+            config.update({
+                'local_radius': args.local_radius[0],
+                'local_order': args.local_order[0],
+                'local_hidden1_size': args.local_hidden1_size[0],
+                'local_hidden2_size': args.local_hidden2_size[0] if args.local_hidden2_size[0] > 0 else args.local_hidden1_size[0] // 2,
+                'emb_dropout': args.emb_dropout[0],
+                'distal_fc_dropout': args.distal_fc_dropout[0],
+                'local_dropout': args.local_dropout[0]
+                })
+        else:
+            config.update({key: None for key in snv_specify_para})
+            config.update({
+                'local_radius': 6,
+                'local_order' : 1,
+                'use_reverse': args.use_reverse
+            })
+
         para=False
         run_standalong_training(train, n_trials, config, args,para)
         #train(config, args)
@@ -241,18 +244,10 @@ def run_train_pipline(args, model_type):
 
     # Configure the search space for relavant hyperparameters
     config = {
-        'local_radius': tune.choice(local_radius),
         'segment_center': segment_center,
-        'local_order': tune.choice(local_order),
-        'local_hidden1_size': tune.choice(local_hidden1_size),
-        #'local_hidden2_size': tune.choice(local_hidden2_size),
-        'local_hidden2_size': tune.choice(local_hidden2_size) if local_hidden2_size[0]>0 else tune.sample_from(lambda spec: spec.config.local_hidden1_size//2), # default local_hidden2_size = local_hidden1_size//2
         'distal_radius': tune.choice(distal_radius),
-        'emb_dropout': tune.choice(emb_dropout),
-        'local_dropout': tune.choice(local_dropout),
         'CNN_kernel_size': tune.choice(CNN_kernel_size),
         'CNN_out_channels': tune.choice(CNN_out_channels),
-        'distal_fc_dropout': tune.choice(distal_fc_dropout),
         'batch_size': tune.choice(batch_size),
         'sampled_segments': tune.choice(sampled_segments),
         'learning_rate': tune.loguniform(learning_rate[0], learning_rate[1]),
@@ -267,7 +262,24 @@ def run_train_pipline(args, model_type):
         'use_ray' : True,
         'custom_dataloader' : args.custom_dataloader
     }
-    
+
+    if model_type == 'snv':
+        config.update({
+            'local_radius': tune.choice(args.local_radius),
+            'local_order': tune.choice(args.local_order),
+            'local_hidden1_size': tune.choice(args.local_hidden1_size),
+            'local_hidden2_size': tune.choice(args.local_hidden2_size) if args.local_hidden2_size > 0 else tune.sample_from(lambda spec: spec.config.local_hidden1_size // 2),
+            'emb_dropout': tune.choice(args.emb_dropout),
+            'distal_fc_dropout': tune.choice(args.distal_fc_dropout),
+            'local_dropout': tune.choice(args.local_dropout)
+            })
+    else:
+        config.update({key: None for key in snv_specify_para})
+        config.update({
+            'local_radius': 6,
+            'local_order' : 1,
+            'use_reverse': args.use_reverse
+            })
 
     # Set the scheduler for parallel training 
     scheduler = ASHAScheduler(
@@ -307,7 +319,3 @@ def run_train_pipline(args, model_type):
         ray.shutdown() 
 
     print('Total time used: %s seconds' % (time.time() - start_time))
-if __name__ == '__main__':
-    main()
-
-

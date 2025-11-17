@@ -132,7 +132,7 @@ def add_indel_eval_parser(subparsers: argparse._SubParsersAction) -> argparse._S
 
       Command line examples
       ---------------------
-       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --window 100000 --model prob2 --regional_only --out_prefix test_region_corr
+       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --window_size 100000 prob2 --regional_only --out_prefix test_region_corr
 
       """)
       )
@@ -246,7 +246,7 @@ def add_snv_eval_parser(subparsers: argparse._SubParsersAction) -> argparse._Sub
 
       Command line examples
       ---------------------
-       mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --window 100000 --model prob2 --regional_only --out_prefix test_region_corr
+       mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --window_size 100000 --regional_only --out_prefix test_region_corr
 
       """)
       )

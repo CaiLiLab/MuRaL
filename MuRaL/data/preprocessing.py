@@ -416,11 +416,11 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, ce
         #categorical_features  = ['cat'+str(i+1) for i in range(cat_n)]
         categorical_features  = get_local_header(local_radius, local_order=local_order, model_type=model_type)
         local_seq_cat2 = pd.concat(local_seq_cat2,keys=range(len(local_seq_cat2)))
-        local_seq_cat2 = pd.concat([local_seq_cat, local_seq_cat2], axis=1)
+        local_seq_cat = pd.concat([local_seq_cat, local_seq_cat2], axis=1)
     else:
         categorical_features = seq_cols
     
-    print('local_seq_cat2 shape and columns:', local_seq_cat2.shape, local_seq_cat2.columns)
+    print('local_seq_cat shape and columns:', local_seq_cat.shape, local_seq_cat.columns)
     print('categorical_features:', categorical_features)
     
     # The 'score' field in the BED file stores the label/class information
@@ -431,9 +431,9 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, ce
     if len(bw_files) > 0 and seq_only == False:
         # Use the mean value of the region of 2*radius+1 bp around the focal site
         bw_data = get_mean_bw_for_bed(bw_files, bw_names, bw_radii, bed_regions)
-        data_local = pd.concat([local_seq_cat2, bw_data, y], axis=1)
+        data_local = pd.concat([local_seq_cat, bw_data, y], axis=1)
     else:
-        data_local = pd.concat([local_seq_cat2, y], axis=1)
+        data_local = pd.concat([local_seq_cat, y], axis=1)
 
     return data_local, seq_cols, categorical_features, output_feature
 
@@ -553,13 +553,19 @@ def get_expanded_region(start, stop, radius, model_type='snv'):
         >>> get_expanded_region(100, 120, 10, 'indel')
         (91, 130)  # [91,130] contains original [100,120]
     """
+    return extend_interval(start, stop, radius, radius, model_type=model_type)
+
+
+def extend_interval(start, stop, left_radius, right_radius, model_type='snv'):
     if model_type == 'snv':
-        start1 = start - radius
-        stop1 = stop + radius
+        start1 = start - left_radius
+        stop1 = stop + right_radius
+    # 0-base [left,right]
     if model_type == 'indel':
-        start1 = start - radius + 1
-        stop1 = stop + radius
+        start1 = start - left_radius + 1
+        stop1 = stop + right_radius # start + 1 + right_radius or stop-2 + right_radius
     return start1, stop1
+    # return start1-1, stop1-1 # tmp, used for bed-format 1base files
 
 
 def get_seqs_to_digitalized(long_seq, regions, radius, seq_strand, model_type='snv'):
