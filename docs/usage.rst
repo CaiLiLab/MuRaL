@@ -7,7 +7,7 @@ substantially across the genome, but existing methods can only obtain
 very rough estimates of local mutation rates and are difficult to be
 applied to non-model species.
 
-**MuRaL** (short for **Mu** tation **Ra** te **L** earner), is a 
+**MuRaL** (short for **Mu**\ tation **Ra**\ te **L**\ earner), is a 
 generalizable deep learning framework for mutation rate estimation. 
 
 Framework Components
