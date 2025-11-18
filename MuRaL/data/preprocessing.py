@@ -437,22 +437,22 @@ def prepare_local_data(bed_regions, ref_genome, bw_files, bw_names, bw_radii, ce
 
     return data_local, seq_cols, categorical_features, output_feature
 
-def local_digitalized_seqs_by_region(bed_regions, seq_records, central_bp, local_radius, local_order=1, model_type='snv'):
+def local_digitalized_seqs_by_region(bed_regions, seq_records, segment_central, local_radius, local_order=1, model_type='snv'):
 
     if 'items' not in dir(seq_records):
         _ = type(seq_records)
         sys.exit(f'seq_records need be dict, but input is {_} !')
     
     #cat_n = local_radius*2 +1 - (local_order-1) 
-    outlier_process = preocess_local_seq_outlier(local_order, local_radius, model_type=model_type)
+    outlier_process = process_local_seq_outlier(local_order, local_radius, model_type=model_type)
 
     seq_cols = get_local_header(local_radius, local_order=local_order, model_type=model_type)
     
-    bed_generator = bed_reader(bed_regions, central_bp)
+    bed_generator = bed_reader(bed_regions, segment_central)
     digit_dataset = []
     y = []
     init = False
-    for batch,stand in bed_generator:
+    for batch,strand in bed_generator:
         if not init:
             chrom = batch[0].chrom
             long_seq = str(seq_records[chrom].seq)
@@ -464,7 +464,7 @@ def local_digitalized_seqs_by_region(bed_regions, seq_records, central_bp, local
         
         #batch_local_encoding = np.empty((len(batch),cat_n), dtype=np.int64)
         batch_local_encoding = np.empty((len(batch), len(seq_cols)), dtype=np.int64)
-        seqs = get_seqs_to_digitalized(long_seq, batch, local_radius, stand, model_type=model_type)
+        seqs = get_seqs_to_digitalized(long_seq, batch, local_radius, strand, model_type=model_type)
         digit_seqs = local_encoding_seqs(long_seq, seqs, local_radius, batch_local_encoding, local_order=local_order, model_type=model_type)
         digit_seqs = outlier_process(digit_seqs)
         digit_dataset.append(pd.DataFrame(digit_seqs,columns=seq_cols))
@@ -489,7 +489,7 @@ def process_local_seq_indel(local_seq_cat,local_radius):
    # preprocess outlier
     return np.where(local_seq_cat>=0, local_seq_cat, 0)
 
-def preocess_local_seq_outlier(local_order,local_radius, model_type='snv'):
+def process_local_seq_outlier(local_order,local_radius, model_type='snv'):
     """
     Generate a function to process local sequence outliers based on the given local order and radius.
 

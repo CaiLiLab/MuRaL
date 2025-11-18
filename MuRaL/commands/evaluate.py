@@ -16,8 +16,6 @@ def add_common_eval_parser(
     # Add required arguments
     eval_required.add_argument('--pred_file', required=True, type=str, help='Predicted file')
 
-    eval_required.add_argument('--ref_genome', required=True, type=str, help='Reference genome FASTA file')
-
     eval_required.add_argument('--out_prefix', default='result', type=str, help='Output filename prefix')
 
     eval_required.add_argument('--kmer_only', default=False, action='store_true', help=textwrap.dedent("""
@@ -32,6 +30,9 @@ def add_common_eval_parser(
         help=argparse.SUPPRESS)
 
     # Add kmer-related arguments, PASS
+    eval_kmer_parser.add_argument('--ref_genome', required=False, default=None, type=str, help=textwrap.dedent("""
+        Reference genome FASTA file, must be provided when evaluating k-mer correlation.
+        """).strip())
 
     # Add regional-related arguments
     eval_regional_parser.add_argument('--window_size', type=int, default=100000, help=textwrap.dedent("""

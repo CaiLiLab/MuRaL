@@ -34,7 +34,7 @@ Predicted indel mutation rate maps for these genomes are available at [ScienceDB
 ### 4. Citation <a name="Citation"></a>
 Fang Y, Deng S, Li C. A generalizable deep learning framework for inferring fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022) [doi:10.1038/s42256-022-00574-5](https://doi.org/10.1038/s42256-022-00574-5)
 
-Deng S, Song H, Li C. A deep learning framework for building INDEL mutation rate maps. *bioarxiv* (2025) []()
+Deng S, Song H, Li C. A deep learning framework for building INDEL mutation rate maps. *bioRxiv* (2025) []()
 
 ### 5. Contact <a name="Contact"></a>
 For reporting issues or requests related to the package, please use GitHub Issues or write to mural-project@outlook.com.

@@ -54,14 +54,14 @@ INDEL Rate Prediction (*H. sapiens*)
 
 Below is an example showing that MuRaL-indel predicted each one-bp insertion mutation rate
 
-.. image:: images/overview.jpg
+.. image:: images/INDEL_predict_overview.jpg
       :width: 500px
 
 Below is an example showing that MuRaL-indel predicted rates (colored lines)
 are highly correlated with observed mutation rates (grey shades) at
 different scales on Chr20 of *H. sapiens*.
 
-.. image:: images/regional_correlation_example.jpg
+.. image:: images/INDEL_regional_correlation_example.jpg
       :width: 500px
 
 
@@ -83,8 +83,8 @@ MuRaL-indel Architecture
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The MuRaL-indel network architecture employs a U-Net based CNN structure (shown below) 
-that processes long sequence contexts around potential indel breakpoints. 
-The model takes one-hot encoded DNA sequences as input and outputs probabilities for different indel lengths (including no mutation).
+that processes long sequence contexts around potential INDEL breakpoints. 
+The model takes one-hot encoded DNA sequences as input and outputs probabilities for different INDEL lengths (including no mutation).
 The U-Net consists of symmetrical downsampling and upsampling paths connected through skip connections, 
 with residual blocks and convolutional layers at each scale to extract hierarchical features.
 
@@ -199,7 +199,7 @@ MuRaL-snv
    * - ``mural_snv train``
      - Train new mutation rate models from scratch
    * - ``mural_snv get_best_model``
-     - Find the best snv rate model from trial results (requires 'progress.csv') 
+     - Find the best SNV rate model from trial results (requires 'progress.csv') 
    * - ``mural_snv transfer``
      - Fine-tune models using transfer learning
    * - ``mural_snv predict``
@@ -219,19 +219,19 @@ MuRaL-indel
    :header-rows: 0
 
    * - ``mural_indel train``
-     - Train new indel rate models
+     - Train new INDEL rate models
    * - ``mural_indel get_best_model``
-     - Find the best indel rate model from trial results (requires 'progress.csv') 
+     - Find the best INDEL rate model from trial results (requires 'progress.csv') 
    * - ``mural_indel transfer``
-     - Apply transfer learning for indel models
+     - Apply transfer learning for INDEL models
    * - ``mural_indel predict``
-     - Predict indel mutation rates
+     - Predict INDEL mutation rates
    * - ``mural_indel evaluate``
-     - Evaluate indel model performance
+     - Evaluate INDEL model performance
    * - ``mural_indel calc_scaling_factor``
      - Calculate scaling factors
    * - ``mural_indel scale``
-     - Scale indel rate predictions
+     - Scale INDEL rate predictions
 
 Model training
 --------------
@@ -382,7 +382,7 @@ but with two key differences:
 
 * Uses larger default context window (``--distal_radius 4000``) to improve INDEL prediction accuracy
   while maintaining reasonable computational requirements
-* Enables Poisson rate calibration (``--poisson_calibration``) specifically for INDEL mutation rate
+* Enables Poisson rate calibration (``--poisson_calib``) specifically for INDEL mutation rate
   estimation
 
 .. code-block:: bash
@@ -390,14 +390,14 @@ but with two key differences:
    # serially running two trials (default)
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
-               --poisson_calibration \
+               --poisson_calib \
                --experiment_name example1 > test1.out 2> test1.err
 
    # parallelly running two trials using Ray, with 3 CPUs each trial (6 requested CPUs in total)
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
                --use_ray --ray_ncpus 6 --cpu_per_trial 3 --experiment_name example1 \
-               --poisson_calibration \
+               --poisson_calib \
                --experiment_name example1 > test1.out 2> test1.err
 
 .. note::
@@ -445,7 +445,7 @@ under the 'examples/' folder in the package.
               --validation_data indel/data/validation.sorted.bed \
               --n_trials 2 \
               --distal_radius 4000 --experiment_name example2 \
-              --poisson_calibration \
+              --poisson_calib \
               > test2.out 2> test2.err
 
 Example 3: Training acceleration
@@ -465,7 +465,7 @@ The following example demonstrates using 3 extra CPUs to acceleration data loadi
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
                --cpu_per_trial 4 \
-               --poisson_calibration \
+               --poisson_calib \
                --experiment_name example3 > test3.out 2> test3.err
 
 Example 4: Training with limited resources
@@ -514,7 +514,7 @@ MuRaL-snv
               --n_trials 2 --local_radius 7 \
               --batch_size 64
               --distal_radius 64000 --experiment_name example4 \
-              --poisson_calibration \
+              --poisson_calib \
               > test4.out 2> test4.err
 
 MuRaL-indel
@@ -538,7 +538,7 @@ MuRaL-indel
               --n_trials 2 --local_radius 7 \
               --batch_size 64
               --distal_radius 64000 --experiment_name example4 \
-              --poisson_calibration \
+              --poisson_calib \
               > test4.out 2> test4.err
 
 .. note::
@@ -623,7 +623,7 @@ using model from 'snv/models/checkpoint_6/':
 
 MuRaL-indel
 ^^^^^^^^^^^^
-Includes Poisson rate calibration (``--poisson_calibration``) for INDEL predictions:
+Includes Poisson rate calibration (``--poisson_calib``) for INDEL predictions:
 
 .. code-block:: bash
 
@@ -631,7 +631,7 @@ Includes Poisson rate calibration (``--poisson_calibration``) for INDEL predicti
                     --model_path indel/models/checkpoint_9/model \
                     --model_config_path indel/models/checkpoint_9/model.config.pkl \
                     --calibrator_path indel/models/checkpoint_9/model.fdiri_cal.pkl \
-                    --poisson_calibration \
+                    --poisson_calib \
                     --pred_file testing.ckpt9.fdiri.tsv.gz \
                     --cpu_only > test5.out 2> test5.err
 
@@ -1011,7 +1011,7 @@ rate.
 
 :: 
 
- mural_snv calc_snv_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
+ mural_snv calc_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
  --m_proportions 0.355 --g_proportions 0.475 > scaling_factor.out
  
  # Output file 'scaling_factor.out' may look like the following:
@@ -1068,7 +1068,7 @@ To calculate the scaling factor, we need to have the predicted mutation rates fo
 a set of representative sites based on a trained model. It is recommended to use
 the validation sites at the training step whose size is relatively small and 
 representative enough. For instance, the following command is for obtaining 
-predicted mutation rates for validation sites of the indel model.
+predicted mutation rates for validation sites of the INDEL model.
 
 ::
  
@@ -1139,6 +1139,9 @@ Citation
 Fang Y, Deng S, Li C. A generalizable deep learning framework for inferring 
 fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
 `doi:10.1038/s42256-022-00574-5 <https://doi.org/10.1038/s42256-022-00574-5>`__
+
+Deng S, Song H, Li C. A deep learning framework for building INDEL mutation rate maps. *bioRxiv* (2025) 
+`doi:`
 
 Contact
 -------

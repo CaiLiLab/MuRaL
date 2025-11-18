@@ -194,6 +194,7 @@ def write_output_files(args, df: pd.DataFrame,
 def run_kmer_corr_calc(args, model_type:'str') -> None:
     """Main processing pipeline"""
 
+    assert args.ref_genome is not None, "--ref_genome is required for k-mer correlation calculation"
     n_class = args.n_class
     kmer_mut_saver = KmerMutSaver(n_class)
     current_chrom = None
