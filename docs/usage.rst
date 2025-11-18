@@ -7,7 +7,7 @@ substantially across the genome, but existing methods can only obtain
 very rough estimates of local mutation rates and are difficult to be
 applied to non-model species.
 
-**MuRaL** (short for **Mu**\ tation **Ra**\ te **L**\ earner), is a 
+**MuRaL** (short for **Mu** tation **Ra** te **L** earner), is a 
 generalizable deep learning framework for mutation rate estimation. 
 
 Framework Components
@@ -106,7 +106,7 @@ Prerequisites
 ~~~~~~~~~~~~~
 
 1. Install `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`__ (version 3+)
-2. Clone/download MuRaL source code and navigate to 'MuRal-xxx/' directory
+2. Clone/download MuRaL source code and navigate to 'MuRaL-xxx/' directory
 
 System Requirements
 ~~~~~~~~~~~~~~~~~~~~~
@@ -336,9 +336,9 @@ Example:
 
 .. code-block:: text
 
-./results/your_experiment_name/Train_zoq97_00000/checkpoint_8   0.401637  # ← Best model (lowest loss)
-./results/your_experiment_name/Train_zoq97_00002/checkpoint_8   0.407693
-./results/your_experiment_name/Train_zoq97_00001/checkpoint_6   0.445094
+    ./results/your_experiment_name/Train_zoq97_00000/checkpoint_8   0.401637  # ← Best model (lowest loss)
+    ./results/your_experiment_name/Train_zoq97_00002/checkpoint_8   0.407693
+    ./results/your_experiment_name/Train_zoq97_00001/checkpoint_6   0.445094
 
 Example 1: Basic Training
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -361,19 +361,18 @@ this example under the 'examples/' folder in the package.
                --experiment_name example1 > test1.out 2> test1.err
 
    # parallelly running two trials using Ray, with 3 CPUs each trial (6 requested CPUs in total)
-   mural_snv train --ref_genome data/seq.fa --train_data data/training.sorted.bed \
+   mural_snv train --ref_genome snv/data/seq.fa --train_data snv/data/training.sorted.bed \
                --use_ray --ray_ncpus 6 --cpu_per_trial 3 --experiment_name example1 \
                > test1.out 2> test1.err
    
 .. note::
-
   If your machine has sufficient resources to execute multiple trials in parallel, 
   it is recommended to add the ``--use_ray`` option. Using Ray allows for better resource 
   scheduling. If running multiple trials serially or running only a single trial (set ``--n_trials 1``), 
   it is recommended not to use ``--use_ray``, which can improve the runtime speed by approximately 
   2-3 times for each trial.
 
-MuaRaL-INDEL
+MuaRaL-indel
 ^^^^^^^^^^^^^
 
 The following commands train an INDEL model with two trials (default: ``--n_trials 2``),
@@ -382,26 +381,21 @@ but with two key differences:
 
 * Uses larger default context window (``--distal_radius 4000``) to improve INDEL prediction accuracy
   while maintaining reasonable computational requirements
-* Enables Poisson rate calibration (``--poisson_calib``) specifically for INDEL mutation rate
-  estimation
 
 .. code-block:: bash
      
    # serially running two trials (default)
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
-               --poisson_calib \
                --experiment_name example1 > test1.out 2> test1.err
 
    # parallelly running two trials using Ray, with 3 CPUs each trial (6 requested CPUs in total)
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
                --use_ray --ray_ncpus 6 --cpu_per_trial 3 --experiment_name example1 \
-               --poisson_calib \
                --experiment_name example1 > test1.out 2> test1.err
 
 .. note::
-
   `--use_reverse` should be added, if insertion model is trained. 
 
 
@@ -422,8 +416,8 @@ under the 'examples/' folder in the package.
 .. code-block:: bash
 
   mural_snv train --ref_genome snv/data/seq.fa \
-              --train_data data/training.sorted.bed \
-              --validation_data data/validation.sorted.bed \
+              --train_data snv/data/training.sorted.bed \
+              --validation_data snv/data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
               --distal_radius 200 --experiment_name example2 \
               > test2.out 2> test2.err
@@ -445,7 +439,6 @@ under the 'examples/' folder in the package.
               --validation_data indel/data/validation.sorted.bed \
               --n_trials 2 \
               --distal_radius 4000 --experiment_name example2 \
-              --poisson_calib \
               > test2.out 2> test2.err
 
 Example 3: Training acceleration
@@ -453,7 +446,7 @@ Example 3: Training acceleration
 
 For large sequence contexts (``distal_radius`` > 1000), data loading may become a bottleneck during training. 
 To mitigate this, specify additional CPUs per trial using ``--cpu_per_trial``.
-The following example demonstrates using 3 extra CPUs to acceleration data loading(applies equally to both ``mural_snv`` and ``mural_indel``):
+The following example demonstrates using 3 extra CPUs to accelerate data loading(applies equally to both ``mural_snv`` and ``mural_indel``):
 
 .. code-block:: bash
      
@@ -465,7 +458,6 @@ The following example demonstrates using 3 extra CPUs to acceleration data loadi
    mural_indel train --ref_genome indel/data/seq.fa \
                --train_data indel/data/training.sorted.bed \
                --cpu_per_trial 4 \
-               --poisson_calib \
                --experiment_name example3 > test3.out 2> test3.err
 
 Example 4: Training with limited resources
@@ -482,7 +474,7 @@ sequence is 300000+2*distal_radius bp (see illustration in the panel A of the fi
 for trade-off between RAM memory usage and data preprocessing speed. You can reduce this 
 (e.g., 50,000 bp) at the cost of an acceptable loss in data preprocessing speed. 
 The second option is to set smaller value for ``--sampled_segments`` (default 10). If changing this, you should also 
-check the performance of trained model, because ``--sampled_segments`` may also influnce model performance 
+check the performance of trained model, because ``--sampled_segments`` may also influence model performance 
 sometimes. The impact of the two parameters on RAM usage can be visualized in the following figure (panels B & C):
 
 .. image:: images/preprocessAndRAM_memory_usage.jpg 
@@ -503,7 +495,7 @@ MuRaL-snv
               --train_data snv/data/training.sorted.bed \
               --validation_data snv/data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
-              --distal_radius 64000 --segment_center 100000 \
+              --distal_radius 6400 --segment_center 100000 \
               --sampled_segments 4 --experiment_name example4 \
               > test4.out 2> test4.err
 
@@ -512,9 +504,8 @@ MuRaL-snv
               --train_data snv/data/training.sorted.bed \
               --validation_data snv/data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
-              --batch_size 64
-              --distal_radius 64000 --experiment_name example4 \
-              --poisson_calib \
+              --batch_size 64 \
+              --distal_radius 6400 --experiment_name example4 \
               > test4.out 2> test4.err
 
 MuRaL-indel
@@ -527,7 +518,7 @@ MuRaL-indel
               --train_data indel/data/training.sorted.bed \
               --validation_data indel/data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
-              --distal_radius 64000 --segment_center 100000 \
+              --distal_radius 6400 --segment_center 100000 \
               --sampled_segments 4 --experiment_name example4 \
               > test4.out 2> test4.err
 
@@ -537,21 +528,17 @@ MuRaL-indel
               --validation_data indel/data/validation.sorted.bed \
               --n_trials 2 --local_radius 7 \
               --batch_size 64
-              --distal_radius 64000 --experiment_name example4 \
-              --poisson_calib \
+              --distal_radius 6400 --experiment_name example4 \
               > test4.out 2> test4.err
 
 .. note::
-
   The RAM memory usage can be estimated as:
   ``sampled_segments * segment_center * 4 * (2 * distal_radius + 1) * 4 / 2^30 + C`` (GB) 
 
   where: 
 
   * ``C`` is a constant term ranging between 5 and 12 GB;
-
   * ``seq_length`` is (2 * distal_radius + 1) for SNV, 
-
   * ``seq_length`` is (2 * distal_radius) for INDEL, 
 
   When experiencing insufficient RAM, this formula helps determine appropriate parameter values.
@@ -614,7 +601,7 @@ using model from 'snv/models/checkpoint_6/':
 
 .. code-block:: bash
 
- mural_snv predict --ref_genome data/seq.fa --test_data snv/data/testing.bed.gz \
+ mural_snv predict --ref_genome snv/data/seq.fa --test_data snv/data/testing.bed.gz \
                     --model_path snv/models/checkpoint_6/model \
                     --model_config_path snv/models/checkpoint_6/model.config.pkl \
                     --calibrator_path snv/models/checkpoint_6/model.fdiri_cal.pkl \
@@ -623,15 +610,13 @@ using model from 'snv/models/checkpoint_6/':
 
 MuRaL-indel
 ^^^^^^^^^^^^
-Includes Poisson rate calibration (``--poisson_calib``) for INDEL predictions:
 
 .. code-block:: bash
 
- mural_indel predict --ref_genome data/seq.fa --test_data indel/data/testing.bed.gz \
+ mural_indel predict --ref_genome indel/data/seq.fa --test_data indel/data/testing.bed.gz \
                     --model_path indel/models/checkpoint_9/model \
                     --model_config_path indel/models/checkpoint_9/model.config.pkl \
                     --calibrator_path indel/models/checkpoint_9/model.fdiri_cal.pkl \
-                    --poisson_calib \
                     --pred_file testing.ckpt9.fdiri.tsv.gz \
                     --cpu_only > test5.out 2> test5.err
 
@@ -770,9 +755,9 @@ to calculate 3-mer, 5-mer and 7-mer correlations:
 
 .. code-block:: bash
 
- mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --kmer_only --out_prefix test_kmer_corr
- mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 5 --kmer_only --out_prefix test_kmer_corr
- mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 7 --kmer_only --out_prefix test_kmer_corr
+ mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome snv/data/seq.fa --kmer_length 3 --kmer_only --out_prefix test_kmer_corr
+ mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome snv/data/seq.fa --kmer_length 5 --kmer_only --out_prefix test_kmer_corr
+ mural_snv evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome snv/data/seq.fa --kmer_length 7 --kmer_only --out_prefix test_kmer_corr
 
 MuRaL-indel
 ^^^^^^^^^^^^
@@ -782,9 +767,9 @@ to calculate 2-mer, 4-mer and 6-mer correlations:
 
 .. code-block:: bash
 
-  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 2 --kmer_only --out_prefix test_kmer_corr
-  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 4 --kmer_only --out_prefix test_kmer_corr
-  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 6 --kmer_only --out_prefix test_kmer_corr
+  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome indel/data/seq.fa --kmer_length 2 --kmer_only --out_prefix test_kmer_corr
+  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome indel/data/seq.fa --kmer_length 4 --kmer_only --out_prefix test_kmer_corr
+  mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome indel/data/seq.fa --kmer_length 6 --kmer_only --out_prefix test_kmer_corr
 
 Regional correlation analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -945,16 +930,19 @@ The plot looks like below:
 .. image:: images/regional_rates.jpg
 
 Scaling MuRaL-predicted mutation rates to per base per generation rates
-=========================================================================
+-------------------------------------------------------------------------
 
 The raw MuRaL-predicted mutation rates are not mutation rates per bp per
 generation. To obtain a mutation rate per bp per generation for each
 nucleotide, one can scale the MuRaL-predicted rates using reported
 genome-wide de novo mutation rate and spectrum per generation. 
 
-1. Calculate factors: use the command ``mural_snv calc_snv_scaling_factor`` to calculate scaling factors for
-   specific groups of sites (e.g. A/T sites, C/G sites). 
-2. Apply scaling: use the command ``mural_snv scale`` to scale mutation rates in prediction files 
+1. Calculate scaling factors: Use the appropriate command for your mutation type:
+   
+   * ``mural_snv calc_scaling_factor`` - for SNV site groups (A/T, C/G, CpG sites)
+   * ``mural_indel calc_scaling_factor`` - for INDEL site types (insertions, deletion starts, deletion ends)
+
+2. Apply scaling: use the command ``mural_snv scale`` or ``mural_indel scale`` to scale mutation rates in prediction files 
    via scaling factors
 
 .. note::
@@ -965,11 +953,11 @@ genome-wide de novo mutation rate and spectrum per generation.
 Example 9 : Scaling workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-MuRaL-snv:
+MuRaL-snv
 ^^^^^^^^^^^^^^
 
 Step 1: Calculate scaling factor
----------------------------------
+""""""""""""""""""""""""""""""""""""
 
 Here is an example for scaling mutation rates for A/T sites. Suppose that we 
 have the following proportions of different mutation types and proportions
@@ -981,15 +969,15 @@ closely related species.
 
 ::
 
- #mutation_type  proportion
- AT_mutations       0.355
- nonCpG_mutations   0.423
- CpG_mutations      0.222
- 
- #site_group    proportion
- AT_sites           0.475
- nonCpG_sites       0.391
- CpG_sites          0.134
+    #mutation_type  proportion
+    AT_mutations       0.355
+    nonCpG_mutations   0.423
+    CpG_mutations      0.222
+    
+    #site_group    proportion
+    AT_sites           0.475
+    nonCpG_sites       0.391
+    CpG_sites          0.134
 
 To calculate the scaling factor, we need to have the predicted mutation rates for
 a set of representative sites based on a trained model. It is recommended to use
@@ -999,10 +987,11 @@ predicted mutation rates for validation sites of the A/T model.
 
 ::
  
- mural_snv predict --ref_genome data/seq.fa --test_data data/AT_validation.sorted.bed --model_path 
- models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  --calibrator_path  
- models/checkpoint_6/model.fdiri_cal.pkl --pred_file AT_validation.ckpt6.fdiri.tsv.gz --cpu_only > 
- test.out 2> test.err
+    mural_snv predict --ref_genome snv/data/seq.fa --test_data snv/data/AT_validation.sorted.bed \
+    --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  \
+    --calibrator_path  models/checkpoint_6/model.fdiri_cal.pkl \
+    --pred_file AT_validation.ckpt6.fdiri.tsv.gz \
+    --cpu_only > test.out 2> test.err
 
 Next, the command ``mural_snv calc_snv_scaling_factor`` will be used to compute the scaling
 factor based on the predicted rates, the proportions of A/T mutation types and 
@@ -1011,20 +1000,23 @@ rate.
 
 :: 
 
- mural_snv calc_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
- --m_proportions 0.355 --g_proportions 0.475 > scaling_factor.out
+    mural_snv calc_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
+    --m_proportions 0.355 --g_proportions 0.475 > scaling_factor.out
  
- # Output file 'scaling_factor.out' may look like the following:
- pred_file: AT_validation.ckpt6.fdiri.tsv.gz
- genomewide_mu: 5e-09
- n_sites: 84000
- g_proportion: 0.475
- m_proportion: 0.355
- prob_sum: 4.000e+03
- scaling factor: 7.848e-08
+Output file 'scaling_factor.out' may look like the following:
+
+::
+
+    pred_file: AT_validation.ckpt6.fdiri.tsv.gz
+    genomewide_mu: 5e-09
+    n_sites: 84000
+    g_proportion: 0.475
+    m_proportion: 0.355
+    prob_sum: 4.000e+03
+    scaling factor: 7.848e-08
  
 Step 2: Apply scaling
-----------------------
+""""""""""""""""""""""""""""""""""""
 
 Finally, the obtained scaling factor ``7.848e-08`` is used to scale all the 
 predicted rates of all A/T sites using ``mural_snv scale --scale_factors``. You can run  
@@ -1032,19 +1024,16 @@ separately for each chromosome.
 
 ::
  
- mural_snv scale --pred_file AT_chr1.tsv.gz --scale_factor 7.848e-08 --out_file AT_chr1.scaled.tsv.gz
+    mural_snv scale --pred_file AT_chr1.tsv.gz --scale_factor 7.848e-08 --out_file AT_chr1.scaled.tsv.gz
 
 Similarly, you can generate the scaled mutation rates for non-CpG and CpG sites like
 the above example. More details can be found in the MuRaL paper.
 
-Trained models and predicted mutation rate maps of multiple species
------------------------------------------------------------------------
-
-MuRaL-indel:
+MuRaL-indel
 ^^^^^^^^^^^^^^^^^^
 
 Step 1: Calculate scaling factor
----------------------------------
+""""""""""""""""""""""""""""""""""""
 
 Here is an example for scaling mutation rates for insertion sites. Suppose that we 
 have the following proportions of different INDEL mutation types and proportions
@@ -1056,10 +1045,10 @@ closely related species.
 
 ::
 
- #INDEL proportion
- insertion       0.352
- deletion start  0.648 
- deletion end    0.648 
+    #INDEL proportion
+    insertion       0.352
+    deletion start  0.648 
+    deletion end    0.648 
 
 Note: Each deletion has two breakpoints—designated as the deletion start and deletion end. 
 These two labels refer to the same deleted interval, so, same proportions are used for both.
@@ -1072,10 +1061,11 @@ predicted mutation rates for validation sites of the INDEL model.
 
 ::
  
- mural_indel predict --ref_genome data/seq.fa --test_data data/insertion_validation.sorted.bed --model_path 
- models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  --calibrator_path  
- models/checkpoint_6/model.fdiri_cal.pkl --pred_file insertion_validation.ckpt6.fdiri.tsv.gz --without_h5 --cpu_only > 
- test.out 2> test.err
+    mural_indel predict --ref_genome indel/data/seq.fa --test_data indel/data/insertion_validation.sorted.bed \
+    --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl  \
+    --calibrator_path  models/checkpoint_6/model.fdiri_cal.pkl \
+    --pred_file insertion_validation.ckpt6.fdiri.tsv.gz \
+    --cpu_only > test.out 2> test.err
 
 Next, the command ``mural_indel scale`` will be used to compute the scaling
 factor based on the predicted rates, the proportions of insertion mutation types, 
@@ -1083,19 +1073,22 @@ and the genome-wide per generation mutation rate.
 
 :: 
 
- mural_indel calc_scaling_factor --pred_files insertion_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 1.5e-9 
- --m_proportions 0.352 > scaling_factor.out
+    mural_indel calc_scaling_factor --pred_files insertion_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 1.5e-9 
+    --m_proportions 0.352 > scaling_factor.out
  
- # Output file 'scaling_factor.out' may look like the following:
- pred_file: insertion_validation.ckpt6.fdiri.tsv.gz
- genomewide_mu: 1.5e-09
- n_sites: 221240912
- m_proportion: 0.352
- prob_sum: 4.000e+03
- scaling factor: 6.271e-09
+Output file 'scaling_factor.out' may look like the following:
+
+::
+
+    pred_file: insertion_validation.ckpt6.fdiri.tsv.gz
+    genomewide_mu: 1.5e-09
+    n_sites: 221240912
+    m_proportion: 0.352
+    prob_sum: 4.000e+03
+    scaling factor: 6.271e-09
 
 Step 2: Apply scaling
-----------------------
+""""""""""""""""""""""""""""""""""""
  
 Finally, the obtained scaling factor ``6.271e-09`` is used to scale all the 
 predicted rates of all insertion sites using ``mural_indel scale --scale_factors``. You can run  
@@ -1109,10 +1102,10 @@ Similarly, you can generate the scaled mutation rates for `deletion start` and `
 the above example. More details can be found in the MuRaL-indel paper.
 
 Trained models and predicted mutation rate maps of multiple species
------------------------------------------------------------------------
+=========================================================================
 
-MuRaL-snv:
-^^^^^^^^^^^^^^
+MuRaL-snv
+-------------
 
 Trained models (by MuRaL v1.0.0) for four species - *Homo sapiens*, *Macaca mulatta*, 
 *Arabidopsis thaliana* and *Drosophila melanogaster* are provided in 
@@ -1122,19 +1115,19 @@ for prediction or transfer learning.
 Predicted single-nucleotide mutation rate maps (by MuRaL v1.0.0) for these genomes are
 available at `ScienceDB <https://www.doi.org/10.11922/sciencedb.01173>`__.
 
-MuRaL-indel:
-^^^^^^^^^^^^^^
+MuRaL-indel
+-------------
 
 Trained models (by MuRaL v1.2.0) for four species - *Homo sapiens*, *Macaca mulatta*, 
 *Arabidopsis thaliana* and *Drosophila melanogaster* are provided in 
 the 'models/*/INDEL' folder of the package. One can use these model files 
 for prediction or transfer learning.
 
-Predicted single-nucleotide INDEL mutation rate maps (by MuRaL v1.2.0) for these genomes are
+Predicted base-resolution INDEL mutation rate maps (by MuRaL v1.2.0) for these genomes are
 available at `ScienceDB <https://doi.org/10.57760/sciencedb.30830>`__.
 
 Citation
---------
+==========
 
 Fang Y, Deng S, Li C. A generalizable deep learning framework for inferring 
 fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
@@ -1144,7 +1137,7 @@ Deng S, Song H, Li C. A deep learning framework for building INDEL mutation rate
 `doi:`
 
 Contact
--------
+=============
 
 For reporting issues or requests related to the package, please use GitHub Issues
 or write to mural-project@outlook.com.

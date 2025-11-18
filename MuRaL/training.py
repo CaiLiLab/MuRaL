@@ -481,7 +481,7 @@ def train(config, args, model_type, checkpoint_dir=None):
             #tmp_cal, _ = calibrate_prob(valid_y_prob.to_numpy(), valid_y, device, calibr_name='TempS')
 
             prob_cal = fdiri_cal.predict_proba(valid_y_prob.to_numpy())  # calibrate
-            if args.poisson_calib:
+            if args.poisson_calib or model_type == "indel":
                 prob_poisson_cal = poisson_calibrate(valid_y_prob)
 
             #Evaluation

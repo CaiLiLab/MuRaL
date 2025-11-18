@@ -221,7 +221,7 @@ def run_predict_pipline(args, model_type='snv'):
             prob_cal = calibr.predict_proba(y_prob.to_numpy())  
             y_prob = pd.DataFrame(data=np.copy(prob_cal), columns=prob_names)
     
-    if args.poisson_calib:
+    if args.poisson_calib or model_type == 'indel':
         y_prob = poisson_calibrate(y_prob)
     
     print('Mean Loss, Total Loss, Test Size:', test_total_loss/test_size, test_total_loss, test_size)

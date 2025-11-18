@@ -99,9 +99,9 @@ def add_indel_eval_parser(subparsers: argparse._SubParsersAction) -> argparse._S
     
       Command line examples
       ---------------------
-       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 2 --kmer_only --out_prefix test
-       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 4 --kmer_only --out_prefix test
-       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 6 --kmer_only --out_prefix test
+       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 2 --kmer_only --out_prefix test_kmer_corr
+       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 4 --kmer_only --out_prefix test_kmer_corr
+       mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 6 --kmer_only --out_prefix test_kmer_corr
 
       Regional Correlation Analysis:
       -----------------------------

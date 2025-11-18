@@ -17,6 +17,18 @@ Use a custom data loader. This data loader is not supported parallelizing
 data loading. For '--cpu-per-trial 1' and without HD5, the speed of loading
 data is faster than default dataloader. Default: False.
 
+`--poisson_calib`:
+    Enable Poisson-based calibration.
+
+    For indel models:
+        - Calibration is automatically enabled unless explicitly disabled.
+
+    For SNV models:
+        - Calibration is disabled by default.
+        - Use this flag to enable it.
+
+    Default: False
+
 # mural_indel/mural_snv predict
 
 ##  func: use h5 output distal encoding
@@ -28,6 +40,9 @@ same as `train` command
 same as `train` command
 
 `--n_h5_files` :
+same as `train` command
+
+`--poisson_calib`:
 same as `train` command
 
 # mural_indel/mural_snv calc_scaling_factor

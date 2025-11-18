@@ -240,7 +240,7 @@ def add_snv_calc_scaling_factor_parser(subparsers: argparse._SubParsersAction) -
         --------------------------
         1. Calculate scaling factors:
 
-            mural_snv calc_scaling_factor_parser --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
+            mural_snv calc_scaling_factor --pred_files AT_validation.ckpt6.fdiri.tsv.gz --genomewide_mu 5e-9 
             --m_proportions 0.355 --g_proportions 0.475 > scaling_factor.out
 
         # Output file 'scaling_factor.out' may look like the following:

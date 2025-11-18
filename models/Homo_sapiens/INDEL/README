@@ -1,10 +1,10 @@
-This folder contains the best trained models with lowest validation losses for the Macaca mulatta genome. 
+This folder contains the best trained models with lowest validation losses for the human genome(hg38). 
 
 training set comprised:
     insertion: 1000,000 mutation sites and 10,000,000 non-mutation sites. 
     deletions: 2000,000 mutation sites and 20,000,000 non-mutation sites. 
 
-hyperparameter settings for MuRaL-indel (v1.3.0):
+hyperparameter settings for MuRaL-indel (v1.2.0):
 --radius        4000
 --downsample_stride_list        1, 4, 5, 5, 5, 2
 --kernel_size   7

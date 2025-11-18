@@ -2,7 +2,7 @@ This folder contains the best trained models with lowest validation losses for t
 500,000 mutated and 5,000,000 non-mutated sites were chosen for training each of insertion, deletion start and deletion end models. 
 No transfer learning was applied.
 
-hyperparameter settings for MuRaL-indel (v1.3.0):
+hyperparameter settings for MuRaL-indel (v1.2.0):
 --radius        4000
 --downsample_stride_list        1, 4, 5, 5, 5, 2
 --kernel_size   7
