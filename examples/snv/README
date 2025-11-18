@@ -1,4 +1,4 @@
-This folder provides example data and command lines for running MuRaL commands.
+This folder provides example data and command lines for running `mural_snv` commands.
 
 The 'data/' folder contains training/validation/testing BED-formatted files and a FASTA file 'seq.fa' served as the reference genome for the BED files.
 

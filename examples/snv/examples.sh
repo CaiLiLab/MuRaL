@@ -18,7 +18,7 @@ mural_snv predict --ref_genome data/seq.fa --test_data data/testing.bed.gz --mod
 mural_snv transfer --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed --validation_data data/validation.sorted.bed --model_path models/checkpoint_6/model --model_config_path models/checkpoint_6/model.config.pkl --train_all  --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 
 # Example 5 (k-mer correlation evaluation):
-mural_indel evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --kmer_only --out_prefix test_kmer_corr
+mural_snv evaluate --pred_file testing.ckpt6.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 3 --kmer_only --out_prefix test_kmer_corr > test5.out 2> test5.err
 
 # Example 6 (regional correlation evaluation):
-mural_indel evaluate --pred_file testing.ckpt4.fdiri.tsv.gz --window_size 100000 --regional_only --out_prefix test_region_corr
+mural_snv evaluate --pred_file testing.ckpt6.fdiri.tsv.gz --window_size 100000 --regional_only --out_prefix test_region_corr > test6.out 2> test6.err

@@ -11,14 +11,18 @@ mural_indel train --ref_genome data/seq.fa --train_data data/training.sorted.bed
 
 # Example 3 (prediction): 
 # The following command will predict mutation rates for all sites in 'data/testing.bed.gz' using model files under the 'checkpoint_9/' folder and save prediction results into 'testing.ckpt9.fdiri.tsv.gz'.
-mural_indel predict --ref_genome data/seq.fa --test_data data/testing.bed.gz --model_path models/checkpoint_9/model --model_config_path models/checkpoint_9/model.config.pkl  --calibrator_path models/checkpoint_9/model.fdiri_cal.pkl --pred_file testing.ckpt9.fdiri.tsv.gz --cpu_only > test3.out 2> test3.err
+mural_indel predict --ref_genome data/seq.fa --test_data data/testing.bed.gz  \
+--model_path models/checkpoint_9/model  \
+--model_config_path models/checkpoint_9/model.config.pkl  \
+--calibrator_path models/checkpoint_9/model.fdiri_cal.pkl \
+--pred_file testing.ckpt9.fdiri.tsv.gz > test3.out 2> test3.err
 
 # Example 4 (transfer learning):
 # The following command will train a transfer learning model using training data in 'data/training_TL.sorted.bed', the validation data in 'data/validation.sorted.bed', and the model files under 'models/checkpoint_9/'.
 mural_indel transfer --ref_genome data/seq.fa --train_data data/training_TL.sorted.bed --validation_data data/validation.sorted.bed --model_path models/checkpoint_9/model --model_config_path models/checkpoint_9/model.config.pkl --train_all  --init_fc_with_pretrained --experiment_name example4 > test4.out 2> test4.err
 
 # Example 5 (k-mer correlation evaluation):
-mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 2 --kmer_only --out_prefix test_kmer_corr
+mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --ref_genome data/seq.fa --kmer_length 2 --kmer_only --out_prefix test_kmer_corr > test5.out 2> test5.err
 
-# Example 6 (regional correlation evaluation):
-mural_indel evaluate --pred_file testing.ckpt9.fdiri.tsv.gz --window_size 100000 --regional_only --out_prefix test_region_corr
+# # Example 6 (regional correlation evaluation):
+mural_indel evaluate --pred_file testing.fckpt9.diri.tsv.gz --window_size 100000 --regional_only --out_prefix test_region_corr > test6.out 2> test6.err
