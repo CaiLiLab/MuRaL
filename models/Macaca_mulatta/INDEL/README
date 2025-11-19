@@ -1,0 +1,13 @@
+This folder contains the best trained models with lowest validation losses for the Macaca mulatta genome. 
+500,000 mutated and 5,000,000 non-mutated sites were chosen for training each of insertion, deletion start and deletion end models. 
+No transfer learning was applied.
+
+hyperparameter settings for MuRaL-indel (v1.2.0):
+--radius        4000
+--downsample_stride_list        1, 4, 5, 5, 5, 2
+--kernel_size   7
+--channels      8
+--learning_rate 0.001
+--weight_decay  0.01
+--weight_decay_auto     0.01
+--LR_gamma 0.98

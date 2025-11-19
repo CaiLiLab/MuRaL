@@ -1,0 +1,16 @@
+This folder contains the best trained models with lowest validation losses for the Drosophila melanogaster genome. 100,000 mutated and 2,000,000 non-mutated sites were chosen for training each of A/T and C/G models.
+
+hyperparameter settings for MuRaL (v1.0.0) to train A/T and C/G models:
+--local_radius  7
+--local_order   3
+--distal_radius 1000
+--CNN_kernel_size   3
+--CNN_out_channels  32
+--learning_rate 0.001
+--weight_decay_auto 0.1
+--LR_gamma  0.95
+--emb_dropout 0.1
+--local_dropout 0.1
+--distal_fc_dropout 0.25
+--epochs 20
+--n_trials 10
