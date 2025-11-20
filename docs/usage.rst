@@ -92,7 +92,7 @@ with residual blocks and convolutional layers at each scale to extract hierarchi
       :width: 830px
 
 
-install
+Install
 ===============
 
 Using Conda
@@ -1134,7 +1134,7 @@ fine-scale germline mutation rate maps. *Nature Machine Intelligence* (2022)
 `doi:10.1038/s42256-022-00574-5 <https://doi.org/10.1038/s42256-022-00574-5>`__
 
 Deng S, Song H, Li C. A deep learning framework for building INDEL mutation rate maps. *bioRxiv* (2025) 
-`doi:`
+`doi:10.1101/2025.11.18.689146 <https://doi.org/10.1101/2025.11.18.689146>`
 
 Contact
 =============
